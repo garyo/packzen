@@ -1,0 +1,21 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+
+const { id } = Astro.params;
+---
+
+<BaseLayout title="Pack - Packing List">
+  <div id="app-root" data-trip-id={id}></div>
+</BaseLayout>
+
+<script>
+  import { render } from 'solid-js/web';
+  import { PackingPage } from '../../../components/trips/PackingPage';
+
+  const root = document.getElementById('app-root');
+  const tripId = root?.dataset.tripId;
+
+  if (root && tripId) {
+    render(() => PackingPage({ tripId }), root);
+  }
+</script>

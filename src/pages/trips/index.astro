@@ -1,0 +1,17 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="Trips - Packing List">
+  <div id="app-root"></div>
+</BaseLayout>
+
+<script>
+  import { render } from 'solid-js/web';
+  import { TripsPage } from '../../components/trips/TripsPage';
+
+  const root = document.getElementById('app-root');
+  if (root) {
+    render(TripsPage, root);
+  }
+</script>

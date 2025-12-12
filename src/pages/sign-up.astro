@@ -1,0 +1,31 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="Sign Up - Packing List">
+  <div class="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-12">
+    <div class="w-full max-w-md">
+      <div class="text-center mb-8">
+        <h1 class="text-3xl font-bold text-gray-900 mb-2">Get Started</h1>
+        <p class="text-gray-600">Create your account to start packing smarter</p>
+      </div>
+
+      <div id="clerk-sign-up" class="bg-white rounded-lg shadow-md p-6"></div>
+    </div>
+  </div>
+</BaseLayout>
+
+<script>
+  import { getClerk } from '../lib/clerk';
+
+  async function initSignUp() {
+    const clerk = await getClerk();
+
+    clerk.mountSignUp(document.getElementById('clerk-sign-up')!, {
+      afterSignUpUrl: '/dashboard',
+      signInUrl: '/sign-in',
+    });
+  }
+
+  initSignUp();
+</script>

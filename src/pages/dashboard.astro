@@ -1,0 +1,17 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="Dashboard - Packing List">
+  <div id="dashboard-root"></div>
+</BaseLayout>
+
+<script>
+  import { render } from 'solid-js/web';
+  import { DashboardPage } from '../components/DashboardPage';
+
+  const root = document.getElementById('dashboard-root');
+  if (root) {
+    render(DashboardPage, root);
+  }
+</script>

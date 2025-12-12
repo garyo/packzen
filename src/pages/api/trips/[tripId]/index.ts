@@ -1,0 +1,138 @@
+import type { APIRoute } from 'astro';
+import { eq, and } from 'drizzle-orm';
+import { drizzle } from 'drizzle-orm/d1';
+import { trips } from '../../../../../db/schema';
+
+export const GET: APIRoute = async ({ locals, params }) => {
+  try {
+    const runtime = locals.runtime as { env: { DB: D1Database } };
+    const db = drizzle(runtime.env.DB);
+
+    const userId = 'temp-user-id'; // This should come from Clerk
+    const { tripId } = params;
+
+    if (!tripId) {
+      return new Response(JSON.stringify({ error: 'Trip ID is required' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    const trip = await db
+      .select()
+      .from(trips)
+      .where(and(eq(trips.id, tripId), eq(trips.clerk_user_id, userId)))
+      .get();
+
+    if (!trip) {
+      return new Response(JSON.stringify({ error: 'Trip not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    return new Response(JSON.stringify(trip), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  } catch (error) {
+    console.error('Error fetching trip:', error);
+    return new Response(JSON.stringify({ error: 'Failed to fetch trip' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+};
+
+export const PUT: APIRoute = async ({ request, locals, params }) => {
+  try {
+    const runtime = locals.runtime as { env: { DB: D1Database } };
+    const db = drizzle(runtime.env.DB);
+
+    const userId = 'temp-user-id'; // This should come from Clerk
+    const { tripId } = params;
+
+    if (!tripId) {
+      return new Response(JSON.stringify({ error: 'Trip ID is required' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    const body = await request.json();
+    const { name, destination, start_date, end_date, notes } = body;
+
+    const updated = await db
+      .update(trips)
+      .set({
+        name,
+        destination,
+        start_date,
+        end_date,
+        notes,
+        updated_at: new Date(),
+      })
+      .where(and(eq(trips.id, tripId), eq(trips.clerk_user_id, userId)))
+      .returning()
+      .get();
+
+    if (!updated) {
+      return new Response(JSON.stringify({ error: 'Trip not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    return new Response(JSON.stringify(updated), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  } catch (error) {
+    console.error('Error updating trip:', error);
+    return new Response(JSON.stringify({ error: 'Failed to update trip' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+};
+
+export const DELETE: APIRoute = async ({ locals, params }) => {
+  try {
+    const runtime = locals.runtime as { env: { DB: D1Database } };
+    const db = drizzle(runtime.env.DB);
+
+    const userId = 'temp-user-id'; // This should come from Clerk
+    const { tripId } = params;
+
+    if (!tripId) {
+      return new Response(JSON.stringify({ error: 'Trip ID is required' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    const deleted = await db
+      .delete(trips)
+      .where(and(eq(trips.id, tripId), eq(trips.clerk_user_id, userId)))
+      .returning()
+      .get();
+
+    if (!deleted) {
+      return new Response(JSON.stringify({ error: 'Trip not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    return new Response(JSON.stringify({ success: true }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  } catch (error) {
+    console.error('Error deleting trip:', error);
+    return new Response(JSON.stringify({ error: 'Failed to delete trip' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+};

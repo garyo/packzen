@@ -1,16 +1,96 @@
 ---
-
+import BaseLayout from '../layouts/BaseLayout.astro';
 ---
 
-<html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-		<meta name="viewport" content="width=device-width" />
-		<meta name="generator" content={Astro.generator} />
-		<title>Astro</title>
-	</head>
-	<body>
-		<h1>Astro</h1>
-	</body>
-</html>
+<BaseLayout title="Packing List - Travel Packing Made Easy">
+  <div class="min-h-screen bg-gradient-to-b from-blue-50 to-white">
+    <!-- Hero Section -->
+    <div class="container mx-auto px-4 py-16">
+      <div class="text-center max-w-3xl mx-auto">
+        <h1 class="text-5xl md:text-6xl font-bold text-gray-900 mb-6">
+          Pack Smarter,<br />Travel Better
+        </h1>
+        <p class="text-xl text-gray-600 mb-8">
+          The mobile-first packing list app that helps you organize your trips, track your bags,
+          and never forget an item again.
+        </p>
+
+        <div class="flex flex-col sm:flex-row gap-4 justify-center">
+          <a
+            href="/sign-up"
+            class="inline-flex items-center justify-center px-8 py-4 text-lg font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Get Started Free
+          </a>
+          <a
+            href="/sign-in"
+            class="inline-flex items-center justify-center px-8 py-4 text-lg font-semibold text-blue-600 bg-white border-2 border-blue-600 rounded-lg hover:bg-blue-50 transition-colors"
+          >
+            Sign In
+          </a>
+        </div>
+      </div>
+
+      <!-- Features -->
+      <div class="mt-24 grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+        <div class="bg-white rounded-lg p-6 shadow-md">
+          <div class="text-4xl mb-4">📝</div>
+          <h3 class="text-xl font-semibold text-gray-900 mb-2">Master Lists</h3>
+          <p class="text-gray-600">
+            Build your perfect packing list once, reuse it for every trip. Organized by categories
+            for easy browsing.
+          </p>
+        </div>
+
+        <div class="bg-white rounded-lg p-6 shadow-md">
+          <div class="text-4xl mb-4">🧳</div>
+          <h3 class="text-xl font-semibold text-gray-900 mb-2">Bag Organization</h3>
+          <p class="text-gray-600">
+            Assign items to specific bags (carry-on, checked, personal). Know exactly what goes
+            where.
+          </p>
+        </div>
+
+        <div class="bg-white rounded-lg p-6 shadow-md">
+          <div class="text-4xl mb-4">✅</div>
+          <h3 class="text-xl font-semibold text-gray-900 mb-2">Pack & Track</h3>
+          <p class="text-gray-600">
+            Check off items as you pack. See your progress at a glance. Never leave anything
+            behind.
+          </p>
+        </div>
+
+        <div class="bg-white rounded-lg p-6 shadow-md">
+          <div class="text-4xl mb-4">📱</div>
+          <h3 class="text-xl font-semibold text-gray-900 mb-2">Mobile First</h3>
+          <p class="text-gray-600">
+            Designed for your phone with large touch targets. Perfect for packing on the go.
+          </p>
+        </div>
+
+        <div class="bg-white rounded-lg p-6 shadow-md">
+          <div class="text-4xl mb-4">🔄</div>
+          <h3 class="text-xl font-semibold text-gray-900 mb-2">Multi-Device Sync</h3>
+          <p class="text-gray-600">
+            Access your lists from any device. Start on your laptop, finish on your phone.
+          </p>
+        </div>
+
+        <div class="bg-white rounded-lg p-6 shadow-md">
+          <div class="text-4xl mb-4">🚀</div>
+          <h3 class="text-xl font-semibold text-gray-900 mb-2">Lightning Fast</h3>
+          <p class="text-gray-600">
+            Built on Cloudflare's edge network. Blazing fast from anywhere in the world.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="mt-24 py-8 border-t border-gray-200">
+      <div class="container mx-auto px-4 text-center text-gray-600">
+        <p>Built with Astro, Solid.js, Tailwind CSS, and Cloudflare</p>
+      </div>
+    </footer>
+  </div>
+</BaseLayout>

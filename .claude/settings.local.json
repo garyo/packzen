@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(bun create:*)",
+      "Bash(bun install:*)",
+      "Bash(bunx astro add:*)",
+      "Bash(bun add:*)",
+      "WebFetch(domain:developers.cloudflare.com)",
+      "WebFetch(domain:docs.astro.build)",
+      "Bash(npx wrangler whoami)",
+      "Bash(npx wrangler:*)",
+      "Bash(cat:*)",
+      "Bash(bun run:*)"
+    ]
+  }
+}
