@@ -246,6 +246,12 @@ export function AllItemsPage() {
       for (const cat of backup.categories) {
         const existing = categories()?.find((c) => c.name === cat.name);
         if (existing) {
+          // Update existing category with new icon/sort_order
+          await api.patch(endpoints.category(existing.id), {
+            name: cat.name,
+            icon: cat.icon,
+            sort_order: cat.sort_order,
+          });
           categoryNameToId.set(cat.name, existing.id);
         } else {
           const response = await api.post(endpoints.categories, {
