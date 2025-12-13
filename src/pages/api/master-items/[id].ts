@@ -55,6 +55,76 @@ export const GET: APIRoute = async ({ locals, params }) => {
   }
 };
 
+export const PATCH: APIRoute = async ({ request, locals, params }) => {
+  try {
+    const runtime = locals.runtime as { env: { DB: D1Database } };
+    const db = drizzle(runtime.env.DB);
+
+    const userId = locals.userId;
+    const { id } = params;
+
+    if (!id) {
+      return new Response(JSON.stringify({ error: 'Item ID is required' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    const body = await request.json();
+    const { name, description, category_id, default_quantity } = body;
+
+    // Build update object dynamically
+    const updates: any = { updated_at: new Date() };
+    if (name !== undefined) updates.name = name;
+    if (description !== undefined) updates.description = description;
+    if (category_id !== undefined) updates.category_id = category_id;
+    if (default_quantity !== undefined) updates.default_quantity = default_quantity;
+
+    const updatedItem = await db
+      .update(masterItems)
+      .set(updates)
+      .where(and(eq(masterItems.id, id), eq(masterItems.clerk_user_id, userId)))
+      .returning()
+      .get();
+
+    if (!updatedItem) {
+      return new Response(JSON.stringify({ error: 'Item not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Fetch the item with category name
+    const itemWithCategory = await db
+      .select({
+        id: masterItems.id,
+        clerk_user_id: masterItems.clerk_user_id,
+        category_id: masterItems.category_id,
+        name: masterItems.name,
+        description: masterItems.description,
+        default_quantity: masterItems.default_quantity,
+        created_at: masterItems.created_at,
+        updated_at: masterItems.updated_at,
+        category_name: categories.name,
+      })
+      .from(masterItems)
+      .leftJoin(categories, eq(masterItems.category_id, categories.id))
+      .where(eq(masterItems.id, updatedItem.id))
+      .get();
+
+    return new Response(JSON.stringify(itemWithCategory), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  } catch (error) {
+    console.error('Error updating master item:', error);
+    return new Response(JSON.stringify({ error: 'Failed to update master item' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+};
+
 export const PUT: APIRoute = async ({ request, locals, params }) => {
   try {
     const runtime = locals.runtime as { env: { DB: D1Database } };

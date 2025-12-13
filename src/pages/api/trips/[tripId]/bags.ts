@@ -116,6 +116,78 @@ export const POST: APIRoute = async ({ request, locals, params }) => {
   }
 };
 
+export const PATCH: APIRoute = async ({ request, locals, params }) => {
+  try {
+    const runtime = locals.runtime as { env: { DB: D1Database } };
+    const db = drizzle(runtime.env.DB);
+
+    const userId = locals.userId;
+    const { tripId } = params;
+
+    if (!tripId) {
+      return new Response(JSON.stringify({ error: 'Trip ID is required' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Verify trip ownership
+    const trip = await db
+      .select()
+      .from(trips)
+      .where(and(eq(trips.id, tripId), eq(trips.clerk_user_id, userId)))
+      .get();
+
+    if (!trip) {
+      return new Response(JSON.stringify({ error: 'Trip not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    const body = await request.json();
+    const { bag_id, name, type, color } = body;
+
+    if (!bag_id) {
+      return new Response(JSON.stringify({ error: 'Bag ID is required' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Build update object dynamically based on what was provided
+    const updates: any = {};
+    if (name !== undefined) updates.name = name;
+    if (type !== undefined) updates.type = type;
+    if (color !== undefined) updates.color = color;
+
+    const updatedBag = await db
+      .update(bags)
+      .set(updates)
+      .where(and(eq(bags.id, bag_id), eq(bags.trip_id, tripId)))
+      .returning()
+      .get();
+
+    if (!updatedBag) {
+      return new Response(JSON.stringify({ error: 'Bag not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    return new Response(JSON.stringify(updatedBag), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  } catch (error) {
+    console.error('Error updating bag:', error);
+    return new Response(JSON.stringify({ error: 'Failed to update bag' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+};
+
 export const DELETE: APIRoute = async ({ request, locals, params }) => {
   try {
     const runtime = locals.runtime as { env: { DB: D1Database } };

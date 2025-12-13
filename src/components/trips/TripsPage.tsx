@@ -7,6 +7,7 @@ import { LoadingSpinner } from '../ui/LoadingSpinner';
 import { EmptyState } from '../ui/EmptyState';
 import { Toast, showToast } from '../ui/Toast';
 import { TripForm } from './TripForm';
+import { NewTripImportModal } from './NewTripImportModal';
 import { formatDate, getTripStatus } from '../../lib/utils';
 import { tripsToCSV, csvToTrips, downloadCSV } from '../../lib/csv';
 import { fetchWithErrorHandling } from '../../lib/resource-helpers';
@@ -14,6 +15,7 @@ import { fetchWithErrorHandling } from '../../lib/resource-helpers';
 export function TripsPage() {
   const [showForm, setShowForm] = createSignal(false);
   const [editingTrip, setEditingTrip] = createSignal<Trip | null>(null);
+  const [showImport, setShowImport] = createSignal(false);
 
   const [trips, { refetch }] = createResource<Trip[]>(async () => {
     return fetchWithErrorHandling(() => api.get<Trip[]>(endpoints.trips), 'Failed to load trips');
@@ -198,10 +200,9 @@ export function TripsPage() {
               <Button variant="secondary" size="sm" onClick={handleExport}>
                 Export
               </Button>
-              <label class="inline-flex cursor-pointer items-center justify-center rounded-lg bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-900 transition-colors hover:bg-gray-300 focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:outline-none">
+              <Button variant="secondary" size="sm" onClick={() => setShowImport(true)}>
                 Import
-                <input type="file" accept=".csv" onChange={handleImport} class="hidden" />
-              </label>
+              </Button>
               <Button
                 size="sm"
                 onClick={() => {
@@ -297,6 +298,16 @@ export function TripsPage() {
           }}
           onSaved={() => {
             setShowForm(false);
+            refetch();
+          }}
+        />
+      </Show>
+
+      <Show when={showImport()}>
+        <NewTripImportModal
+          onClose={() => setShowImport(false)}
+          onImported={() => {
+            setShowImport(false);
             refetch();
           }}
         />

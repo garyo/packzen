@@ -14,6 +14,7 @@ interface EditTripItemProps {
 }
 
 export function EditTripItem(props: EditTripItemProps) {
+  const [name, setName] = createSignal(props.item.name);
   const [quantity, setQuantity] = createSignal(props.item.quantity);
   const [bagId, setBagId] = createSignal<string | null>(null);
   const [categoryId, setCategoryId] = createSignal<string | null>(null);
@@ -84,6 +85,7 @@ export function EditTripItem(props: EditTripItemProps) {
 
     const patchData = {
       id: props.item.id,
+      name: name().trim(),
       quantity: quantity(),
       bag_id: bagId(),
       category_name: finalCategoryName || null,
@@ -117,8 +119,18 @@ export function EditTripItem(props: EditTripItemProps) {
   };
 
   return (
-    <Modal title={`Edit: ${props.item.name}`} onClose={props.onClose}>
+    <Modal title="Edit Item" onClose={props.onClose}>
       <div class="space-y-4">
+        <div>
+          <label class="mb-1 block text-sm font-medium text-gray-700">Name</label>
+          <Input
+            type="text"
+            value={name()}
+            onInput={(e) => setName(e.currentTarget.value)}
+            placeholder="Item name"
+          />
+        </div>
+
         <div>
           <label class="mb-1 block text-sm font-medium text-gray-700">Quantity</label>
           <Input

@@ -44,6 +44,59 @@ export const GET: APIRoute = async ({ locals, params }) => {
   }
 };
 
+export const PATCH: APIRoute = async ({ request, locals, params }) => {
+  try {
+    const runtime = locals.runtime as { env: { DB: D1Database } };
+    const db = drizzle(runtime.env.DB);
+
+    const userId = locals.userId;
+    const { tripId } = params;
+
+    if (!tripId) {
+      return new Response(JSON.stringify({ error: 'Trip ID is required' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    const body = await request.json();
+    const { name, destination, start_date, end_date, notes } = body;
+
+    // Build update object dynamically based on what was provided
+    const updates: any = { updated_at: new Date() };
+    if (name !== undefined) updates.name = name;
+    if (destination !== undefined) updates.destination = destination;
+    if (start_date !== undefined) updates.start_date = start_date;
+    if (end_date !== undefined) updates.end_date = end_date;
+    if (notes !== undefined) updates.notes = notes;
+
+    const updated = await db
+      .update(trips)
+      .set(updates)
+      .where(and(eq(trips.id, tripId), eq(trips.clerk_user_id, userId)))
+      .returning()
+      .get();
+
+    if (!updated) {
+      return new Response(JSON.stringify({ error: 'Trip not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    return new Response(JSON.stringify(updated), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  } catch (error) {
+    console.error('Error updating trip:', error);
+    return new Response(JSON.stringify({ error: 'Failed to update trip' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+};
+
 export const PUT: APIRoute = async ({ request, locals, params }) => {
   try {
     const runtime = locals.runtime as { env: { DB: D1Database } };

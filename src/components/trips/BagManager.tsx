@@ -31,6 +31,12 @@ export function BagManager(props: BagManagerProps) {
     type: 'carry_on' as const,
     color: 'blue',
   });
+  const [editingId, setEditingId] = createSignal<string | null>(null);
+  const [editData, setEditData] = createSignal({
+    name: '',
+    type: 'carry_on' as const,
+    color: 'blue',
+  });
 
   const [bags, { refetch }] = createResource<Bag[]>(async () => {
     const response = await api.get<Bag[]>(endpoints.tripBags(props.tripId));
@@ -83,6 +89,46 @@ export function BagManager(props: BagManagerProps) {
     }
   };
 
+  const startEdit = (bag: Bag) => {
+    setEditingId(bag.id);
+    setEditData({
+      name: bag.name,
+      type: bag.type as any,
+      color: bag.color || 'blue',
+    });
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditData({ name: '', type: 'carry_on', color: 'blue' });
+  };
+
+  const handleUpdate = async (e: Event) => {
+    e.preventDefault();
+
+    const data = editData();
+    if (!data.name.trim()) {
+      showToast('error', 'Bag name is required');
+      return;
+    }
+
+    const response = await api.patch(endpoints.tripBags(props.tripId), {
+      bag_id: editingId(),
+      name: data.name.trim(),
+      type: data.type,
+      color: data.color,
+    });
+
+    if (response.success) {
+      showToast('success', 'Bag updated');
+      cancelEdit();
+      refetch();
+      props.onSaved();
+    } else {
+      showToast('error', response.error || 'Failed to update bag');
+    }
+  };
+
   return (
     <Modal title="Manage Bags" onClose={props.onClose}>
       <div class="space-y-4">
@@ -101,27 +147,114 @@ export function BagManager(props: BagManagerProps) {
               <div class="space-y-2">
                 <For each={bags()}>
                   {(bag) => (
-                    <div class="flex items-center justify-between rounded-lg border border-gray-200 p-3 hover:border-gray-300">
-                      <div class="flex items-center gap-3">
-                        <div
-                          class={`h-4 w-4 rounded-full ${
-                            BAG_COLORS.find((c) => c.value === bag.color)?.class || 'bg-gray-500'
-                          }`}
-                        />
-                        <div>
-                          <p class="font-medium text-gray-900">{bag.name}</p>
-                          <p class="text-xs text-gray-500">
-                            {BAG_TYPES.find((t) => t.type === bag.type)?.label || bag.type}
-                          </p>
+                    <>
+                      {editingId() === bag.id ? (
+                        <form
+                          onSubmit={handleUpdate}
+                          class="space-y-3 rounded-lg border border-blue-300 bg-blue-50 p-3"
+                        >
+                          <div>
+                            <label class="mb-1 block text-sm font-medium text-gray-700">
+                              Bag Type
+                            </label>
+                            <select
+                              value={editData().type}
+                              onChange={(e) =>
+                                setEditData({ ...editData(), type: e.target.value as any })
+                              }
+                              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                            >
+                              <For each={BAG_TYPES}>
+                                {(type) => <option value={type.type}>{type.label}</option>}
+                              </For>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label class="mb-1 block text-sm font-medium text-gray-700">
+                              Bag Name
+                            </label>
+                            <Input
+                              type="text"
+                              value={editData().name}
+                              onInput={(e) =>
+                                setEditData({ ...editData(), name: e.currentTarget.value })
+                              }
+                              placeholder="e.g., Red Suitcase"
+                            />
+                          </div>
+
+                          <div>
+                            <label class="mb-1 block text-sm font-medium text-gray-700">
+                              Color
+                            </label>
+                            <div class="flex gap-2">
+                              <For each={BAG_COLORS}>
+                                {(color) => (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setEditData({ ...editData(), color: color.value })
+                                    }
+                                    class={`h-6 w-6 rounded-full ${color.class} ${
+                                      editData().color === color.value
+                                        ? 'ring-2 ring-blue-500 ring-offset-2'
+                                        : 'hover:scale-110'
+                                    } transition-transform`}
+                                    title={color.label}
+                                  />
+                                )}
+                              </For>
+                            </div>
+                          </div>
+
+                          <div class="flex gap-2">
+                            <Button type="submit" size="sm">
+                              Save
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              size="sm"
+                              onClick={cancelEdit}
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        </form>
+                      ) : (
+                        <div class="flex items-center justify-between rounded-lg border border-gray-200 p-3 hover:border-gray-300">
+                          <div class="flex items-center gap-3">
+                            <div
+                              class={`h-4 w-4 rounded-full ${
+                                BAG_COLORS.find((c) => c.value === bag.color)?.class ||
+                                'bg-gray-500'
+                              }`}
+                            />
+                            <div>
+                              <p class="font-medium text-gray-900">{bag.name}</p>
+                              <p class="text-xs text-gray-500">
+                                {BAG_TYPES.find((t) => t.type === bag.type)?.label || bag.type}
+                              </p>
+                            </div>
+                          </div>
+                          <div class="flex gap-2">
+                            <button
+                              onClick={() => startEdit(bag)}
+                              class="text-sm text-blue-600 hover:text-blue-700"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleDelete(bag.id)}
+                              class="text-sm text-red-600 hover:text-red-700"
+                            >
+                              Delete
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                      <button
-                        onClick={() => handleDelete(bag.id)}
-                        class="text-sm text-red-600 hover:text-red-700"
-                      >
-                        Delete
-                      </button>
-                    </div>
+                      )}
+                    </>
                   )}
                 </For>
               </div>

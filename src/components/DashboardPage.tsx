@@ -60,7 +60,10 @@ export function DashboardPage() {
       <header class="border-b border-gray-200 bg-white">
         <div class="container mx-auto px-4 py-4">
           <div class="flex items-center justify-between">
-            <h1 class="text-2xl font-bold text-gray-900">PackZen</h1>
+            <div class="flex items-center gap-2">
+              <span class="text-2xl">🧳</span>
+              <h1 class="text-2xl font-bold text-gray-900">PackZen</h1>
+            </div>
             <button
               onClick={handleSignOut}
               class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"

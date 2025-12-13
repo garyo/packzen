@@ -148,7 +148,7 @@ export const PATCH: APIRoute = async ({ request, locals, params }) => {
     }
 
     const body = await request.json();
-    const { id, is_packed, quantity, bag_id, category_name } = body;
+    const { id, is_packed, quantity, bag_id, category_name, name } = body;
 
     // Build update object dynamically based on what was provided
     const updates: any = { updated_at: new Date() };
@@ -156,6 +156,7 @@ export const PATCH: APIRoute = async ({ request, locals, params }) => {
     if (quantity !== undefined) updates.quantity = quantity;
     if (bag_id !== undefined) updates.bag_id = bag_id;
     if (category_name !== undefined) updates.category_name = category_name;
+    if (name !== undefined) updates.name = name;
 
     const updated = await db
       .update(tripItems)

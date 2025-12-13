@@ -16,6 +16,10 @@ export function CategoryManager(props: CategoryManagerProps) {
   const [newName, setNewName] = createSignal('');
   const [newIcon, setNewIcon] = createSignal('');
   const [adding, setAdding] = createSignal(false);
+  const [editingId, setEditingId] = createSignal<string | null>(null);
+  const [editName, setEditName] = createSignal('');
+  const [editIcon, setEditIcon] = createSignal('');
+  const [updating, setUpdating] = createSignal(false);
 
   const handleAdd = async (e: Event) => {
     e.preventDefault();
@@ -58,6 +62,44 @@ export function CategoryManager(props: CategoryManagerProps) {
     }
   };
 
+  const startEdit = (category: Category) => {
+    setEditingId(category.id);
+    setEditName(category.name);
+    setEditIcon(category.icon || '');
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditName('');
+    setEditIcon('');
+  };
+
+  const handleUpdate = async (e: Event) => {
+    e.preventDefault();
+
+    if (!editName().trim()) {
+      showToast('error', 'Category name is required');
+      return;
+    }
+
+    setUpdating(true);
+
+    const response = await api.patch(endpoints.category(editingId()!), {
+      name: editName().trim(),
+      icon: editIcon().trim() || null,
+    });
+
+    setUpdating(false);
+
+    if (response.success) {
+      showToast('success', 'Category updated');
+      cancelEdit();
+      props.onSaved();
+    } else {
+      showToast('error', response.error || 'Failed to update category');
+    }
+  };
+
   return (
     <Modal isOpen={true} onClose={props.onClose} title="Manage Categories">
       <div class="space-y-4">
@@ -94,18 +136,60 @@ export function CategoryManager(props: CategoryManagerProps) {
               fallback={<p class="py-4 text-center text-sm text-gray-500">No categories yet</p>}
             >
               {(category) => (
-                <div class="flex items-center justify-between rounded-lg bg-gray-50 p-3">
-                  <div class="flex items-center gap-2">
-                    <span class="text-xl">{category.icon || '📦'}</span>
-                    <span class="font-medium text-gray-900">{category.name}</span>
-                  </div>
-                  <button
-                    onClick={() => handleDelete(category.id)}
-                    class="text-sm font-medium text-red-600 hover:text-red-700"
-                  >
-                    Delete
-                  </button>
-                </div>
+                <>
+                  {editingId() === category.id ? (
+                    <form onSubmit={handleUpdate} class="rounded-lg bg-blue-50 p-3">
+                      <div class="flex gap-2">
+                        <Input
+                          type="text"
+                          value={editIcon()}
+                          onInput={(e) => setEditIcon(e.currentTarget.value)}
+                          placeholder="📦"
+                          class="w-16"
+                        />
+                        <Input
+                          type="text"
+                          value={editName()}
+                          onInput={(e) => setEditName(e.currentTarget.value)}
+                          placeholder="Category name"
+                          class="flex-1"
+                        />
+                        <Button type="submit" disabled={updating()} size="sm">
+                          {updating() ? '...' : 'Save'}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          onClick={cancelEdit}
+                          size="sm"
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </form>
+                  ) : (
+                    <div class="flex items-center justify-between rounded-lg bg-gray-50 p-3">
+                      <div class="flex items-center gap-2">
+                        <span class="text-xl">{category.icon || '📦'}</span>
+                        <span class="font-medium text-gray-900">{category.name}</span>
+                      </div>
+                      <div class="flex gap-2">
+                        <button
+                          onClick={() => startEdit(category)}
+                          class="text-sm font-medium text-blue-600 hover:text-blue-700"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDelete(category.id)}
+                          class="text-sm font-medium text-red-600 hover:text-red-700"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </For>
           </div>

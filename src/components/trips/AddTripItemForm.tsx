@@ -112,6 +112,8 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
         setIsNewCategory(false);
         setNewCategoryName('');
         setKeepOpen(false);
+        // Refetch categories to ensure new categories show up
+        await refetchCategories();
         // Focus back on name input
         setTimeout(() => {
           document.querySelector<HTMLInputElement>('input[type="text"]')?.focus();
