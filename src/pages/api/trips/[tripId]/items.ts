@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
 import { eq, and, asc } from 'drizzle-orm';
 import { z } from 'zod';
-import { tripItems, trips } from '../../../../../db/schema';
+import { tripItems, trips, bags } from '../../../../../db/schema';
 import { tripItemCreateSchema, tripItemUpdateSchema, validateRequestSafe } from '../../../../lib/validation';
 import { createGetHandler, createPostHandler, createPatchHandler, createDeleteHandler } from '../../../../lib/api-helpers';
 
@@ -56,6 +56,19 @@ export const POST: APIRoute = createPostHandler<
 
     const { name, category_name, quantity, bag_id, master_item_id } = validatedData;
 
+    // Verify bag ownership if bag_id is provided
+    if (bag_id) {
+      const bag = await db
+        .select()
+        .from(bags)
+        .where(and(eq(bags.id, bag_id), eq(bags.trip_id, tripId)))
+        .get();
+
+      if (!bag) {
+        throw new Error('Bag not found or does not belong to this trip');
+      }
+    }
+
     return await db
       .insert(tripItems)
       .values({
@@ -96,6 +109,19 @@ export const PATCH: APIRoute = createPatchHandler<
     }
 
     const { id, is_packed, quantity, bag_id, category_name, name } = validatedData;
+
+    // Verify bag ownership if bag_id is being updated
+    if (bag_id !== undefined && bag_id !== null) {
+      const bag = await db
+        .select()
+        .from(bags)
+        .where(and(eq(bags.id, bag_id), eq(bags.trip_id, tripId)))
+        .get();
+
+      if (!bag) {
+        throw new Error('Bag not found or does not belong to this trip');
+      }
+    }
 
     // Build update object dynamically
     type TripItemUpdate = Partial<Pick<typeof tripItems.$inferSelect, 'name' | 'category_name' | 'quantity' | 'bag_id' | 'is_packed'>>;

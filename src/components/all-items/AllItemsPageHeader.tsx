@@ -6,12 +6,12 @@
  */
 
 import type { Accessor } from 'solid-js';
-import type { Category, MasterItem } from '../../lib/types';
+import type { Category, MasterItemWithCategory } from '../../lib/types';
 import { Button } from '../ui/Button';
 import { CSVImportExport } from './CSVImportExport';
 
 interface AllItemsPageHeaderProps {
-  items: Accessor<MasterItem[] | undefined>;
+  items: Accessor<MasterItemWithCategory[] | undefined>;
   categories: Accessor<Category[] | undefined>;
   onAddItem: () => void;
   onManageCategories: () => void;

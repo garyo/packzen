@@ -1,22 +1,27 @@
-import type { MasterItem } from './types';
+import Papa from 'papaparse';
+import type { MasterItemWithCategory } from './types';
 
 /**
  * Convert master items to CSV format
+ * Uses PapaParse for robust CSV generation
  */
-export function masterItemsToCSV(items: MasterItem[]): string {
-  const headers = ['name', 'description', 'category_name', 'default_quantity'];
-  const rows = items.map((item) => [
-    escapeCsvField(item.name),
-    escapeCsvField(item.description || ''),
-    escapeCsvField(item.category_name || ''),
-    item.default_quantity.toString(),
-  ]);
+export function masterItemsToCSV(items: MasterItemWithCategory[]): string {
+  const data = items.map((item) => ({
+    name: item.name,
+    description: item.description || '',
+    category_name: item.category_name || '',
+    default_quantity: item.default_quantity,
+  }));
 
-  return [headers.join(','), ...rows.map((row) => row.join(','))].join('\n');
+  return Papa.unparse(data, {
+    header: true,
+    quotes: true, // Quote all fields for safety
+  });
 }
 
 /**
  * Parse CSV to master items format
+ * Uses PapaParse for robust CSV parsing with proper edge case handling
  */
 export function csvToMasterItems(csv: string): Array<{
   name: string;
@@ -24,37 +29,52 @@ export function csvToMasterItems(csv: string): Array<{
   category_name?: string;
   default_quantity: number;
 }> {
-  const lines = csv.trim().split('\n');
-  if (lines.length < 2) {
-    throw new Error('CSV must have headers and at least one row');
+  const result = Papa.parse(csv, {
+    header: true,
+    skipEmptyLines: true,
+    transformHeader: (header: string) => header.toLowerCase().trim(),
+  });
+
+  if (result.errors && result.errors.length > 0) {
+    const errorMessages = result.errors.map((e: Papa.ParseError) => e.message).join(', ');
+    throw new Error(`CSV parsing errors: ${errorMessages}`);
   }
 
-  const headers = lines[0].split(',').map((h) => h.trim().toLowerCase());
-  const nameIndex = headers.indexOf('name');
+  if (!result.data || result.data.length === 0) {
+    throw new Error('CSV must have at least one row');
+  }
 
-  if (nameIndex === -1) {
+  // Find name column (required)
+  const firstRow = result.data[0] as Record<string, string>;
+  const hasNameColumn = 'name' in firstRow;
+
+  if (!hasNameColumn) {
     throw new Error('CSV must have a "name" column');
   }
 
-  const descIndex = headers.findIndex((h) => h.includes('desc'));
-  const categoryIndex = headers.findIndex((h) => h.includes('category'));
-  const quantityIndex = headers.findIndex((h) => h.includes('quantity') || h.includes('qty'));
+  // Parse and validate items
+  const items = (result.data as Array<Record<string, string>>)
+    .map((row, index) => {
+      const name = row.name?.trim();
+      if (!name) {
+        console.warn(`Skipping row ${index + 2}: missing name`);
+        return null;
+      }
 
-  const items = [];
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line) continue;
+      const quantityStr = row.default_quantity?.trim() || '1';
+      const quantity = parseInt(quantityStr, 10);
 
-    const fields = parseCsvLine(line);
-    const name = fields[nameIndex]?.trim();
-    if (!name) continue;
+      return {
+        name,
+        description: row.description?.trim() || undefined,
+        category_name: row.category_name?.trim() || undefined,
+        default_quantity: isNaN(quantity) || quantity < 1 ? 1 : quantity,
+      };
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null);
 
-    items.push({
-      name,
-      description: descIndex >= 0 ? fields[descIndex]?.trim() : undefined,
-      category_name: categoryIndex >= 0 ? fields[categoryIndex]?.trim() : undefined,
-      default_quantity: quantityIndex >= 0 ? parseInt(fields[quantityIndex] || '1') || 1 : 1,
-    });
+  if (items.length === 0) {
+    throw new Error('No valid items found in CSV');
   }
 
   return items;
@@ -74,46 +94,4 @@ export function downloadCSV(filename: string, csvContent: string): void {
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
-}
-
-/**
- * Escape CSV field (handle commas, quotes, newlines)
- */
-function escapeCsvField(field: string): string {
-  if (!field) return '';
-  if (field.includes(',') || field.includes('"') || field.includes('\n')) {
-    return `"${field.replace(/"/g, '""')}"`;
-  }
-  return field;
-}
-
-/**
- * Parse a single CSV line, handling quoted fields
- */
-function parseCsvLine(line: string): string[] {
-  const fields: string[] = [];
-  let currentField = '';
-  let inQuotes = false;
-
-  for (let i = 0; i < line.length; i++) {
-    const char = line[i];
-    const nextChar = line[i + 1];
-
-    if (char === '"') {
-      if (inQuotes && nextChar === '"') {
-        currentField += '"';
-        i++; // Skip next quote
-      } else {
-        inQuotes = !inQuotes;
-      }
-    } else if (char === ',' && !inQuotes) {
-      fields.push(currentField);
-      currentField = '';
-    } else {
-      currentField += char;
-    }
-  }
-  fields.push(currentField);
-
-  return fields.map((f) => f.trim());
 }

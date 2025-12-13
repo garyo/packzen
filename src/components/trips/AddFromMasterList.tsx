@@ -1,6 +1,6 @@
 import { createResource, For, Show, createSignal } from 'solid-js';
 import { api, endpoints } from '../../lib/api';
-import type { MasterItem, Bag } from '../../lib/types';
+import type { MasterItemWithCategory, Bag } from '../../lib/types';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
@@ -17,9 +17,9 @@ export function AddFromMasterList(props: AddFromMasterListProps) {
   const [addingItems, setAddingItems] = createSignal<Set<string>>(new Set());
   const [selectedBag, setSelectedBag] = createSignal<string | null>(null);
 
-  const [masterItems] = createResource<MasterItem[]>(async () => {
+  const [masterItems] = createResource<MasterItemWithCategory[]>(async () => {
     return fetchWithErrorHandling(
-      () => api.get<MasterItem[]>(endpoints.masterItems),
+      () => api.get<MasterItemWithCategory[]>(endpoints.masterItems),
       'Failed to load items'
     );
   });
@@ -31,7 +31,7 @@ export function AddFromMasterList(props: AddFromMasterListProps) {
     );
   });
 
-  const handleAddItem = async (item: MasterItem) => {
+  const handleAddItem = async (item: MasterItemWithCategory) => {
     // Optimistically mark as adding
     setAddingItems((prev) => new Set(prev).add(item.id));
 
@@ -59,9 +59,9 @@ export function AddFromMasterList(props: AddFromMasterListProps) {
 
   const groupedItems = () => {
     const items = masterItems();
-    if (!items) return new Map<string, MasterItem[]>();
+    if (!items) return new Map<string, MasterItemWithCategory[]>();
 
-    const groups = new Map<string, MasterItem[]>();
+    const groups = new Map<string, MasterItemWithCategory[]>();
     items.forEach((item) => {
       const category = item.category_name || 'Uncategorized';
       if (!groups.has(category)) {

@@ -12,6 +12,14 @@ export type {
   NewTripItem,
 } from '../../db/schema';
 
+// Import for extending
+import type { MasterItem } from '../../db/schema';
+
+// Extended type for master items with joined category name (returned by API)
+export type MasterItemWithCategory = MasterItem & {
+  category_name: string | null;
+};
+
 // Auth types
 export interface User {
   id: string;

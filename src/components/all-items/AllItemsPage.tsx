@@ -1,7 +1,7 @@
 import { createSignal, createResource, Show, onMount } from 'solid-js';
 import { authStore } from '../../stores/auth';
 import { api, endpoints } from '../../lib/api';
-import type { Category, MasterItem } from '../../lib/types';
+import type { Category, MasterItemWithCategory } from '../../lib/types';
 import { Button } from '../ui/Button';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
 import { EmptyState } from '../ui/EmptyState';
@@ -15,7 +15,7 @@ import { fetchWithErrorHandling } from '../../lib/resource-helpers';
 export function AllItemsPage() {
   const [showItemForm, setShowItemForm] = createSignal(false);
   const [showCategoryManager, setShowCategoryManager] = createSignal(false);
-  const [editingItem, setEditingItem] = createSignal<MasterItem | null>(null);
+  const [editingItem, setEditingItem] = createSignal<MasterItemWithCategory | null>(null);
 
   // Fetch categories
   const [categories, { refetch: refetchCategories }] = createResource<Category[]>(async () => {
@@ -26,9 +26,9 @@ export function AllItemsPage() {
   });
 
   // Fetch all items
-  const [items, { refetch: refetchItems }] = createResource<MasterItem[]>(async () => {
+  const [items, { refetch: refetchItems }] = createResource<MasterItemWithCategory[]>(async () => {
     return fetchWithErrorHandling(
-      () => api.get<MasterItem[]>(endpoints.masterItems),
+      () => api.get<MasterItemWithCategory[]>(endpoints.masterItems),
       'Failed to load items'
     );
   });
@@ -43,7 +43,7 @@ export function AllItemsPage() {
     setShowItemForm(true);
   };
 
-  const handleEditItem = (item: MasterItem) => {
+  const handleEditItem = (item: MasterItemWithCategory) => {
     setEditingItem(item);
     setShowItemForm(true);
   };

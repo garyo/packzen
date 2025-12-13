@@ -6,14 +6,14 @@
  */
 
 import type { Accessor } from 'solid-js';
-import type { Category, MasterItem } from '../../lib/types';
+import type { Category, MasterItemWithCategory } from '../../lib/types';
 import { Button } from '../ui/Button';
 import { showToast } from '../ui/Toast';
 import { masterItemsToCSV, csvToMasterItems, downloadCSV } from '../../lib/csv';
 import { api, endpoints } from '../../lib/api';
 
 interface CSVImportExportProps {
-  items: Accessor<MasterItem[] | undefined>;
+  items: Accessor<MasterItemWithCategory[] | undefined>;
   categories: Accessor<Category[] | undefined>;
   onDataChanged: () => void;
 }

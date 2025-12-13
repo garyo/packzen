@@ -1,6 +1,6 @@
 import { createSignal, createResource, For, Show } from 'solid-js';
 import { api, endpoints } from '../../lib/api';
-import type { Bag, Category } from '../../lib/types';
+import type { Bag, Category, MasterItemWithCategory } from '../../lib/types';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
@@ -69,7 +69,7 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
     }
 
     // Check if item exists in master list
-    const masterItemsResponse = await api.get<any[]>(endpoints.masterItems);
+    const masterItemsResponse = await api.get<MasterItemWithCategory[]>(endpoints.masterItems);
     const existingMasterItem = masterItemsResponse.data?.find(
       (item) => item.name.toLowerCase() === itemName.toLowerCase()
     );
@@ -79,14 +79,14 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
 
     // If not in master list, add it
     if (!existingMasterItem) {
-      const createMasterResponse = await api.post(endpoints.masterItems, {
+      const createMasterResponse = await api.post<MasterItemWithCategory>(endpoints.masterItems, {
         name: itemName,
         category_id: finalCategoryId,
         default_quantity: quantity(),
       });
-      if (createMasterResponse.success) {
-        masterItemId = createMasterResponse.data?.id;
-        categoryName = createMasterResponse.data?.category_name;
+      if (createMasterResponse.success && createMasterResponse.data) {
+        masterItemId = createMasterResponse.data.id;
+        categoryName = createMasterResponse.data.category_name;
         showToast('success', `Added "${itemName}" to all items`);
       }
     } else {

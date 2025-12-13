@@ -6,12 +6,12 @@
  */
 
 import { For, Show, type Accessor } from 'solid-js';
-import type { Category, MasterItem } from '../../lib/types';
+import type { Category, MasterItemWithCategory } from '../../lib/types';
 
 interface ItemsListProps {
-  items: Accessor<MasterItem[] | undefined>;
+  items: Accessor<MasterItemWithCategory[] | undefined>;
   categories: Accessor<Category[] | undefined>;
-  onEditItem: (item: MasterItem) => void;
+  onEditItem: (item: MasterItemWithCategory) => void;
   onDeleteItem: (id: string) => void;
 }
 
@@ -66,8 +66,8 @@ export function ItemsList(props: ItemsListProps) {
 
 interface CategorySectionProps {
   category: Category;
-  items: MasterItem[];
-  onEditItem: (item: MasterItem) => void;
+  items: MasterItemWithCategory[];
+  onEditItem: (item: MasterItemWithCategory) => void;
   onDeleteItem: (id: string) => void;
 }
 
@@ -95,7 +95,7 @@ function CategorySection(props: CategorySectionProps) {
 }
 
 interface ItemCardProps {
-  item: MasterItem;
+  item: MasterItemWithCategory;
   onEdit: () => void;
   onDelete: () => void;
 }

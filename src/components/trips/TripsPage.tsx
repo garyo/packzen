@@ -26,53 +26,11 @@ export function TripsPage() {
 
   const handleCopy = async (trip: Trip) => {
     try {
-      // Get all bags and items from the original trip
-      const [bagsResponse, itemsResponse] = await Promise.all([
-        api.get(endpoints.tripBags(trip.id)),
-        api.get(endpoints.tripItems(trip.id)),
-      ]);
+      const response = await api.post(`/api/trips/${trip.id}/copy`, {});
 
-      const bags = bagsResponse.data || [];
-      const items = itemsResponse.data || [];
-
-      // Create new trip with "Copy" appended to name
-      const newTripResponse = await api.post(endpoints.trips, {
-        name: `${trip.name} (Copy)`,
-        destination: trip.destination,
-        start_date: trip.start_date,
-        end_date: trip.end_date,
-        notes: trip.notes,
-      });
-
-      if (!newTripResponse.success || !newTripResponse.data) {
-        showToast('error', 'Failed to create new trip');
+      if (!response.success) {
+        showToast('error', response.error || 'Failed to copy trip');
         return;
-      }
-
-      const newTripId = newTripResponse.data.id;
-
-      // Copy bags and create a mapping of old bag IDs to new bag IDs
-      const bagIdMap = new Map<string, string>();
-      for (const bag of bags) {
-        const newBagResponse = await api.post(endpoints.tripBags(newTripId), {
-          name: bag.name,
-          color: bag.color,
-        });
-        if (newBagResponse.success && newBagResponse.data) {
-          bagIdMap.set(bag.id, newBagResponse.data.id);
-        }
-      }
-
-      // Copy items with updated bag IDs
-      for (const item of items) {
-        const newBagId = item.bag_id ? bagIdMap.get(item.bag_id) || null : null;
-        await api.post(endpoints.tripItems(newTripId), {
-          name: item.name,
-          category_name: item.category_name,
-          quantity: item.quantity,
-          bag_id: newBagId,
-          master_item_id: item.master_item_id,
-        });
       }
 
       showToast('success', `Created copy of "${trip.name}"`);
