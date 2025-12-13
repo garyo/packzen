@@ -8,7 +8,7 @@ export const GET: APIRoute = async ({ locals, params }) => {
     const runtime = locals.runtime as { env: { DB: D1Database } };
     const db = drizzle(runtime.env.DB);
 
-    const userId = 'temp-user-id'; // This should come from Clerk
+    const userId = locals.userId;
     const { tripId } = params;
 
     if (!tripId) {
@@ -57,7 +57,7 @@ export const POST: APIRoute = async ({ request, locals, params }) => {
     const runtime = locals.runtime as { env: { DB: D1Database } };
     const db = drizzle(runtime.env.DB);
 
-    const userId = 'temp-user-id'; // This should come from Clerk
+    const userId = locals.userId;
     const { tripId } = params;
 
     if (!tripId) {
@@ -123,7 +123,7 @@ export const PATCH: APIRoute = async ({ request, locals, params }) => {
     const runtime = locals.runtime as { env: { DB: D1Database } };
     const db = drizzle(runtime.env.DB);
 
-    const userId = 'temp-user-id'; // This should come from Clerk
+    const userId = locals.userId;
     const { tripId } = params;
 
     if (!tripId) {
@@ -148,13 +148,14 @@ export const PATCH: APIRoute = async ({ request, locals, params }) => {
     }
 
     const body = await request.json();
-    const { id, is_packed, quantity, bag_id } = body;
+    const { id, is_packed, quantity, bag_id, category_name } = body;
 
     // Build update object dynamically based on what was provided
     const updates: any = { updated_at: new Date() };
     if (is_packed !== undefined) updates.is_packed = is_packed;
     if (quantity !== undefined) updates.quantity = quantity;
     if (bag_id !== undefined) updates.bag_id = bag_id;
+    if (category_name !== undefined) updates.category_name = category_name;
 
     const updated = await db
       .update(tripItems)
@@ -188,7 +189,7 @@ export const DELETE: APIRoute = async ({ request, locals, params }) => {
     const runtime = locals.runtime as { env: { DB: D1Database } };
     const db = drizzle(runtime.env.DB);
 
-    const userId = 'temp-user-id'; // This should come from Clerk
+    const userId = locals.userId;
     const { tripId } = params;
 
     if (!tripId) {

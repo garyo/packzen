@@ -12,11 +12,11 @@ export function Input(props: InputProps) {
   return (
     <div class="w-full">
       {local.label && (
-        <label class="block text-sm font-medium text-gray-700 mb-1">{local.label}</label>
+        <label class="mb-1 block text-sm font-medium text-gray-700">{local.label}</label>
       )}
       <input
         class={cn(
-          'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent',
+          'w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500 focus:outline-none',
           local.error && 'border-red-500 focus:ring-red-500',
           local.class
         )}

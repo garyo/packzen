@@ -5,6 +5,7 @@ import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
 import { showToast } from '../ui/Toast';
+import { fetchWithErrorHandling } from '../../lib/resource-helpers';
 
 interface AddFromMasterListProps {
   tripId: string;
@@ -17,19 +18,17 @@ export function AddFromMasterList(props: AddFromMasterListProps) {
   const [selectedBag, setSelectedBag] = createSignal<string | null>(null);
 
   const [masterItems] = createResource<MasterItem[]>(async () => {
-    const response = await api.get<MasterItem[]>(endpoints.masterItems);
-    if (response.success && response.data) {
-      return response.data;
-    }
-    return [];
+    return fetchWithErrorHandling(
+      () => api.get<MasterItem[]>(endpoints.masterItems),
+      'Failed to load items'
+    );
   });
 
   const [bags] = createResource<Bag[]>(async () => {
-    const response = await api.get<Bag[]>(endpoints.tripBags(props.tripId));
-    if (response.success && response.data) {
-      return response.data;
-    }
-    return [];
+    return fetchWithErrorHandling(
+      () => api.get<Bag[]>(endpoints.tripBags(props.tripId)),
+      'Failed to load bags'
+    );
   });
 
   const handleAddItem = async (item: MasterItem) => {
@@ -74,45 +73,43 @@ export function AddFromMasterList(props: AddFromMasterListProps) {
   };
 
   return (
-    <Modal title="Add from Master List" onClose={props.onClose}>
+    <Modal title="Add from All Items" onClose={props.onClose}>
       {/* Bag Selector */}
       <div class="mb-4">
-        <label class="block text-sm font-medium text-gray-700 mb-2">
+        <label class="mb-2 block text-sm font-medium text-gray-700">
           Add items to bag (optional):
         </label>
         <select
           value={selectedBag() || ''}
           onChange={(e) => setSelectedBag(e.target.value || null)}
-          class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
         >
           <option value="">No bag (add to trip)</option>
-          <For each={bags()}>
-            {(bag) => <option value={bag.id}>{bag.name}</option>}
-          </For>
+          <For each={bags()}>{(bag) => <option value={bag.id}>{bag.name}</option>}</For>
         </select>
       </div>
 
-      <div class="space-y-4 max-h-96 overflow-y-auto">
+      <div class="max-h-96 space-y-4 overflow-y-auto">
         <Show when={!masterItems.loading} fallback={<LoadingSpinner text="Loading items..." />}>
           <Show
             when={(masterItems()?.length || 0) > 0}
             fallback={
-              <div class="text-center py-8 text-gray-500">
-                <p>No items in master list</p>
-                <p class="text-sm mt-2">Add items to your master list first</p>
+              <div class="py-8 text-center text-gray-500">
+                <p>No items in all items list</p>
+                <p class="mt-2 text-sm">Add items to your all items list first</p>
               </div>
             }
           >
             <For each={Array.from(groupedItems().entries())}>
               {([category, items]) => (
-                <div class="border-b border-gray-200 last:border-0 pb-4 last:pb-0">
-                  <h3 class="font-semibold text-gray-900 mb-2">{category}</h3>
+                <div class="border-b border-gray-200 pb-4 last:border-0 last:pb-0">
+                  <h3 class="mb-2 font-semibold text-gray-900">{category}</h3>
                   <div class="space-y-2">
                     <For each={items}>
                       {(item) => {
                         const isAdding = () => addingItems().has(item.id);
                         return (
-                          <div class="flex items-center justify-between p-2 hover:bg-gray-50 rounded">
+                          <div class="flex items-center justify-between rounded p-2 hover:bg-gray-50">
                             <div class="flex-1">
                               <p class="font-medium text-gray-900">{item.name}</p>
                               {item.description && (

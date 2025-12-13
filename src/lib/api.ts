@@ -5,6 +5,7 @@ const API_BASE_URL = '/api';
 
 interface RequestOptions extends RequestInit {
   params?: Record<string, string>;
+  skipErrorHandling?: boolean; // Allow callers to handle errors themselves
 }
 
 async function makeRequest<T>(
@@ -33,9 +34,23 @@ async function makeRequest<T>(
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ error: response.statusText }));
+      const errorMessage = error.error || `Request failed with status ${response.status}`;
+
+      // Handle 401 errors by redirecting to sign-in
+      if (response.status === 401 && !options.skipErrorHandling) {
+        // Don't redirect if already on sign-in/sign-up pages
+        const currentPath = window.location.pathname;
+        if (!currentPath.includes('/sign-in') && !currentPath.includes('/sign-up')) {
+          setTimeout(() => {
+            window.location.href = '/sign-in';
+          }, 1000);
+        }
+      }
+
       return {
         success: false,
-        error: error.error || `Request failed with status ${response.status}`,
+        error: errorMessage,
+        statusCode: response.status,
       };
     }
 
@@ -45,6 +60,7 @@ async function makeRequest<T>(
       data,
     };
   } catch (error) {
+    console.error('API request error:', error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'An unknown error occurred',

@@ -4,7 +4,8 @@ interface Props {
   description?: string;
 }
 
-const { title, description = 'A mobile-first packing list app for travel' } = Astro.props;
+const { title, description = 'PackZen - A mobile-first packing list app for mindful travel' } =
+  Astro.props;
 ---
 
 <!doctype html>
@@ -13,7 +14,8 @@ const { title, description = 'A mobile-first packing list app for travel' } = As
     <meta charset="UTF-8" />
     <meta name="description" content={description} />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/favicon.png" />
     <meta name="generator" content={Astro.generator} />
     <title>{title}</title>
   </head>

@@ -64,12 +64,8 @@
           "name": "bags_trip_id_trips_id_fk",
           "tableFrom": "bags",
           "tableTo": "trips",
-          "columnsFrom": [
-            "trip_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["trip_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -198,12 +194,8 @@
           "name": "master_items_category_id_categories_id_fk",
           "tableFrom": "master_items",
           "tableTo": "categories",
-          "columnsFrom": [
-            "category_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["category_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -301,12 +293,8 @@
           "name": "trip_items_trip_id_trips_id_fk",
           "tableFrom": "trip_items",
           "tableTo": "trips",
-          "columnsFrom": [
-            "trip_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["trip_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -314,12 +302,8 @@
           "name": "trip_items_bag_id_bags_id_fk",
           "tableFrom": "trip_items",
           "tableTo": "bags",
-          "columnsFrom": [
-            "bag_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["bag_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -327,12 +311,8 @@
           "name": "trip_items_master_item_id_master_items_id_fk",
           "tableFrom": "trip_items",
           "tableTo": "master_items",
-          "columnsFrom": [
-            "master_item_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["master_item_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }

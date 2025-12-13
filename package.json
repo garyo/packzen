@@ -1,5 +1,5 @@
 {
-  "name": "packing-list",
+  "name": "packzen",
   "type": "module",
   "version": "0.0.1",
   "scripts": {
@@ -8,14 +8,15 @@
     "preview": "astro preview",
     "astro": "astro",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "wrangler d1 migrations apply packing-list-db --local",
-    "db:migrate:prod": "wrangler d1 migrations apply packing-list-db --remote",
+    "db:migrate": "wrangler d1 migrations apply packzen-db --local",
+    "db:migrate:prod": "wrangler d1 migrations apply packzen-db --remote",
     "db:studio": "drizzle-kit studio",
     "format": "prettier --write ."
   },
   "dependencies": {
     "@astrojs/cloudflare": "^12.6.12",
     "@astrojs/solid-js": "^5.1.3",
+    "@clerk/astro": "^2.16.7",
     "@clerk/clerk-js": "^5.114.1",
     "@cloudflare/workers-types": "^4.20251212.0",
     "@tailwindcss/vite": "^4.1.18",

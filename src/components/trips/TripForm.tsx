@@ -88,17 +88,17 @@ export function TripForm(props: TripFormProps) {
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+          <label class="mb-1 block text-sm font-medium text-gray-700">Notes</label>
           <textarea
             value={notes()}
             onInput={(e) => setNotes(e.currentTarget.value)}
             placeholder="Trip details, reminders, etc."
-            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
             rows={3}
           />
         </div>
 
-        <div class="flex gap-2 justify-end pt-4">
+        <div class="flex justify-end gap-2 pt-4">
           <Button type="button" variant="secondary" onClick={props.onClose}>
             Cancel
           </Button>

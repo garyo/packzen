@@ -2,29 +2,30 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 ---
 
-<BaseLayout title="Packing List - Travel Packing Made Easy">
+<BaseLayout title="PackZen - Travel Packing Made Easy">
   <div class="min-h-screen bg-gradient-to-b from-blue-50 to-white">
     <!-- Hero Section -->
     <div class="container mx-auto px-4 py-16">
-      <div class="text-center max-w-3xl mx-auto">
-        <h1 class="text-5xl md:text-6xl font-bold text-gray-900 mb-6">
+      <div class="mx-auto max-w-3xl text-center">
+        <img src="/logo.png" alt="PackZen" class="mx-auto mb-8 w-64" />
+        <h1 class="mb-6 text-5xl font-bold text-gray-900 md:text-6xl">
           Pack Smarter,<br />Travel Better
         </h1>
-        <p class="text-xl text-gray-600 mb-8">
-          The mobile-first packing list app that helps you organize your trips, track your bags,
-          and never forget an item again.
+        <p class="mb-8 text-xl text-gray-600">
+          The mobile-first packing list app that helps you organize your trips, track your bags, and
+          never forget an item again.
         </p>
 
-        <div class="flex flex-col sm:flex-row gap-4 justify-center">
+        <div class="flex flex-col justify-center gap-4 sm:flex-row">
           <a
             href="/sign-up"
-            class="inline-flex items-center justify-center px-8 py-4 text-lg font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+            class="inline-flex items-center justify-center rounded-lg bg-blue-600 px-8 py-4 text-lg font-semibold text-white transition-colors hover:bg-blue-700"
           >
             Get Started Free
           </a>
           <a
             href="/sign-in"
-            class="inline-flex items-center justify-center px-8 py-4 text-lg font-semibold text-blue-600 bg-white border-2 border-blue-600 rounded-lg hover:bg-blue-50 transition-colors"
+            class="inline-flex items-center justify-center rounded-lg border-2 border-blue-600 bg-white px-8 py-4 text-lg font-semibold text-blue-600 transition-colors hover:bg-blue-50"
           >
             Sign In
           </a>
@@ -32,53 +33,52 @@ import BaseLayout from '../layouts/BaseLayout.astro';
       </div>
 
       <!-- Features -->
-      <div class="mt-24 grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-        <div class="bg-white rounded-lg p-6 shadow-md">
-          <div class="text-4xl mb-4">📝</div>
-          <h3 class="text-xl font-semibold text-gray-900 mb-2">Master Lists</h3>
+      <div class="mx-auto mt-24 grid max-w-5xl gap-8 md:grid-cols-3">
+        <div class="rounded-lg bg-white p-6 shadow-md">
+          <div class="mb-4 text-4xl">📝</div>
+          <h3 class="mb-2 text-xl font-semibold text-gray-900">All Items</h3>
           <p class="text-gray-600">
             Build your perfect packing list once, reuse it for every trip. Organized by categories
             for easy browsing.
           </p>
         </div>
 
-        <div class="bg-white rounded-lg p-6 shadow-md">
-          <div class="text-4xl mb-4">🧳</div>
-          <h3 class="text-xl font-semibold text-gray-900 mb-2">Bag Organization</h3>
+        <div class="rounded-lg bg-white p-6 shadow-md">
+          <div class="mb-4 text-4xl">🧳</div>
+          <h3 class="mb-2 text-xl font-semibold text-gray-900">Bag Organization</h3>
           <p class="text-gray-600">
             Assign items to specific bags (carry-on, checked, personal). Know exactly what goes
             where.
           </p>
         </div>
 
-        <div class="bg-white rounded-lg p-6 shadow-md">
-          <div class="text-4xl mb-4">✅</div>
-          <h3 class="text-xl font-semibold text-gray-900 mb-2">Pack & Track</h3>
+        <div class="rounded-lg bg-white p-6 shadow-md">
+          <div class="mb-4 text-4xl">✅</div>
+          <h3 class="mb-2 text-xl font-semibold text-gray-900">Pack & Track</h3>
           <p class="text-gray-600">
-            Check off items as you pack. See your progress at a glance. Never leave anything
-            behind.
+            Check off items as you pack. See your progress at a glance. Never leave anything behind.
           </p>
         </div>
 
-        <div class="bg-white rounded-lg p-6 shadow-md">
-          <div class="text-4xl mb-4">📱</div>
-          <h3 class="text-xl font-semibold text-gray-900 mb-2">Mobile First</h3>
+        <div class="rounded-lg bg-white p-6 shadow-md">
+          <div class="mb-4 text-4xl">📱</div>
+          <h3 class="mb-2 text-xl font-semibold text-gray-900">Mobile First</h3>
           <p class="text-gray-600">
             Designed for your phone with large touch targets. Perfect for packing on the go.
           </p>
         </div>
 
-        <div class="bg-white rounded-lg p-6 shadow-md">
-          <div class="text-4xl mb-4">🔄</div>
-          <h3 class="text-xl font-semibold text-gray-900 mb-2">Multi-Device Sync</h3>
+        <div class="rounded-lg bg-white p-6 shadow-md">
+          <div class="mb-4 text-4xl">🔄</div>
+          <h3 class="mb-2 text-xl font-semibold text-gray-900">Multi-Device Sync</h3>
           <p class="text-gray-600">
             Access your lists from any device. Start on your laptop, finish on your phone.
           </p>
         </div>
 
-        <div class="bg-white rounded-lg p-6 shadow-md">
-          <div class="text-4xl mb-4">🚀</div>
-          <h3 class="text-xl font-semibold text-gray-900 mb-2">Lightning Fast</h3>
+        <div class="rounded-lg bg-white p-6 shadow-md">
+          <div class="mb-4 text-4xl">🚀</div>
+          <h3 class="mb-2 text-xl font-semibold text-gray-900">Lightning Fast</h3>
           <p class="text-gray-600">
             Built on Cloudflare's edge network. Blazing fast from anywhere in the world.
           </p>
@@ -87,7 +87,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     </div>
 
     <!-- Footer -->
-    <footer class="mt-24 py-8 border-t border-gray-200">
+    <footer class="mt-24 border-t border-gray-200 py-8">
       <div class="container mx-auto px-4 text-center text-gray-600">
         <p>Built with Astro, Solid.js, Tailwind CSS, and Cloudflare</p>
       </div>

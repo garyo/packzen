@@ -53,7 +53,7 @@ export function BagManager(props: BagManagerProps) {
       name: data.name.trim(),
       type: data.type,
       color: data.color,
-      sort_order: (bags()?.length || 0),
+      sort_order: bags()?.length || 0,
     });
 
     if (response.success) {
@@ -88,12 +88,12 @@ export function BagManager(props: BagManagerProps) {
       <div class="space-y-4">
         {/* Existing Bags */}
         <div>
-          <h3 class="font-semibold text-gray-900 mb-3">Bags for this trip</h3>
+          <h3 class="mb-3 font-semibold text-gray-900">Bags for this trip</h3>
           <Show when={!bags.loading} fallback={<LoadingSpinner text="Loading bags..." />}>
             <Show
               when={(bags()?.length || 0) > 0}
               fallback={
-                <div class="text-center py-4 text-gray-500 text-sm">
+                <div class="py-4 text-center text-sm text-gray-500">
                   No bags yet. Add your first bag below.
                 </div>
               }
@@ -101,10 +101,10 @@ export function BagManager(props: BagManagerProps) {
               <div class="space-y-2">
                 <For each={bags()}>
                   {(bag) => (
-                    <div class="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:border-gray-300">
+                    <div class="flex items-center justify-between rounded-lg border border-gray-200 p-3 hover:border-gray-300">
                       <div class="flex items-center gap-3">
                         <div
-                          class={`w-4 h-4 rounded-full ${
+                          class={`h-4 w-4 rounded-full ${
                             BAG_COLORS.find((c) => c.value === bag.color)?.class || 'bg-gray-500'
                           }`}
                         />
@@ -117,7 +117,7 @@ export function BagManager(props: BagManagerProps) {
                       </div>
                       <button
                         onClick={() => handleDelete(bag.id)}
-                        class="text-red-600 hover:text-red-700 text-sm"
+                        class="text-sm text-red-600 hover:text-red-700"
                       >
                         Delete
                       </button>
@@ -143,13 +143,11 @@ export function BagManager(props: BagManagerProps) {
               <h3 class="font-semibold text-gray-900">Add New Bag</h3>
 
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Bag Type</label>
+                <label class="mb-1 block text-sm font-medium text-gray-700">Bag Type</label>
                 <select
                   value={formData().type}
-                  onChange={(e) =>
-                    setFormData({ ...formData(), type: e.target.value as any })
-                  }
-                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  onChange={(e) => setFormData({ ...formData(), type: e.target.value as any })}
+                  class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
                 >
                   <For each={BAG_TYPES}>
                     {(type) => (
@@ -162,28 +160,26 @@ export function BagManager(props: BagManagerProps) {
               </div>
 
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Bag Name</label>
+                <label class="mb-1 block text-sm font-medium text-gray-700">Bag Name</label>
                 <Input
                   type="text"
                   value={formData().name}
-                  onInput={(e) =>
-                    setFormData({ ...formData(), name: e.currentTarget.value })
-                  }
+                  onInput={(e) => setFormData({ ...formData(), name: e.currentTarget.value })}
                   placeholder="e.g., Red Suitcase"
                 />
               </div>
 
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Color</label>
+                <label class="mb-1 block text-sm font-medium text-gray-700">Color</label>
                 <div class="flex gap-2">
                   <For each={BAG_COLORS}>
                     {(color) => (
                       <button
                         type="button"
                         onClick={() => setFormData({ ...formData(), color: color.value })}
-                        class={`w-8 h-8 rounded-full ${color.class} ${
+                        class={`h-8 w-8 rounded-full ${color.class} ${
                           formData().color === color.value
-                            ? 'ring-2 ring-offset-2 ring-blue-500'
+                            ? 'ring-2 ring-blue-500 ring-offset-2'
                             : 'hover:scale-110'
                         } transition-transform`}
                         title={color.label}

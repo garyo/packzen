@@ -1,28 +1,22 @@
 {
-	"main": "dist/_worker.js/index.js",
-	"name": "packing-list",
-	"account_id": "97571a833a50d387280ecaac7d736c4e",
+  "main": "dist/_worker.js/index.js",
+  "name": "packzen",
+  "account_id": "97571a833a50d387280ecaac7d736c4e",
   "compatibility_date": "2025-12-12",
-  "compatibility_flags": [
-    "nodejs_compat",
-    "global_fetch_strictly_public"
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "binding": "ASSETS",
+    "directory": "./dist",
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "packzen-db",
+      "database_id": "7adf70b9-fb7d-4061-a0b4-61599fb92fcb",
+      "migrations_dir": "db/migrations",
+    },
   ],
-	"assets": {
-		"binding": "ASSETS",
-		"directory": "./dist"
-	},
-	"d1_databases": [
-		{
-			"binding": "DB",
-			"database_name": "packing-list-db",
-			"database_id": "76fc0205-a137-4870-b45e-9545bfb62391",
-			"migrations_dir": "db/migrations"
-		}
-	],
-	"vars": {
-		"PUBLIC_CLERK_PUBLISHABLE_KEY": ""
-	},
-	"observability": {
-    "enabled": true
-  }
+  "observability": {
+    "enabled": true,
+  },
 }

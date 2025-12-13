@@ -1,6 +1,6 @@
-# Packing List Web App
+# PackZen
 
-A mobile-first packing list web app for travel with master list management, trip planning, and bag organization. Built with Astro, Solid.js, Tailwind CSS, Cloudflare D1, and Clerk Auth.
+A mobile-first packing list web app for travel with all items management, trip planning, and bag organization. Built with Astro, Solid.js, Tailwind CSS, Cloudflare D1, and Clerk Auth.
 
 ## Tech Stack
 
@@ -13,7 +13,7 @@ A mobile-first packing list web app for travel with master list management, trip
 
 ## Features
 
-- 📝 Master list with categories for all your packing items
+- 📝 All items list with categories for your packing items
 - 🧳 Trip-specific packing lists
 - 👜 Bag organization (carry-on, checked, personal item)
 - ✅ Pack/unpack tracking
@@ -60,18 +60,18 @@ CLERK_SECRET_KEY=sk_test_your_key_here
 npx wrangler login
 
 # Create D1 database
-npx wrangler d1 create packing-list-db
+npx wrangler d1 create packzen-db
 ```
 
 This will output something like:
 
 ```
-✅ Successfully created DB 'packing-list-db' in region WEUR
+✅ Successfully created DB 'packzen-db' in region WEUR
 Created your database using D1's new storage backend.
 
 [[d1_databases]]
 binding = "DB"
-database_name = "packing-list-db"
+database_name = "packzen-db"
 database_id = "your-database-id-here"
 ```
 
@@ -82,10 +82,10 @@ Copy the `database_id` and update `wrangler.jsonc`:
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "packing-list-db",
-      "database_id": "paste-your-database-id-here"
-    }
-  ]
+      "database_name": "packzen-db",
+      "database_id": "paste-your-database-id-here",
+    },
+  ],
 }
 ```
 
@@ -141,15 +141,12 @@ bun run db:studio
 ├── db/                      # Database schema & migrations
 │   ├── schema.ts            # Drizzle schema definitions
 │   └── migrations/          # Generated SQL migrations
-├── functions/               # Cloudflare Workers API routes
-│   ├── _middleware.ts       # Auth verification
-│   └── api/                 # API endpoints
 ├── src/
 │   ├── components/          # Solid.js components
 │   ├── layouts/             # Astro layouts
 │   ├── lib/                 # Utilities
-│   ├── middleware/          # Astro middleware
-│   ├── pages/               # Astro routes
+│   ├── middleware.ts        # Astro middleware for auth
+│   ├── pages/               # Astro routes & API endpoints
 │   ├── stores/              # Solid stores
 │   └── styles/              # Global CSS
 ├── public/                  # Static assets
@@ -188,8 +185,8 @@ Update `wrangler.jsonc` with your production values:
 ```jsonc
 {
   "vars": {
-    "PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_live_your_production_key"
-  }
+    "PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_live_your_production_key",
+  },
 }
 ```
 
@@ -204,12 +201,12 @@ bun run db:migrate:prod
 ## Implementation Phases
 
 - ✅ **Phase 1**: Project Setup
-- ⏳ **Phase 2**: Database Schema & Auth
-- ⏳ **Phase 3**: Master List Management
-- ⏳ **Phase 4**: Trip Management
-- ⏳ **Phase 5**: Bag Management
-- ⏳ **Phase 6**: Trip Items & Packing
-- ⏳ **Phase 7**: Layout & Navigation
+- ✅ **Phase 2**: Database Schema & Auth
+- ✅ **Phase 3**: All Items Management
+- ✅ **Phase 4**: Trip Management
+- ✅ **Phase 5**: Bag Management
+- ✅ **Phase 6**: Trip Items & Packing
+- ✅ **Phase 7**: Layout & Navigation
 - ⏳ **Phase 8**: Polish & Optimization
 
 ## Mobile-First Design Principles

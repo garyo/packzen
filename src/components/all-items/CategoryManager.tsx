@@ -63,7 +63,7 @@ export function CategoryManager(props: CategoryManagerProps) {
       <div class="space-y-4">
         {/* Add New Category */}
         <form onSubmit={handleAdd} class="border-b border-gray-200 pb-4">
-          <h3 class="text-sm font-medium text-gray-700 mb-3">Add New Category</h3>
+          <h3 class="mb-3 text-sm font-medium text-gray-700">Add New Category</h3>
           <div class="flex gap-2">
             <Input
               type="text"
@@ -87,23 +87,21 @@ export function CategoryManager(props: CategoryManagerProps) {
 
         {/* Existing Categories */}
         <div>
-          <h3 class="text-sm font-medium text-gray-700 mb-3">Your Categories</h3>
+          <h3 class="mb-3 text-sm font-medium text-gray-700">Your Categories</h3>
           <div class="space-y-2">
             <For
               each={props.categories}
-              fallback={
-                <p class="text-sm text-gray-500 text-center py-4">No categories yet</p>
-              }
+              fallback={<p class="py-4 text-center text-sm text-gray-500">No categories yet</p>}
             >
               {(category) => (
-                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div class="flex items-center justify-between rounded-lg bg-gray-50 p-3">
                   <div class="flex items-center gap-2">
                     <span class="text-xl">{category.icon || '📦'}</span>
                     <span class="font-medium text-gray-900">{category.name}</span>
                   </div>
                   <button
                     onClick={() => handleDelete(category.id)}
-                    class="text-red-600 hover:text-red-700 text-sm font-medium"
+                    class="text-sm font-medium text-red-600 hover:text-red-700"
                   >
                     Delete
                   </button>

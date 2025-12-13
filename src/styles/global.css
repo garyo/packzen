@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 /* Mobile-first base styles */
 * {
@@ -19,8 +19,8 @@ body {
 /* Ensure minimum touch target size (44x44px) */
 button,
 a,
-input[type="checkbox"],
-input[type="radio"] {
+input[type='checkbox'],
+input[type='radio'] {
   @apply min-h-[44px] min-w-[44px];
 }
 

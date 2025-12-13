@@ -8,9 +8,7 @@ export const GET: APIRoute = async ({ locals }) => {
     const runtime = locals.runtime as { env: { DB: D1Database } };
     const db = drizzle(runtime.env.DB);
 
-    // For now, return empty array since we need auth
-    // TODO: Add Clerk auth verification
-    const userId = 'temp-user-id'; // This should come from Clerk
+    const userId = locals.userId;
 
     const items = await db
       .select()
@@ -36,7 +34,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
     const runtime = locals.runtime as { env: { DB: D1Database } };
     const db = drizzle(runtime.env.DB);
 
-    const userId = 'temp-user-id'; // This should come from Clerk
+    const userId = locals.userId;
     const body = await request.json();
     const { name, icon, sort_order } = body;
 

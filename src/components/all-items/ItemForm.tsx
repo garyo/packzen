@@ -52,11 +52,7 @@ export function ItemForm(props: ItemFormProps) {
   };
 
   return (
-    <Modal
-      isOpen={true}
-      onClose={props.onClose}
-      title={props.item ? 'Edit Item' : 'Add Item'}
-    >
+    <Modal isOpen={true} onClose={props.onClose} title={props.item ? 'Edit Item' : 'Add Item'}>
       <form onSubmit={handleSubmit} class="space-y-4">
         <Input
           label="Item Name *"
@@ -68,11 +64,11 @@ export function ItemForm(props: ItemFormProps) {
         />
 
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
+          <label class="mb-1 block text-sm font-medium text-gray-700">Category</label>
           <select
             value={categoryId()}
             onChange={(e) => setCategoryId(e.currentTarget.value)}
-            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
           >
             <option value="">No category</option>
             {props.categories.map((cat) => (
@@ -84,12 +80,12 @@ export function ItemForm(props: ItemFormProps) {
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+          <label class="mb-1 block text-sm font-medium text-gray-700">Description</label>
           <textarea
             value={description()}
             onInput={(e) => setDescription(e.currentTarget.value)}
             placeholder="Optional notes about this item"
-            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
             rows={3}
           />
         </div>
@@ -102,7 +98,7 @@ export function ItemForm(props: ItemFormProps) {
           onInput={(e) => setQuantity(parseInt(e.currentTarget.value) || 1)}
         />
 
-        <div class="flex gap-2 justify-end pt-4">
+        <div class="flex justify-end gap-2 pt-4">
           <Button type="button" variant="secondary" onClick={props.onClose}>
             Cancel
           </Button>

@@ -23,8 +23,19 @@ export async function getClerk(): Promise<Clerk> {
 
 // Helper to get the current session token
 export async function getSessionToken(): Promise<string | null> {
-  const clerk = await getClerk();
-  return clerk.session?.getToken() ?? null;
+  try {
+    const clerk = await getClerk();
+
+    // Wait for Clerk to be fully loaded
+    if (!clerk.loaded) {
+      await clerk.load();
+    }
+
+    return (await clerk.session?.getToken()) ?? null;
+  } catch (error) {
+    console.error('Error getting session token:', error);
+    return null;
+  }
 }
 
 // Helper to check if user is signed in

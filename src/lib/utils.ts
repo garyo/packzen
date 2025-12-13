@@ -17,8 +17,13 @@ export function getTripDuration(startDate: string, endDate: string): number {
 // Check if trip is upcoming, active, or past
 export function getTripStatus(startDate: string, endDate: string): 'upcoming' | 'active' | 'past' {
   const now = new Date();
+  now.setHours(0, 0, 0, 0); // Strip time component
+
   const start = new Date(startDate);
+  start.setHours(0, 0, 0, 0);
+
   const end = new Date(endDate);
+  end.setHours(0, 0, 0, 0);
 
   if (now < start) return 'upcoming';
   if (now > end) return 'past';

@@ -3,7 +3,9 @@ import { sql } from 'drizzle-orm';
 
 // Categories table
 export const categories = sqliteTable('categories', {
-  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id: text('id')
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   clerk_user_id: text('clerk_user_id').notNull(),
   name: text('name').notNull(),
   icon: text('icon'), // emoji or icon name
@@ -15,7 +17,9 @@ export const categories = sqliteTable('categories', {
 
 // Master Items table
 export const masterItems = sqliteTable('master_items', {
-  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id: text('id')
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   clerk_user_id: text('clerk_user_id').notNull(),
   category_id: text('category_id').references(() => categories.id, { onDelete: 'set null' }),
   name: text('name').notNull(),
@@ -31,7 +35,9 @@ export const masterItems = sqliteTable('master_items', {
 
 // Trips table
 export const trips = sqliteTable('trips', {
-  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id: text('id')
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   clerk_user_id: text('clerk_user_id').notNull(),
   name: text('name').notNull(),
   destination: text('destination'),
@@ -48,7 +54,9 @@ export const trips = sqliteTable('trips', {
 
 // Bags table (per trip)
 export const bags = sqliteTable('bags', {
-  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id: text('id')
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   trip_id: text('trip_id')
     .notNull()
     .references(() => trips.id, { onDelete: 'cascade' }),
@@ -63,7 +71,9 @@ export const bags = sqliteTable('bags', {
 
 // Trip Items table (items copied/added to specific trips)
 export const tripItems = sqliteTable('trip_items', {
-  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id: text('id')
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   trip_id: text('trip_id')
     .notNull()
     .references(() => trips.id, { onDelete: 'cascade' }),

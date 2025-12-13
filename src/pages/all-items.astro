@@ -2,16 +2,16 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 ---
 
-<BaseLayout title="Master List - Packing List">
+<BaseLayout title="All Items - PackZen">
   <div id="app-root"></div>
 </BaseLayout>
 
 <script>
   import { render } from 'solid-js/web';
-  import { MasterListPage } from '../components/master-list/MasterListPage';
+  import { AllItemsPage } from '../components/all-items/AllItemsPage';
 
   const root = document.getElementById('app-root');
   if (root) {
-    render(MasterListPage, root);
+    render(AllItemsPage, root);
   }
 </script>

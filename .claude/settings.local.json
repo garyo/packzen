@@ -11,7 +11,14 @@
       "Bash(npx wrangler whoami)",
       "Bash(npx wrangler:*)",
       "Bash(cat:*)",
-      "Bash(bun run:*)"
+      "Bash(bun run:*)",
+      "Bash(lsof:*)",
+      "Bash(pgrep:*)",
+      "Bash(pkill:*)",
+      "Bash(xargs kill:*)",
+      "Bash(find:*)",
+      "Bash(test:*)",
+      "Bash(curl:*)"
     ]
   }
 }

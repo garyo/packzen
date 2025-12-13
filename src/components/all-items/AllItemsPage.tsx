@@ -9,28 +9,27 @@ import { Toast, showToast } from '../ui/Toast';
 import { ItemForm } from './ItemForm';
 import { CategoryManager } from './CategoryManager';
 import { masterItemsToCSV, csvToMasterItems, downloadCSV } from '../../lib/csv';
+import { fetchWithErrorHandling } from '../../lib/resource-helpers';
 
-export function MasterListPage() {
+export function AllItemsPage() {
   const [showItemForm, setShowItemForm] = createSignal(false);
   const [showCategoryManager, setShowCategoryManager] = createSignal(false);
   const [editingItem, setEditingItem] = createSignal<MasterItem | null>(null);
 
   // Fetch categories
   const [categories, { refetch: refetchCategories }] = createResource<Category[]>(async () => {
-    const response = await api.get<Category[]>(endpoints.categories);
-    if (response.success && response.data) {
-      return response.data;
-    }
-    return [];
+    return fetchWithErrorHandling(
+      () => api.get<Category[]>(endpoints.categories),
+      'Failed to load categories'
+    );
   });
 
-  // Fetch master items
+  // Fetch all items
   const [items, { refetch: refetchItems }] = createResource<MasterItem[]>(async () => {
-    const response = await api.get<MasterItem[]>(endpoints.masterItems);
-    if (response.success && response.data) {
-      return response.data;
-    }
-    return [];
+    return fetchWithErrorHandling(
+      () => api.get<MasterItem[]>(endpoints.masterItems),
+      'Failed to load items'
+    );
   });
 
   // Initialize auth on mount
@@ -75,8 +74,8 @@ export function MasterListPage() {
 
     const csv = masterItemsToCSV(itemsList);
     const timestamp = new Date().toISOString().split('T')[0];
-    downloadCSV(`master-list-${timestamp}.csv`, csv);
-    showToast('success', 'Master list exported');
+    downloadCSV(`all-items-${timestamp}.csv`, csv);
+    showToast('success', 'All items exported');
   };
 
   const handleImport = async (event: Event) => {
@@ -176,20 +175,25 @@ export function MasterListPage() {
       <Toast />
 
       {/* Header */}
-      <header class="bg-white border-b border-gray-200 sticky top-0 z-10">
+      <header class="sticky top-0 z-10 border-b border-gray-200 bg-white">
         <div class="container mx-auto px-4 py-4">
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-4">
               <a
                 href="/dashboard"
-                class="text-gray-600 hover:text-gray-900 flex items-center gap-1"
+                class="flex items-center gap-1 text-gray-600 hover:text-gray-900"
               >
-                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M15 19l-7-7 7-7"
+                  />
                 </svg>
               </a>
               <div>
-                <h1 class="text-2xl font-bold text-gray-900">Master List</h1>
+                <h1 class="text-2xl font-bold text-gray-900">All Items</h1>
                 <p class="text-sm text-gray-600">Your reusable packing essentials</p>
               </div>
             </div>
@@ -200,14 +204,9 @@ export function MasterListPage() {
               <Button variant="secondary" size="sm" onClick={handleExport}>
                 Export
               </Button>
-              <label class="inline-flex items-center justify-center font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 px-3 py-1.5 text-sm bg-gray-200 text-gray-900 hover:bg-gray-300 focus:ring-gray-500 cursor-pointer">
+              <label class="inline-flex cursor-pointer items-center justify-center rounded-lg bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-900 transition-colors hover:bg-gray-300 focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:outline-none">
                 Import
-                <input
-                  type="file"
-                  accept=".csv"
-                  onChange={handleImport}
-                  class="hidden"
-                />
+                <input type="file" accept=".csv" onChange={handleImport} class="hidden" />
               </label>
               <Button size="sm" onClick={handleAddItem}>
                 + Add Item
@@ -226,7 +225,7 @@ export function MasterListPage() {
               <EmptyState
                 icon="📝"
                 title="No items yet"
-                description="Start building your master packing list by adding your first item"
+                description="Start building your packing list by adding your first item"
                 action={<Button onClick={handleAddItem}>Add Your First Item</Button>}
               />
             }
@@ -238,34 +237,34 @@ export function MasterListPage() {
                   const categoryItems = () => getItemsByCategory(category.id);
                   return (
                     <Show when={categoryItems().length > 0}>
-                      <div class="bg-white rounded-lg shadow-sm p-4">
-                        <div class="flex items-center gap-2 mb-4">
+                      <div class="rounded-lg bg-white p-4 shadow-sm">
+                        <div class="mb-4 flex items-center gap-2">
                           <span class="text-2xl">{category.icon || '📦'}</span>
                           <h2 class="text-lg font-semibold text-gray-900">{category.name}</h2>
                           <span class="text-sm text-gray-500">({categoryItems().length})</span>
                         </div>
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        <div class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
                           <For each={categoryItems()}>
                             {(item) => (
-                              <div class="border border-gray-200 rounded-lg p-3 hover:border-blue-500 transition-colors">
+                              <div class="rounded-lg border border-gray-200 p-3 transition-colors hover:border-blue-500">
                                 <div class="flex items-start justify-between">
                                   <div class="flex-1">
                                     <h3 class="font-medium text-gray-900">{item.name}</h3>
                                     {item.description && (
-                                      <p class="text-sm text-gray-600 mt-1">{item.description}</p>
+                                      <p class="mt-1 text-sm text-gray-600">{item.description}</p>
                                     )}
-                                    <p class="text-xs text-gray-500 mt-1">
+                                    <p class="mt-1 text-xs text-gray-500">
                                       Qty: {item.default_quantity}
                                     </p>
                                   </div>
-                                  <div class="flex gap-1 ml-2">
+                                  <div class="ml-2 flex gap-1">
                                     <button
                                       onClick={() => handleEditItem(item)}
                                       class="p-1 text-gray-400 hover:text-blue-600"
                                       aria-label="Edit"
                                     >
                                       <svg
-                                        class="w-4 h-4"
+                                        class="h-4 w-4"
                                         fill="none"
                                         viewBox="0 0 24 24"
                                         stroke="currentColor"
@@ -284,7 +283,7 @@ export function MasterListPage() {
                                       aria-label="Delete"
                                     >
                                       <svg
-                                        class="w-4 h-4"
+                                        class="h-4 w-4"
                                         fill="none"
                                         viewBox="0 0 24 24"
                                         stroke="currentColor"
@@ -311,32 +310,30 @@ export function MasterListPage() {
 
               {/* Uncategorized */}
               <Show when={uncategorizedItems().length > 0}>
-                <div class="bg-white rounded-lg shadow-sm p-4">
-                  <h2 class="text-lg font-semibold text-gray-900 mb-4">
+                <div class="rounded-lg bg-white p-4 shadow-sm">
+                  <h2 class="mb-4 text-lg font-semibold text-gray-900">
                     Uncategorized ({uncategorizedItems().length})
                   </h2>
-                  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  <div class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
                     <For each={uncategorizedItems()}>
                       {(item) => (
-                        <div class="border border-gray-200 rounded-lg p-3 hover:border-blue-500 transition-colors">
+                        <div class="rounded-lg border border-gray-200 p-3 transition-colors hover:border-blue-500">
                           <div class="flex items-start justify-between">
                             <div class="flex-1">
                               <h3 class="font-medium text-gray-900">{item.name}</h3>
                               {item.description && (
-                                <p class="text-sm text-gray-600 mt-1">{item.description}</p>
+                                <p class="mt-1 text-sm text-gray-600">{item.description}</p>
                               )}
-                              <p class="text-xs text-gray-500 mt-1">
-                                Qty: {item.default_quantity}
-                              </p>
+                              <p class="mt-1 text-xs text-gray-500">Qty: {item.default_quantity}</p>
                             </div>
-                            <div class="flex gap-1 ml-2">
+                            <div class="ml-2 flex gap-1">
                               <button
                                 onClick={() => handleEditItem(item)}
                                 class="p-1 text-gray-400 hover:text-blue-600"
                                 aria-label="Edit"
                               >
                                 <svg
-                                  class="w-4 h-4"
+                                  class="h-4 w-4"
                                   fill="none"
                                   viewBox="0 0 24 24"
                                   stroke="currentColor"
@@ -355,7 +352,7 @@ export function MasterListPage() {
                                 aria-label="Delete"
                               >
                                 <svg
-                                  class="w-4 h-4"
+                                  class="h-4 w-4"
                                   fill="none"
                                   viewBox="0 0 24 24"
                                   stroke="currentColor"
@@ -409,9 +406,9 @@ export function MasterListPage() {
       <div class="fixed bottom-4 left-4">
         <a
           href="/dashboard"
-          class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg shadow-md hover:bg-gray-50"
+          class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 shadow-md hover:bg-gray-50"
         >
-          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path
               stroke-linecap="round"
               stroke-linejoin="round"

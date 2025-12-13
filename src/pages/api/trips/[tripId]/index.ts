@@ -8,7 +8,7 @@ export const GET: APIRoute = async ({ locals, params }) => {
     const runtime = locals.runtime as { env: { DB: D1Database } };
     const db = drizzle(runtime.env.DB);
 
-    const userId = 'temp-user-id'; // This should come from Clerk
+    const userId = locals.userId;
     const { tripId } = params;
 
     if (!tripId) {
@@ -49,7 +49,7 @@ export const PUT: APIRoute = async ({ request, locals, params }) => {
     const runtime = locals.runtime as { env: { DB: D1Database } };
     const db = drizzle(runtime.env.DB);
 
-    const userId = 'temp-user-id'; // This should come from Clerk
+    const userId = locals.userId;
     const { tripId } = params;
 
     if (!tripId) {
@@ -101,7 +101,7 @@ export const DELETE: APIRoute = async ({ locals, params }) => {
     const runtime = locals.runtime as { env: { DB: D1Database } };
     const db = drizzle(runtime.env.DB);
 
-    const userId = 'temp-user-id'; // This should come from Clerk
+    const userId = locals.userId;
     const { tripId } = params;
 
     if (!tripId) {

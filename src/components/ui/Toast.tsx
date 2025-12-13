@@ -34,7 +34,7 @@ export function Toast() {
   return (
     <Show when={toasts().length > 0}>
       <Portal>
-        <div class="fixed bottom-4 right-4 z-50 flex flex-col">
+        <div class="fixed right-4 bottom-4 z-50 flex flex-col">
           <For each={toasts()}>
             {(toast) => <div class={getStyles(toast.type)}>{toast.message}</div>}
           </For>
