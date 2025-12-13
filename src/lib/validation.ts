@@ -107,7 +107,7 @@ export const tripUpdateSchema = z.object({
 export const bagCreateSchema = z.object({
   name: sanitizeString(MAX_NAME_LENGTH),
   type: z.enum(['carry_on', 'checked', 'personal', 'custom']),
-  color: z.string().trim().regex(/^#[0-9A-Fa-f]{6}$/, 'Must be a valid hex color').nullable().optional(),
+  color: z.enum(['blue', 'red', 'green', 'yellow', 'purple', 'gray', 'black']).nullable().optional(),
   sort_order: z.number().int().min(0).optional(),
 });
 
@@ -115,7 +115,7 @@ export const bagUpdateSchema = z.object({
   bag_id: z.string().uuid(),
   name: sanitizeString(MAX_NAME_LENGTH).optional(),
   type: z.enum(['carry_on', 'checked', 'personal', 'custom']).optional(),
-  color: z.string().trim().regex(/^#[0-9A-Fa-f]{6}$/, 'Must be a valid hex color').nullable().optional(),
+  color: z.enum(['blue', 'red', 'green', 'yellow', 'purple', 'gray', 'black']).nullable().optional(),
 });
 
 // Trip Item schemas

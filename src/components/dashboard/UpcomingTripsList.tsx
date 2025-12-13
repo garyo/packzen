@@ -19,10 +19,13 @@ export function UpcomingTripsList(props: UpcomingTripsListProps) {
     return allTrips
       .filter(
         (t) =>
-          t.start_date && getTripStatus(t.start_date, t.end_date || t.start_date) === 'upcoming'
+          !t.start_date || getTripStatus(t.start_date, t.end_date || t.start_date) === 'upcoming'
       )
       .sort((a, b) => {
-        if (!a.start_date || !b.start_date) return 0;
+        // Trips without dates go to the end
+        if (!a.start_date && !b.start_date) return 0;
+        if (!a.start_date) return 1;
+        if (!b.start_date) return -1;
         return new Date(a.start_date).getTime() - new Date(b.start_date).getTime();
       })
       .slice(0, 2);
@@ -31,7 +34,7 @@ export function UpcomingTripsList(props: UpcomingTripsListProps) {
   const upcomingCount = () => {
     const allTrips = props.trips() || [];
     return allTrips.filter(
-      (t) => t.start_date && getTripStatus(t.start_date, t.end_date || t.start_date) === 'upcoming'
+      (t) => !t.start_date || getTripStatus(t.start_date, t.end_date || t.start_date) === 'upcoming'
     ).length;
   };
 
@@ -87,10 +90,12 @@ function TripCard(props: TripCardProps) {
             <p class="mt-1 text-sm text-gray-600">📍 {props.trip.destination}</p>
           </Show>
           <p class="mt-1 text-sm text-gray-500">
-            {formatDate(props.trip.start_date)}
-            <Show when={props.trip.end_date && props.trip.end_date !== props.trip.start_date}>
-              {' '}
-              - {formatDate(props.trip.end_date)}
+            <Show when={props.trip.start_date} fallback={<span class="text-gray-400">No date set</span>}>
+              {formatDate(props.trip.start_date!)}
+              <Show when={props.trip.end_date && props.trip.end_date !== props.trip.start_date}>
+                {' '}
+                - {formatDate(props.trip.end_date!)}
+              </Show>
             </Show>
           </p>
         </div>

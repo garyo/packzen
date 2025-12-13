@@ -96,7 +96,7 @@ export function TripsPage() {
 
   const upcomingTrips = () =>
     trips()?.filter(
-      (t) => t.start_date && getTripStatus(t.start_date, t.end_date || t.start_date) === 'upcoming'
+      (t) => !t.start_date || getTripStatus(t.start_date, t.end_date || t.start_date) === 'upcoming'
     ) || [];
   const activeTrips = () =>
     trips()?.filter(
@@ -293,12 +293,16 @@ function TripCard(props: { trip: Trip; onCopy: () => void; onDelete: () => void 
         </span>
       </div>
 
-      {props.trip.start_date && (
-        <p class="mb-4 text-sm text-gray-600">
-          {formatDate(props.trip.start_date)}
-          {props.trip.end_date && ` - ${formatDate(props.trip.end_date)}`}
-        </p>
-      )}
+      <p class="mb-4 text-sm text-gray-600">
+        {props.trip.start_date ? (
+          <>
+            {formatDate(props.trip.start_date)}
+            {props.trip.end_date && ` - ${formatDate(props.trip.end_date)}`}
+          </>
+        ) : (
+          <span class="text-gray-400">No date set</span>
+        )}
+      </p>
 
       <div class="flex gap-2">
         <a
