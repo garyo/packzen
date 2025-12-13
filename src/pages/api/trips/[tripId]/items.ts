@@ -2,6 +2,7 @@ import type { APIRoute } from 'astro';
 import { eq, and, asc } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import { tripItems, trips } from '../../../../../db/schema';
+import { tripItemCreateSchema, tripItemUpdateSchema, validateRequestSafe } from '../../../../lib/validation';
 
 export const GET: APIRoute = async ({ locals, params }) => {
   try {
@@ -82,14 +83,17 @@ export const POST: APIRoute = async ({ request, locals, params }) => {
     }
 
     const body = await request.json();
-    const { name, category_name, quantity, bag_id, master_item_id } = body;
 
-    if (!name) {
-      return new Response(JSON.stringify({ error: 'Name is required' }), {
+    // Validate and sanitize input
+    const validation = validateRequestSafe(tripItemCreateSchema, body);
+    if (!validation.success) {
+      return new Response(JSON.stringify({ error: validation.error }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
       });
     }
+
+    const { name, category_name, quantity, bag_id, master_item_id } = validation.data;
 
     const newItem = await db
       .insert(tripItems)
@@ -148,7 +152,17 @@ export const PATCH: APIRoute = async ({ request, locals, params }) => {
     }
 
     const body = await request.json();
-    const { id, is_packed, quantity, bag_id, category_name, name } = body;
+
+    // Validate and sanitize input
+    const validation = validateRequestSafe(tripItemUpdateSchema, body);
+    if (!validation.success) {
+      return new Response(JSON.stringify({ error: validation.error }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    const { id, is_packed, quantity, bag_id, category_name, name } = validation.data;
 
     // Build update object dynamically based on what was provided
     type TripItemUpdate = Partial<Pick<typeof tripItems.$inferSelect, 'name' | 'category_name' | 'quantity' | 'bag_id' | 'is_packed'>>;

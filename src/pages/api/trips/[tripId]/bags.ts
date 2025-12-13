@@ -2,6 +2,7 @@ import type { APIRoute } from 'astro';
 import { eq, and, asc } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import { bags, trips } from '../../../../../db/schema';
+import { bagCreateSchema, bagUpdateSchema, validateRequestSafe } from '../../../../lib/validation';
 
 export const GET: APIRoute = async ({ locals, params }) => {
   try {
@@ -82,14 +83,17 @@ export const POST: APIRoute = async ({ request, locals, params }) => {
     }
 
     const body = await request.json();
-    const { name, type, color, sort_order } = body;
 
-    if (!name || !type) {
-      return new Response(JSON.stringify({ error: 'Name and type are required' }), {
+    // Validate and sanitize input
+    const validation = validateRequestSafe(bagCreateSchema, body);
+    if (!validation.success) {
+      return new Response(JSON.stringify({ error: validation.error }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
       });
     }
+
+    const { name, type, color, sort_order } = validation.data;
 
     const newBag = await db
       .insert(bags)
@@ -146,14 +150,17 @@ export const PATCH: APIRoute = async ({ request, locals, params }) => {
     }
 
     const body = await request.json();
-    const { bag_id, name, type, color } = body;
 
-    if (!bag_id) {
-      return new Response(JSON.stringify({ error: 'Bag ID is required' }), {
+    // Validate and sanitize input
+    const validation = validateRequestSafe(bagUpdateSchema, body);
+    if (!validation.success) {
+      return new Response(JSON.stringify({ error: validation.error }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
       });
     }
+
+    const { bag_id, name, type, color } = validation.data;
 
     // Build update object dynamically based on what was provided
     type BagUpdate = Partial<Pick<typeof bags.$inferSelect, 'name' | 'type' | 'color'>>;

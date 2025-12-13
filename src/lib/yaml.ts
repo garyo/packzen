@@ -74,9 +74,9 @@ export function tripToYAML(
   const exportData: TripExport = {
     trip: {
       name: trip.name,
-      destination: trip.destination,
-      start_date: trip.start_date,
-      end_date: trip.end_date,
+      destination: trip.destination || '',
+      start_date: trip.start_date || '',
+      end_date: trip.end_date || '',
       notes: trip.notes,
     },
     bags: bags.map((bag) => ({
@@ -178,9 +178,9 @@ export function fullBackupToYAML(
     })),
     trips: trips.map(({ trip, bags, items }) => ({
       name: trip.name,
-      destination: trip.destination,
-      start_date: trip.start_date,
-      end_date: trip.end_date,
+      destination: trip.destination || '',
+      start_date: trip.start_date || '',
+      end_date: trip.end_date || '',
       notes: trip.notes,
       bags: bags.map((bag) => ({
         name: bag.name,

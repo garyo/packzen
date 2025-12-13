@@ -2,6 +2,7 @@ import type { APIRoute } from 'astro';
 import { eq, desc } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import { trips } from '../../../../db/schema';
+import { tripCreateSchema, validateRequestSafe } from '../../../lib/validation';
 
 export const GET: APIRoute = async ({ locals }) => {
   try {
@@ -37,14 +38,17 @@ export const POST: APIRoute = async ({ request, locals }) => {
 
     const userId = locals.userId;
     const body = await request.json();
-    const { name, destination, start_date, end_date, notes } = body;
 
-    if (!name) {
-      return new Response(JSON.stringify({ error: 'Name is required' }), {
+    // Validate and sanitize input
+    const validation = validateRequestSafe(tripCreateSchema, body);
+    if (!validation.success) {
+      return new Response(JSON.stringify({ error: validation.error }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
       });
     }
+
+    const { name, destination, start_date, end_date, notes } = validation.data;
 
     const newTrip = await db
       .insert(trips)

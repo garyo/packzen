@@ -19,7 +19,8 @@
       "Bash(find:*)",
       "Bash(test:*)",
       "Bash(curl:*)",
-      "Bash(wc:*)"
+      "Bash(wc:*)",
+      "Bash(bunx tsc:*)"
     ]
   }
 }

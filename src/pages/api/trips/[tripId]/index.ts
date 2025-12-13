@@ -2,6 +2,7 @@ import type { APIRoute } from 'astro';
 import { eq, and } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import { trips } from '../../../../../db/schema';
+import { tripUpdateSchema, validateRequestSafe } from '../../../../lib/validation';
 
 export const GET: APIRoute = async ({ locals, params }) => {
   try {
@@ -60,7 +61,17 @@ export const PATCH: APIRoute = async ({ request, locals, params }) => {
     }
 
     const body = await request.json();
-    const { name, destination, start_date, end_date, notes } = body;
+
+    // Validate and sanitize input
+    const validation = validateRequestSafe(tripUpdateSchema, body);
+    if (!validation.success) {
+      return new Response(JSON.stringify({ error: validation.error }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    const { name, destination, start_date, end_date, notes } = validation.data;
 
     // Build update object dynamically based on what was provided
     type TripUpdate = Partial<Pick<typeof trips.$inferSelect, 'name' | 'destination' | 'start_date' | 'end_date' | 'notes'>>;
