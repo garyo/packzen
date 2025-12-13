@@ -1,4 +1,4 @@
-import type { MasterItem, Trip } from './types';
+import type { MasterItem } from './types';
 
 /**
  * Convert master items to CSV format
@@ -58,70 +58,6 @@ export function csvToMasterItems(csv: string): Array<{
   }
 
   return items;
-}
-
-/**
- * Convert trips to CSV format
- */
-export function tripsToCSV(trips: Trip[]): string {
-  const headers = ['name', 'destination', 'start_date', 'end_date', 'notes'];
-  const rows = trips.map((trip) => [
-    escapeCsvField(trip.name),
-    escapeCsvField(trip.destination || ''),
-    trip.start_date || '',
-    trip.end_date || '',
-    escapeCsvField(trip.notes || ''),
-  ]);
-
-  return [headers.join(','), ...rows.map((row) => row.join(','))].join('\n');
-}
-
-/**
- * Parse CSV to trips format
- */
-export function csvToTrips(csv: string): Array<{
-  name: string;
-  destination?: string;
-  start_date?: string;
-  end_date?: string;
-  notes?: string;
-}> {
-  const lines = csv.trim().split('\n');
-  if (lines.length < 2) {
-    throw new Error('CSV must have headers and at least one row');
-  }
-
-  const headers = lines[0].split(',').map((h) => h.trim().toLowerCase());
-  const nameIndex = headers.indexOf('name');
-
-  if (nameIndex === -1) {
-    throw new Error('CSV must have a "name" column');
-  }
-
-  const destIndex = headers.findIndex((h) => h.includes('dest'));
-  const startIndex = headers.findIndex((h) => h.includes('start'));
-  const endIndex = headers.findIndex((h) => h.includes('end'));
-  const notesIndex = headers.findIndex((h) => h.includes('note'));
-
-  const trips = [];
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line) continue;
-
-    const fields = parseCsvLine(line);
-    const name = fields[nameIndex]?.trim();
-    if (!name) continue;
-
-    trips.push({
-      name,
-      destination: destIndex >= 0 ? fields[destIndex]?.trim() : undefined,
-      start_date: startIndex >= 0 ? fields[startIndex]?.trim() : undefined,
-      end_date: endIndex >= 0 ? fields[endIndex]?.trim() : undefined,
-      notes: notesIndex >= 0 ? fields[notesIndex]?.trim() : undefined,
-    });
-  }
-
-  return trips;
 }
 
 /**

@@ -9,7 +9,6 @@ import { Toast, showToast } from '../ui/Toast';
 import { TripForm } from './TripForm';
 import { NewTripImportModal } from './NewTripImportModal';
 import { formatDate, getTripStatus } from '../../lib/utils';
-import { tripsToCSV, csvToTrips, downloadCSV } from '../../lib/csv';
 import { fetchWithErrorHandling } from '../../lib/resource-helpers';
 
 export function TripsPage() {
@@ -95,68 +94,6 @@ export function TripsPage() {
     }
   };
 
-  const handleExport = () => {
-    const tripsList = trips();
-    if (!tripsList || tripsList.length === 0) {
-      showToast('error', 'No trips to export');
-      return;
-    }
-
-    const csv = tripsToCSV(tripsList);
-    const timestamp = new Date().toISOString().split('T')[0];
-    downloadCSV(`trips-${timestamp}.csv`, csv);
-    showToast('success', 'Trips exported');
-  };
-
-  const handleImport = async (event: Event) => {
-    const input = event.target as HTMLInputElement;
-    const file = input.files?.[0];
-    if (!file) return;
-
-    try {
-      const text = await file.text();
-      const parsedTrips = csvToTrips(text);
-      const existingTrips = trips() || [];
-
-      let createdCount = 0;
-      let updatedCount = 0;
-
-      for (const trip of parsedTrips) {
-        // Check if trip with same name exists (case-insensitive)
-        const existing = existingTrips.find(
-          (e) => e.name.toLowerCase() === trip.name.toLowerCase()
-        );
-
-        if (existing) {
-          // Update existing trip
-          const response = await api.put(endpoints.trip(existing.id), {
-            ...existing,
-            destination: trip.destination || existing.destination,
-            start_date: trip.start_date || existing.start_date,
-            end_date: trip.end_date || existing.end_date,
-            notes: trip.notes || existing.notes,
-          });
-          if (response.success) {
-            updatedCount++;
-          }
-        } else {
-          // Create new trip
-          const response = await api.post(endpoints.trips, trip);
-          if (response.success) {
-            createdCount++;
-          }
-        }
-      }
-
-      showToast('success', `Imported: ${createdCount} created, ${updatedCount} updated`);
-      refetch();
-    } catch (error) {
-      showToast('error', error instanceof Error ? error.message : 'Failed to import CSV');
-    } finally {
-      input.value = ''; // Reset file input
-    }
-  };
-
   const upcomingTrips = () =>
     trips()?.filter(
       (t) => t.start_date && getTripStatus(t.start_date, t.end_date || t.start_date) === 'upcoming'
@@ -197,9 +134,6 @@ export function TripsPage() {
               </div>
             </div>
             <div class="flex gap-2">
-              <Button variant="secondary" size="sm" onClick={handleExport}>
-                Export
-              </Button>
               <Button variant="secondary" size="sm" onClick={() => setShowImport(true)}>
                 Import
               </Button>
