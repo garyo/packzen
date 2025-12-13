@@ -1,17 +1,13 @@
 import type { APIRoute } from 'astro';
 import { eq } from 'drizzle-orm';
-import { drizzle } from 'drizzle-orm/d1';
+import { z } from 'zod';
 import { masterItems, categories } from '../../../../db/schema';
 import { masterItemCreateSchema, validateRequestSafe } from '../../../lib/validation';
+import { createGetHandler, createPostHandler } from '../../../lib/api-helpers';
 
-export const GET: APIRoute = async ({ locals }) => {
-  try {
-    const runtime = locals.runtime as { env: { DB: D1Database } };
-    const db = drizzle(runtime.env.DB);
-
-    const userId = locals.userId;
-
-    const items = await db
+export const GET: APIRoute = createGetHandler(
+  async ({ db, userId }) => {
+    return await db
       .select({
         id: masterItems.id,
         clerk_user_id: masterItems.clerk_user_id,
@@ -27,38 +23,28 @@ export const GET: APIRoute = async ({ locals }) => {
       .leftJoin(categories, eq(masterItems.category_id, categories.id))
       .where(eq(masterItems.clerk_user_id, userId))
       .all();
+  },
+  'fetch master items'
+);
 
-    return new Response(JSON.stringify(items), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  } catch (error) {
-    console.error('Error fetching master items:', error);
-    return new Response(JSON.stringify({ error: 'Failed to fetch master items' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
+type MasterItemWithCategory = {
+  id: string;
+  clerk_user_id: string;
+  category_id: string | null;
+  name: string;
+  description: string | null;
+  default_quantity: number;
+  created_at: Date;
+  updated_at: Date;
+  category_name: string | null;
 };
 
-export const POST: APIRoute = async ({ request, locals }) => {
-  try {
-    const runtime = locals.runtime as { env: { DB: D1Database } };
-    const db = drizzle(runtime.env.DB);
-
-    const userId = locals.userId;
-    const body = await request.json();
-
-    // Validate and sanitize input
-    const validation = validateRequestSafe(masterItemCreateSchema, body);
-    if (!validation.success) {
-      return new Response(JSON.stringify({ error: validation.error }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
-
-    const { name, description, category_id, default_quantity } = validation.data;
+export const POST: APIRoute = createPostHandler<
+  z.infer<typeof masterItemCreateSchema>,
+  MasterItemWithCategory
+>(
+  async ({ db, userId, validatedData }) => {
+    const { name, description, category_id, default_quantity } = validatedData;
 
     const newItem = await db
       .insert(masterItems)
@@ -73,7 +59,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
       .get();
 
     // Fetch the item with category name
-    const itemWithCategory = await db
+    const result = await db
       .select({
         id: masterItems.id,
         clerk_user_id: masterItems.clerk_user_id,
@@ -90,15 +76,12 @@ export const POST: APIRoute = async ({ request, locals }) => {
       .where(eq(masterItems.id, newItem.id))
       .get();
 
-    return new Response(JSON.stringify(itemWithCategory), {
-      status: 201,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  } catch (error) {
-    console.error('Error creating master item:', error);
-    return new Response(JSON.stringify({ error: 'Failed to create master item' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
-};
+    if (!result) {
+      throw new Error('Failed to fetch created item');
+    }
+
+    return result;
+  },
+  'create master item',
+  (data) => validateRequestSafe(masterItemCreateSchema, data)
+);

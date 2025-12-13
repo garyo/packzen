@@ -1,22 +1,15 @@
 import type { APIRoute } from 'astro';
 import { eq, and, asc } from 'drizzle-orm';
-import { drizzle } from 'drizzle-orm/d1';
+import { z } from 'zod';
 import { bags, trips } from '../../../../../db/schema';
 import { bagCreateSchema, bagUpdateSchema, validateRequestSafe } from '../../../../lib/validation';
+import { createGetHandler, createPostHandler, createPatchHandler, createDeleteHandler } from '../../../../lib/api-helpers';
 
-export const GET: APIRoute = async ({ locals, params }) => {
-  try {
-    const runtime = locals.runtime as { env: { DB: D1Database } };
-    const db = drizzle(runtime.env.DB);
-
-    const userId = locals.userId;
+export const GET: APIRoute = createGetHandler(
+  async ({ db, userId, params }) => {
     const { tripId } = params;
-
     if (!tripId) {
-      return new Response(JSON.stringify({ error: 'Trip ID is required' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      throw new Error('Trip ID is required');
     }
 
     // Verify trip ownership
@@ -27,45 +20,27 @@ export const GET: APIRoute = async ({ locals, params }) => {
       .get();
 
     if (!trip) {
-      return new Response(JSON.stringify({ error: 'Trip not found' }), {
-        status: 404,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      throw new Error('Trip not found');
     }
 
-    const tripBags = await db
+    return await db
       .select()
       .from(bags)
       .where(eq(bags.trip_id, tripId))
       .orderBy(asc(bags.sort_order))
       .all();
+  },
+  'fetch bags'
+);
 
-    return new Response(JSON.stringify(tripBags), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  } catch (error) {
-    console.error('Error fetching bags:', error);
-    return new Response(JSON.stringify({ error: 'Failed to fetch bags' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
-};
-
-export const POST: APIRoute = async ({ request, locals, params }) => {
-  try {
-    const runtime = locals.runtime as { env: { DB: D1Database } };
-    const db = drizzle(runtime.env.DB);
-
-    const userId = locals.userId;
+export const POST: APIRoute = createPostHandler<
+  z.infer<typeof bagCreateSchema>,
+  typeof bags.$inferSelect
+>(
+  async ({ db, userId, validatedData, params }) => {
     const { tripId } = params;
-
     if (!tripId) {
-      return new Response(JSON.stringify({ error: 'Trip ID is required' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      throw new Error('Trip ID is required');
     }
 
     // Verify trip ownership
@@ -76,26 +51,12 @@ export const POST: APIRoute = async ({ request, locals, params }) => {
       .get();
 
     if (!trip) {
-      return new Response(JSON.stringify({ error: 'Trip not found' }), {
-        status: 404,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      throw new Error('Trip not found');
     }
 
-    const body = await request.json();
+    const { name, type, color, sort_order } = validatedData;
 
-    // Validate and sanitize input
-    const validation = validateRequestSafe(bagCreateSchema, body);
-    if (!validation.success) {
-      return new Response(JSON.stringify({ error: validation.error }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
-
-    const { name, type, color, sort_order } = validation.data;
-
-    const newBag = await db
+    return await db
       .insert(bags)
       .values({
         trip_id: tripId,
@@ -106,33 +67,19 @@ export const POST: APIRoute = async ({ request, locals, params }) => {
       })
       .returning()
       .get();
+  },
+  'create bag',
+  (data) => validateRequestSafe(bagCreateSchema, data)
+);
 
-    return new Response(JSON.stringify(newBag), {
-      status: 201,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  } catch (error) {
-    console.error('Error creating bag:', error);
-    return new Response(JSON.stringify({ error: 'Failed to create bag' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
-};
-
-export const PATCH: APIRoute = async ({ request, locals, params }) => {
-  try {
-    const runtime = locals.runtime as { env: { DB: D1Database } };
-    const db = drizzle(runtime.env.DB);
-
-    const userId = locals.userId;
+export const PATCH: APIRoute = createPatchHandler<
+  z.infer<typeof bagUpdateSchema>,
+  typeof bags.$inferSelect
+>(
+  async ({ db, userId, validatedData, params }) => {
     const { tripId } = params;
-
     if (!tripId) {
-      return new Response(JSON.stringify({ error: 'Trip ID is required' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      throw new Error('Trip ID is required');
     }
 
     // Verify trip ownership
@@ -143,82 +90,41 @@ export const PATCH: APIRoute = async ({ request, locals, params }) => {
       .get();
 
     if (!trip) {
-      return new Response(JSON.stringify({ error: 'Trip not found' }), {
-        status: 404,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      throw new Error('Trip not found');
     }
 
-    const body = await request.json();
+    const { bag_id, name, type, color } = validatedData;
 
-    // Validate and sanitize input
-    const validation = validateRequestSafe(bagUpdateSchema, body);
-    if (!validation.success) {
-      return new Response(JSON.stringify({ error: validation.error }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
-
-    const { bag_id, name, type, color } = validation.data;
-
-    // Build update object dynamically based on what was provided
+    // Build update object dynamically
     type BagUpdate = Partial<Pick<typeof bags.$inferSelect, 'name' | 'type' | 'color'>>;
     const updates: BagUpdate = {};
     if (name !== undefined) updates.name = name;
     if (type !== undefined) updates.type = type;
     if (color !== undefined) updates.color = color;
 
-    const updatedBag = await db
+    return await db
       .update(bags)
       .set(updates)
       .where(and(eq(bags.id, bag_id), eq(bags.trip_id, tripId)))
       .returning()
       .get();
+  },
+  'update bag',
+  (data) => validateRequestSafe(bagUpdateSchema, data)
+);
 
-    if (!updatedBag) {
-      return new Response(JSON.stringify({ error: 'Bag not found' }), {
-        status: 404,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
-
-    return new Response(JSON.stringify(updatedBag), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  } catch (error) {
-    console.error('Error updating bag:', error);
-    return new Response(JSON.stringify({ error: 'Failed to update bag' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
-};
-
-export const DELETE: APIRoute = async ({ request, locals, params }) => {
-  try {
-    const runtime = locals.runtime as { env: { DB: D1Database } };
-    const db = drizzle(runtime.env.DB);
-
-    const userId = locals.userId;
+export const DELETE: APIRoute = createDeleteHandler(
+  async ({ db, userId, params, request }) => {
     const { tripId } = params;
-
     if (!tripId) {
-      return new Response(JSON.stringify({ error: 'Trip ID is required' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return false;
     }
 
     const body = await request.json();
     const { bag_id } = body;
 
     if (!bag_id) {
-      return new Response(JSON.stringify({ error: 'Bag ID is required' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return false;
     }
 
     // Verify trip ownership
@@ -229,10 +135,7 @@ export const DELETE: APIRoute = async ({ request, locals, params }) => {
       .get();
 
     if (!trip) {
-      return new Response(JSON.stringify({ error: 'Trip not found' }), {
-        status: 404,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return false;
     }
 
     const deleted = await db
@@ -241,22 +144,7 @@ export const DELETE: APIRoute = async ({ request, locals, params }) => {
       .returning()
       .get();
 
-    if (!deleted) {
-      return new Response(JSON.stringify({ error: 'Bag not found' }), {
-        status: 404,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
-
-    return new Response(JSON.stringify({ success: true }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  } catch (error) {
-    console.error('Error deleting bag:', error);
-    return new Response(JSON.stringify({ error: 'Failed to delete bag' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
-};
+    return !!deleted;
+  },
+  'delete bag'
+);

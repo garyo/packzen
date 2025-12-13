@@ -1,4 +1,4 @@
-import { createSignal, createResource, For, Show, onMount, onCleanup } from 'solid-js';
+import { createSignal, createResource, Show, onMount } from 'solid-js';
 import { authStore } from '../../stores/auth';
 import { api, endpoints } from '../../lib/api';
 import type { Trip, TripItem, Bag } from '../../lib/types';
@@ -12,6 +12,10 @@ import { BagManager } from './BagManager';
 import { EditTripItem } from './EditTripItem';
 import { AddTripItemForm } from './AddTripItemForm';
 import { TripImportModal } from './TripImportModal';
+import { PackingPageHeader } from './PackingPageHeader';
+import { PackingListBagView } from './PackingListBagView';
+import { PackingListCategoryView } from './PackingListCategoryView';
+import { SelectModeActionBar } from './SelectModeActionBar';
 import { fetchWithErrorHandling, fetchSingleWithErrorHandling } from '../../lib/resource-helpers';
 import { tripToYAML, downloadYAML } from '../../lib/yaml';
 
@@ -27,9 +31,7 @@ export function PackingPage(props: PackingPageProps) {
   const [selectMode, setSelectMode] = createSignal(false);
   const [selectedItems, setSelectedItems] = createSignal<Set<string>>(new Set());
   const [showImport, setShowImport] = createSignal(false);
-  const [showMenu, setShowMenu] = createSignal(false);
   const [sortBy, setSortBy] = createSignal<'bag' | 'category'>('bag');
-  let menuRef: HTMLDivElement | undefined;
 
   const [items, { mutate, refetch }] = createResource<TripItem[]>(async () => {
     return fetchWithErrorHandling(
@@ -56,29 +58,6 @@ export function PackingPage(props: PackingPageProps) {
     await authStore.initAuth();
   });
 
-  // Handle clicks outside menu and ESC key
-  onMount(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (showMenu() && menuRef && !menuRef.contains(e.target as Node)) {
-        setShowMenu(false);
-      }
-    };
-
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && showMenu()) {
-        setShowMenu(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    document.addEventListener('keydown', handleEscape);
-
-    onCleanup(() => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('keydown', handleEscape);
-    });
-  });
-
   const handleTogglePacked = async (item: TripItem) => {
     // Optimistic update
     mutate((prev) => prev?.map((i) => (i.id === item.id ? { ...i, is_packed: !i.is_packed } : i)));
@@ -100,12 +79,12 @@ export function PackingPage(props: PackingPageProps) {
 
   const toggleSelectMode = () => {
     setSelectMode(!selectMode());
-    setSelectedItems(new Set());
+    setSelectedItems(new Set<string>());
   };
 
   const toggleItemSelection = (itemId: string) => {
     setSelectedItems((prev) => {
-      const newSet = new Set(prev);
+      const newSet = new Set<string>(prev);
       if (newSet.has(itemId)) {
         newSet.delete(itemId);
       } else {
@@ -120,12 +99,11 @@ export function PackingPage(props: PackingPageProps) {
     if (itemsToUpdate.length === 0) return;
 
     try {
-      // Update all selected items
       await Promise.all(
         itemsToUpdate.map((itemId) =>
           api.patch(endpoints.tripItems(props.tripId), {
             id: itemId,
-            bag_id: bagId === '' ? null : bagId,
+            bag_id: bagId,
           })
         )
       );
@@ -133,7 +111,7 @@ export function PackingPage(props: PackingPageProps) {
       showToast('success', `Assigned ${itemsToUpdate.length} items to bag`);
       await refetch();
       setSelectMode(false);
-      setSelectedItems(new Set());
+      setSelectedItems(new Set<string>());
     } catch (error) {
       showToast('error', 'Failed to assign items');
     }
@@ -192,198 +170,26 @@ export function PackingPage(props: PackingPageProps) {
   const totalCount = () => items()?.length || 0;
   const progress = () => getPackingProgress(packedCount(), totalCount());
 
-  const itemsByBag = () => {
-    const allItems = items() || [];
-    const allBags = bags() || [];
-    const grouped = new Map<string | null, Map<string, TripItem[]>>();
-
-    // Group items by bag_id, then by category
-    allItems.forEach((item) => {
-      const bagId = item.bag_id || null;
-      const category = item.category_name || 'Uncategorized';
-
-      if (!grouped.has(bagId)) {
-        grouped.set(bagId, new Map());
-      }
-
-      const bagCategories = grouped.get(bagId)!;
-      if (!bagCategories.has(category)) {
-        bagCategories.set(category, []);
-      }
-
-      bagCategories.get(category)!.push(item);
-    });
-
-    // Add virtual "Wearing" bag to the list
-    const bagsWithWearing = [
-      ...allBags,
-      {
-        id: null as any,
-        trip_id: props.tripId,
-        name: 'Wearing / No Bag',
-        type: 'wearing' as any,
-        color: null,
-        sort_order: 999,
-        created_at: new Date().toISOString(),
-      },
-    ];
-
-    return { grouped, allBags: bagsWithWearing };
-  };
-
-  const itemsByCategory = () => {
-    const allItems = items() || [];
-    const allBags = bags() || [];
-    const grouped = new Map<string, Map<string | null, TripItem[]>>();
-
-    // Group items by category, then by bag_id
-    allItems.forEach((item) => {
-      const category = item.category_name || 'Uncategorized';
-      const bagId = item.bag_id || null;
-
-      if (!grouped.has(category)) {
-        grouped.set(category, new Map());
-      }
-
-      const categoryBags = grouped.get(category)!;
-      if (!categoryBags.has(bagId)) {
-        categoryBags.set(bagId, []);
-      }
-
-      categoryBags.get(bagId)!.push(item);
-    });
-
-    // Add virtual "Wearing" bag to the list
-    const bagsWithWearing = [
-      ...allBags,
-      {
-        id: null as any,
-        trip_id: props.tripId,
-        name: 'Wearing / No Bag',
-        type: 'wearing' as any,
-        color: null,
-        sort_order: 999,
-        created_at: new Date().toISOString(),
-      },
-    ];
-
-    return { grouped, allBags: bagsWithWearing };
-  };
-
   return (
     <div class="min-h-screen bg-gray-50">
       <Toast />
 
-      {/* Header with Progress */}
-      <header class="sticky top-0 z-10 border-b border-gray-200 bg-white">
-        <div class="container mx-auto px-4 py-4 md:py-2">
-          <div class="mb-3 md:mb-2 flex items-center justify-between">
-            <div class="flex items-center gap-2">
-              <a href="/trips" class="flex items-center text-gray-600 hover:text-gray-900">
-                <svg class="h-5 w-5 md:h-4 md:w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M15 19l-7-7 7-7"
-                  />
-                </svg>
-              </a>
-              <div>
-                <h1 class="text-2xl md:text-lg font-bold text-gray-900">{trip()?.name || 'Packing'}</h1>
-                <p class="text-sm md:text-xs text-gray-600">
-                  {packedCount()} of {totalCount()} packed
-                </p>
-              </div>
-            </div>
-            <div class="flex gap-2">
-              <Show
-                when={selectMode()}
-                fallback={
-                  <>
-                    <Button variant="secondary" size="sm" onClick={() => setShowBagManager(true)}>
-                      Bags
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => setShowAddFromMaster(true)}
-                    >
-                      + From All Items
-                    </Button>
-                    <Button variant="secondary" size="sm" onClick={toggleSelectMode}>
-                      Select
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => setSortBy(sortBy() === 'bag' ? 'category' : 'bag')}
-                      title={`Currently sorting by ${sortBy()}. Click to switch.`}
-                    >
-                      {sortBy() === 'bag' ? '👜→📁' : '📁→👜'}
-                    </Button>
-                    <Button size="sm" onClick={handleAddItem}>
-                      + Add
-                    </Button>
-                    <div class="relative" ref={menuRef}>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => setShowMenu(!showMenu())}
-                      >
-                        ⋮
-                      </Button>
-                      <Show when={showMenu()}>
-                        <div class="absolute right-0 top-full z-20 mt-1 w-48 rounded-lg border border-gray-200 bg-white shadow-lg">
-                          <button
-                            onClick={() => {
-                              handleExport();
-                              setShowMenu(false);
-                            }}
-                            class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
-                          >
-                            Export Trip
-                          </button>
-                          <button
-                            onClick={() => {
-                              setShowImport(true);
-                              setShowMenu(false);
-                            }}
-                            class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
-                          >
-                            Import/Merge Trip
-                          </button>
-                          <button
-                            onClick={() => {
-                              handleClearAll();
-                              setShowMenu(false);
-                            }}
-                            class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 text-red-600"
-                          >
-                            Clear All (Unpack)
-                          </button>
-                        </div>
-                      </Show>
-                    </div>
-                  </>
-                }
-              >
-                <Button variant="secondary" size="sm" onClick={toggleSelectMode}>
-                  Cancel
-                </Button>
-              </Show>
-            </div>
-          </div>
-
-          {/* Progress Bar */}
-          <div class="h-3 w-full rounded-full bg-gray-200">
-            <div
-              class="h-3 rounded-full bg-green-600 transition-all duration-300"
-              style={{ width: `${progress()}%` }}
-            />
-          </div>
-        </div>
-      </header>
+      <PackingPageHeader
+        trip={trip}
+        packedCount={packedCount}
+        totalCount={totalCount}
+        progress={progress}
+        selectMode={selectMode}
+        sortBy={sortBy}
+        onToggleSelectMode={toggleSelectMode}
+        onToggleSortBy={() => setSortBy(sortBy() === 'bag' ? 'category' : 'bag')}
+        onAddItem={handleAddItem}
+        onManageBags={() => setShowBagManager(true)}
+        onAddFromMaster={() => setShowAddFromMaster(true)}
+        onExport={handleExport}
+        onImport={() => setShowImport(true)}
+        onClearAll={handleClearAll}
+      />
 
       {/* Packing List */}
       <main class="container mx-auto px-4 py-6 pb-20 md:px-3 md:py-3 md:pb-16">
@@ -402,228 +208,26 @@ export function PackingPage(props: PackingPageProps) {
             <Show
               when={sortBy() === 'bag'}
               fallback={
-                /* Category-first view */
-                <div class="space-y-6 md:space-y-3">
-                  <For each={Array.from(itemsByCategory().grouped.entries())}>
-                    {([category, categoryBags]) => {
-                      const totalItems = () =>
-                        Array.from(categoryBags.values()).reduce(
-                          (sum, items) => sum + items.length,
-                          0
-                        );
-                      return (
-                        <Show when={totalItems() > 0}>
-                          <div>
-                            <div class="mb-3 md:mb-1.5 flex items-center gap-2">
-                              <h2 class="text-lg md:text-base font-semibold text-gray-900">
-                                📁 {category}
-                              </h2>
-                              <span class="text-sm md:text-xs text-gray-500">({totalItems()})</span>
-                            </div>
-                            <For each={Array.from(categoryBags.entries())}>
-                              {([bagId, bagItems]) => {
-                                const bag = () =>
-                                  itemsByCategory().allBags.find((b) => b.id === bagId);
-                                return (
-                                  <div class="mb-4 md:mb-2">
-                                    <h3 class="mb-2 md:mb-1 px-1 text-sm md:text-xs font-medium text-gray-600">
-                                      {bag()?.name || 'No bag'}
-                                    </h3>
-                                    <div
-                                      class="grid gap-2 md:gap-1.5"
-                                      style="grid-template-columns: repeat(auto-fill, minmax(320px, 400px))"
-                                    >
-                                      <For each={bagItems}>
-                                        {(item) => (
-                                          <div
-                                            class={`flex items-center gap-4 md:gap-2 rounded-lg bg-white p-4 md:p-2 shadow-sm ${item.is_packed ? 'opacity-60' : ''} ${selectMode() && selectedItems().has(item.id) ? 'ring-2 ring-blue-500' : ''} `}
-                                          >
-                                            <Show when={!selectMode()}>
-                                              <input
-                                                type="checkbox"
-                                                checked={item.is_packed}
-                                                onChange={() => handleTogglePacked(item)}
-                                                class="h-8 w-8 md:h-6 md:w-6 cursor-pointer rounded border-2 border-gray-300 text-green-600 focus:ring-2 focus:ring-green-500"
-                                              />
-                                            </Show>
-                                            <div class="flex-1">
-                                              <p
-                                                class={`text-lg md:text-base font-medium ${item.is_packed ? 'text-gray-500 line-through' : 'text-gray-900'}`}
-                                              >
-                                                {item.name}
-                                              </p>
-                                              <div class="mt-1 md:mt-0.5 flex gap-3 md:gap-2 text-sm md:text-xs text-gray-500">
-                                                {bag() && <span>👜 {bag()!.name}</span>}
-                                                {item.quantity > 1 && <span>×{item.quantity}</span>}
-                                              </div>
-                                            </div>
-                                            <Show
-                                              when={selectMode()}
-                                              fallback={
-                                                <button
-                                                  onClick={() => setEditingItem(item)}
-                                                  class="p-2 text-gray-400 transition-colors hover:text-blue-600"
-                                                  aria-label="Edit item"
-                                                >
-                                                  <svg
-                                                    class="h-5 w-5"
-                                                    fill="none"
-                                                    viewBox="0 0 24 24"
-                                                    stroke="currentColor"
-                                                  >
-                                                    <path
-                                                      stroke-linecap="round"
-                                                      stroke-linejoin="round"
-                                                      stroke-width="2"
-                                                      d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                                                    />
-                                                  </svg>
-                                                </button>
-                                              }
-                                            >
-                                              <input
-                                                type="checkbox"
-                                                checked={selectedItems().has(item.id)}
-                                                onChange={() => toggleItemSelection(item.id)}
-                                                class="h-8 w-8 cursor-pointer rounded border-2 border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
-                                              />
-                                            </Show>
-                                          </div>
-                                        )}
-                                      </For>
-                                    </div>
-                                  </div>
-                                );
-                              }}
-                            </For>
-                          </div>
-                        </Show>
-                      );
-                    }}
-                  </For>
-                </div>
+                <PackingListCategoryView
+                  items={items}
+                  bags={bags}
+                  selectMode={selectMode}
+                  selectedItems={selectedItems}
+                  onTogglePacked={handleTogglePacked}
+                  onEditItem={setEditingItem}
+                  onToggleItemSelection={toggleItemSelection}
+                />
               }
             >
-              {/* Bag-first view */}
-              <div class="space-y-6 md:space-y-3">
-                {/* Items grouped by bag */}
-                <For each={itemsByBag().allBags}>
-                {(bag) => {
-                  const bagCategories = () => itemsByBag().grouped.get(bag.id) || new Map();
-                  const totalItems = () =>
-                    Array.from(bagCategories().values()).reduce(
-                      (sum, items) => sum + items.length,
-                      0
-                    );
-                  return (
-                    <Show when={totalItems() > 0}>
-                      <div>
-                        <div class="mb-3 md:mb-1.5 flex items-center gap-2">
-                          <Show
-                            when={bag.id !== null}
-                            fallback={<span class="text-lg md:text-base">👕</span>}
-                          >
-                            <div
-                              class={`h-3 w-3 md:h-2.5 md:w-2.5 rounded-full ${
-                                bag.color === 'blue'
-                                  ? 'bg-blue-500'
-                                  : bag.color === 'red'
-                                    ? 'bg-red-500'
-                                    : bag.color === 'green'
-                                      ? 'bg-green-500'
-                                      : bag.color === 'yellow'
-                                        ? 'bg-yellow-500'
-                                        : bag.color === 'purple'
-                                          ? 'bg-purple-500'
-                                          : bag.color === 'black'
-                                            ? 'bg-black'
-                                            : 'bg-gray-500'
-                              }`}
-                            />
-                          </Show>
-                          <h2 class="text-lg md:text-base font-semibold text-gray-900">{bag.name}</h2>
-                          <span class="text-sm md:text-xs text-gray-500">({totalItems()})</span>
-                        </div>
-                        <For each={Array.from(bagCategories().entries())}>
-                          {([category, categoryItems]) => (
-                            <div class="mb-4 md:mb-2">
-                              <h3 class="mb-2 md:mb-1 px-1 text-sm md:text-xs font-medium text-gray-600">
-                                {category}
-                              </h3>
-                              <div
-                                class="grid gap-2 md:gap-1.5"
-                                style="grid-template-columns: repeat(auto-fill, minmax(320px, 400px))"
-                              >
-                                <For each={categoryItems}>
-                                  {(item) => (
-                                    <div
-                                      class={`flex items-center gap-4 md:gap-2 rounded-lg bg-white p-4 md:p-2 shadow-sm ${item.is_packed ? 'opacity-60' : ''} ${selectMode() && selectedItems().has(item.id) ? 'ring-2 ring-blue-500' : ''} `}
-                                    >
-                                      <Show when={!selectMode()}>
-                                        <input
-                                          type="checkbox"
-                                          checked={item.is_packed}
-                                          onChange={() => handleTogglePacked(item)}
-                                          class="h-8 w-8 md:h-6 md:w-6 cursor-pointer rounded border-2 border-gray-300 text-green-600 focus:ring-2 focus:ring-green-500"
-                                        />
-                                      </Show>
-                                      <div class="flex-1">
-                                        <p
-                                          class={`text-lg md:text-base font-medium ${item.is_packed ? 'text-gray-500 line-through' : 'text-gray-900'}`}
-                                        >
-                                          {item.name}
-                                        </p>
-                                        <div class="mt-1 md:mt-0.5 flex gap-3 md:gap-2 text-sm md:text-xs text-gray-500">
-                                          {item.category_name && (
-                                            <span>📁 {item.category_name}</span>
-                                          )}
-                                          {item.quantity > 1 && <span>×{item.quantity}</span>}
-                                        </div>
-                                      </div>
-                                      <Show
-                                        when={selectMode()}
-                                        fallback={
-                                          <button
-                                            onClick={() => setEditingItem(item)}
-                                            class="p-2 text-gray-400 transition-colors hover:text-blue-600"
-                                            aria-label="Edit item"
-                                          >
-                                            <svg
-                                              class="h-5 w-5"
-                                              fill="none"
-                                              viewBox="0 0 24 24"
-                                              stroke="currentColor"
-                                            >
-                                              <path
-                                                stroke-linecap="round"
-                                                stroke-linejoin="round"
-                                                stroke-width="2"
-                                                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                                              />
-                                            </svg>
-                                          </button>
-                                        }
-                                      >
-                                        <input
-                                          type="checkbox"
-                                          checked={selectedItems().has(item.id)}
-                                          onChange={() => toggleItemSelection(item.id)}
-                                          class="h-8 w-8 cursor-pointer rounded border-2 border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
-                                        />
-                                      </Show>
-                                    </div>
-                                  )}
-                                </For>
-                              </div>
-                            </div>
-                          )}
-                        </For>
-                      </div>
-                    </Show>
-                  );
-                }}
-              </For>
-              </div>
+              <PackingListBagView
+                items={items}
+                bags={bags}
+                selectMode={selectMode}
+                selectedItems={selectedItems}
+                onTogglePacked={handleTogglePacked}
+                onEditItem={setEditingItem}
+                onToggleItemSelection={toggleItemSelection}
+              />
             </Show>
           </Show>
         </Show>
@@ -686,26 +290,11 @@ export function PackingPage(props: PackingPageProps) {
 
       {/* Bottom Action Bar (Select Mode) */}
       <Show when={selectMode() && selectedItems().size > 0}>
-        <div class="fixed right-0 bottom-0 left-0 z-20 border-t-2 border-gray-200 bg-white shadow-lg">
-          <div class="container mx-auto px-4 py-4">
-            <div class="flex items-center justify-between gap-4">
-              <span class="font-medium text-gray-900">
-                {selectedItems().size} item{selectedItems().size !== 1 ? 's' : ''} selected
-              </span>
-              <div class="flex items-center gap-3">
-                <label class="text-sm font-medium text-gray-700">Assign to:</label>
-                <select
-                  onChange={(e) => handleBatchAssignToBag(e.target.value)}
-                  class="rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Select a bag...</option>
-                  <option value="">No bag</option>
-                  <For each={bags()}>{(bag) => <option value={bag.id}>{bag.name}</option>}</For>
-                </select>
-              </div>
-            </div>
-          </div>
-        </div>
+        <SelectModeActionBar
+          selectedCount={() => selectedItems().size}
+          bags={bags}
+          onAssignToBag={handleBatchAssignToBag}
+        />
       </Show>
 
       {/* Back Button */}

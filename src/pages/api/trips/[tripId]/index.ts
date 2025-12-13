@@ -1,22 +1,15 @@
 import type { APIRoute } from 'astro';
 import { eq, and } from 'drizzle-orm';
-import { drizzle } from 'drizzle-orm/d1';
+import { z } from 'zod';
 import { trips } from '../../../../../db/schema';
 import { tripUpdateSchema, validateRequestSafe } from '../../../../lib/validation';
+import { createGetHandler, createPatchHandler, createDeleteHandler } from '../../../../lib/api-helpers';
 
-export const GET: APIRoute = async ({ locals, params }) => {
-  try {
-    const runtime = locals.runtime as { env: { DB: D1Database } };
-    const db = drizzle(runtime.env.DB);
-
-    const userId = locals.userId;
+export const GET: APIRoute = createGetHandler(
+  async ({ db, userId, params }) => {
     const { tripId } = params;
-
     if (!tripId) {
-      return new Response(JSON.stringify({ error: 'Trip ID is required' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      throw new Error('Trip ID is required');
     }
 
     const trip = await db
@@ -26,54 +19,27 @@ export const GET: APIRoute = async ({ locals, params }) => {
       .get();
 
     if (!trip) {
-      return new Response(JSON.stringify({ error: 'Trip not found' }), {
-        status: 404,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      throw new Error('Trip not found');
     }
 
-    return new Response(JSON.stringify(trip), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  } catch (error) {
-    console.error('Error fetching trip:', error);
-    return new Response(JSON.stringify({ error: 'Failed to fetch trip' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
-};
+    return trip;
+  },
+  'fetch trip'
+);
 
-export const PATCH: APIRoute = async ({ request, locals, params }) => {
-  try {
-    const runtime = locals.runtime as { env: { DB: D1Database } };
-    const db = drizzle(runtime.env.DB);
-
-    const userId = locals.userId;
+export const PATCH: APIRoute = createPatchHandler<
+  z.infer<typeof tripUpdateSchema>,
+  typeof trips.$inferSelect
+>(
+  async ({ db, userId, validatedData, params }) => {
     const { tripId } = params;
-
     if (!tripId) {
-      return new Response(JSON.stringify({ error: 'Trip ID is required' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      throw new Error('Trip ID is required');
     }
 
-    const body = await request.json();
+    const { name, destination, start_date, end_date, notes } = validatedData;
 
-    // Validate and sanitize input
-    const validation = validateRequestSafe(tripUpdateSchema, body);
-    if (!validation.success) {
-      return new Response(JSON.stringify({ error: validation.error }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
-
-    const { name, destination, start_date, end_date, notes } = validation.data;
-
-    // Build update object dynamically based on what was provided
+    // Build update object dynamically
     type TripUpdate = Partial<Pick<typeof trips.$inferSelect, 'name' | 'destination' | 'start_date' | 'end_date' | 'notes'>>;
     const updates: TripUpdate & { updated_at: Date } = { updated_at: new Date() };
     if (name !== undefined) updates.name = name;
@@ -82,52 +48,30 @@ export const PATCH: APIRoute = async ({ request, locals, params }) => {
     if (end_date !== undefined) updates.end_date = end_date;
     if (notes !== undefined) updates.notes = notes;
 
-    const updated = await db
+    return await db
       .update(trips)
       .set(updates)
       .where(and(eq(trips.id, tripId), eq(trips.clerk_user_id, userId)))
       .returning()
       .get();
+  },
+  'update trip',
+  (data) => validateRequestSafe(tripUpdateSchema, data)
+);
 
-    if (!updated) {
-      return new Response(JSON.stringify({ error: 'Trip not found' }), {
-        status: 404,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
-
-    return new Response(JSON.stringify(updated), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  } catch (error) {
-    console.error('Error updating trip:', error);
-    return new Response(JSON.stringify({ error: 'Failed to update trip' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
-};
-
-export const PUT: APIRoute = async ({ request, locals, params }) => {
-  try {
-    const runtime = locals.runtime as { env: { DB: D1Database } };
-    const db = drizzle(runtime.env.DB);
-
-    const userId = locals.userId;
+export const PUT: APIRoute = createPatchHandler<
+  z.infer<typeof tripUpdateSchema>,
+  typeof trips.$inferSelect
+>(
+  async ({ db, userId, validatedData, params }) => {
     const { tripId } = params;
-
     if (!tripId) {
-      return new Response(JSON.stringify({ error: 'Trip ID is required' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      throw new Error('Trip ID is required');
     }
 
-    const body = await request.json();
-    const { name, destination, start_date, end_date, notes } = body;
+    const { name, destination, start_date, end_date, notes } = validatedData;
 
-    const updated = await db
+    return await db
       .update(trips)
       .set({
         name,
@@ -140,40 +84,16 @@ export const PUT: APIRoute = async ({ request, locals, params }) => {
       .where(and(eq(trips.id, tripId), eq(trips.clerk_user_id, userId)))
       .returning()
       .get();
+  },
+  'update trip (PUT)',
+  (data) => validateRequestSafe(tripUpdateSchema, data)
+);
 
-    if (!updated) {
-      return new Response(JSON.stringify({ error: 'Trip not found' }), {
-        status: 404,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
-
-    return new Response(JSON.stringify(updated), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  } catch (error) {
-    console.error('Error updating trip:', error);
-    return new Response(JSON.stringify({ error: 'Failed to update trip' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
-};
-
-export const DELETE: APIRoute = async ({ locals, params }) => {
-  try {
-    const runtime = locals.runtime as { env: { DB: D1Database } };
-    const db = drizzle(runtime.env.DB);
-
-    const userId = locals.userId;
+export const DELETE: APIRoute = createDeleteHandler(
+  async ({ db, userId, params, request }) => {
     const { tripId } = params;
-
     if (!tripId) {
-      return new Response(JSON.stringify({ error: 'Trip ID is required' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return false;
     }
 
     const deleted = await db
@@ -182,22 +102,7 @@ export const DELETE: APIRoute = async ({ locals, params }) => {
       .returning()
       .get();
 
-    if (!deleted) {
-      return new Response(JSON.stringify({ error: 'Trip not found' }), {
-        status: 404,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
-
-    return new Response(JSON.stringify({ success: true }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  } catch (error) {
-    console.error('Error deleting trip:', error);
-    return new Response(JSON.stringify({ error: 'Failed to delete trip' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
-};
+    return !!deleted;
+  },
+  'delete trip'
+);

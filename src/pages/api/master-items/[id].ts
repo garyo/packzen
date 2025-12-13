@@ -1,22 +1,27 @@
 import type { APIRoute } from 'astro';
 import { eq, and } from 'drizzle-orm';
-import { drizzle } from 'drizzle-orm/d1';
+import { z } from 'zod';
 import { masterItems, categories } from '../../../../db/schema';
 import { masterItemUpdateSchema, validateRequestSafe } from '../../../lib/validation';
+import { createGetHandler, createPatchHandler, createDeleteHandler } from '../../../lib/api-helpers';
 
-export const GET: APIRoute = async ({ locals, params }) => {
-  try {
-    const runtime = locals.runtime as { env: { DB: D1Database } };
-    const db = drizzle(runtime.env.DB);
+type MasterItemWithCategory = {
+  id: string;
+  clerk_user_id: string;
+  category_id: string | null;
+  name: string;
+  description: string | null;
+  default_quantity: number;
+  created_at: Date;
+  updated_at: Date;
+  category_name: string | null;
+};
 
-    const userId = locals.userId;
+export const GET: APIRoute = createGetHandler(
+  async ({ db, userId, params }) => {
     const { id } = params;
-
     if (!id) {
-      return new Response(JSON.stringify({ error: 'Item ID is required' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      throw new Error('Item ID is required');
     }
 
     const item = await db
@@ -37,52 +42,25 @@ export const GET: APIRoute = async ({ locals, params }) => {
       .get();
 
     if (!item) {
-      return new Response(JSON.stringify({ error: 'Item not found' }), {
-        status: 404,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      throw new Error('Item not found');
     }
 
-    return new Response(JSON.stringify(item), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  } catch (error) {
-    console.error('Error fetching master item:', error);
-    return new Response(JSON.stringify({ error: 'Failed to fetch master item' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
-};
+    return item;
+  },
+  'fetch master item'
+);
 
-export const PATCH: APIRoute = async ({ request, locals, params }) => {
-  try {
-    const runtime = locals.runtime as { env: { DB: D1Database } };
-    const db = drizzle(runtime.env.DB);
-
-    const userId = locals.userId;
+export const PATCH: APIRoute = createPatchHandler<
+  z.infer<typeof masterItemUpdateSchema>,
+  MasterItemWithCategory
+>(
+  async ({ db, userId, validatedData, params }) => {
     const { id } = params;
-
     if (!id) {
-      return new Response(JSON.stringify({ error: 'Item ID is required' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      throw new Error('Item ID is required');
     }
 
-    const body = await request.json();
-
-    // Validate and sanitize input
-    const validation = validateRequestSafe(masterItemUpdateSchema, body);
-    if (!validation.success) {
-      return new Response(JSON.stringify({ error: validation.error }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
-
-    const { name, description, category_id, default_quantity } = validation.data;
+    const { name, description, category_id, default_quantity } = validatedData;
 
     // Build update object dynamically
     type MasterItemUpdate = Partial<Pick<typeof masterItems.$inferSelect, 'name' | 'description' | 'category_id' | 'default_quantity'>>;
@@ -100,14 +78,11 @@ export const PATCH: APIRoute = async ({ request, locals, params }) => {
       .get();
 
     if (!updatedItem) {
-      return new Response(JSON.stringify({ error: 'Item not found' }), {
-        status: 404,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return null;
     }
 
     // Fetch the item with category name
-    const itemWithCategory = await db
+    const result = await db
       .select({
         id: masterItems.id,
         clerk_user_id: masterItems.clerk_user_id,
@@ -124,36 +99,23 @@ export const PATCH: APIRoute = async ({ request, locals, params }) => {
       .where(eq(masterItems.id, updatedItem.id))
       .get();
 
-    return new Response(JSON.stringify(itemWithCategory), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  } catch (error) {
-    console.error('Error updating master item:', error);
-    return new Response(JSON.stringify({ error: 'Failed to update master item' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
-};
+    return result || null;
+  },
+  'update master item',
+  (data) => validateRequestSafe(masterItemUpdateSchema, data)
+);
 
-export const PUT: APIRoute = async ({ request, locals, params }) => {
-  try {
-    const runtime = locals.runtime as { env: { DB: D1Database } };
-    const db = drizzle(runtime.env.DB);
-
-    const userId = locals.userId;
+export const PUT: APIRoute = createPatchHandler<
+  z.infer<typeof masterItemUpdateSchema>,
+  MasterItemWithCategory
+>(
+  async ({ db, userId, validatedData, params }) => {
     const { id } = params;
-
     if (!id) {
-      return new Response(JSON.stringify({ error: 'Item ID is required' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      throw new Error('Item ID is required');
     }
 
-    const body = await request.json();
-    const { name, description, category_id, default_quantity } = body;
+    const { name, description, category_id, default_quantity } = validatedData;
 
     const updatedItem = await db
       .update(masterItems)
@@ -169,14 +131,11 @@ export const PUT: APIRoute = async ({ request, locals, params }) => {
       .get();
 
     if (!updatedItem) {
-      return new Response(JSON.stringify({ error: 'Item not found' }), {
-        status: 404,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return null;
     }
 
     // Fetch the item with category name
-    const itemWithCategory = await db
+    const result = await db
       .select({
         id: masterItems.id,
         clerk_user_id: masterItems.clerk_user_id,
@@ -193,32 +152,17 @@ export const PUT: APIRoute = async ({ request, locals, params }) => {
       .where(eq(masterItems.id, updatedItem.id))
       .get();
 
-    return new Response(JSON.stringify(itemWithCategory), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  } catch (error) {
-    console.error('Error updating master item:', error);
-    return new Response(JSON.stringify({ error: 'Failed to update master item' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
-};
+    return result || null;
+  },
+  'update master item (PUT)',
+  (data) => validateRequestSafe(masterItemUpdateSchema, data)
+);
 
-export const DELETE: APIRoute = async ({ locals, params }) => {
-  try {
-    const runtime = locals.runtime as { env: { DB: D1Database } };
-    const db = drizzle(runtime.env.DB);
-
-    const userId = locals.userId;
+export const DELETE: APIRoute = createDeleteHandler(
+  async ({ db, userId, params, request }) => {
     const { id } = params;
-
     if (!id) {
-      return new Response(JSON.stringify({ error: 'Item ID is required' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return false;
     }
 
     const deleted = await db
@@ -227,22 +171,7 @@ export const DELETE: APIRoute = async ({ locals, params }) => {
       .returning()
       .get();
 
-    if (!deleted) {
-      return new Response(JSON.stringify({ error: 'Item not found' }), {
-        status: 404,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
-
-    return new Response(JSON.stringify({ success: true }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  } catch (error) {
-    console.error('Error deleting master item:', error);
-    return new Response(JSON.stringify({ error: 'Failed to delete master item' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
-};
+    return !!deleted;
+  },
+  'delete master item'
+);
