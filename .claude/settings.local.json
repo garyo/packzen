@@ -18,7 +18,8 @@
       "Bash(xargs kill:*)",
       "Bash(find:*)",
       "Bash(test:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(wc:*)"
     ]
   }
 }

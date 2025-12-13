@@ -156,7 +156,8 @@ export const PATCH: APIRoute = async ({ request, locals, params }) => {
     }
 
     // Build update object dynamically based on what was provided
-    const updates: any = {};
+    type BagUpdate = Partial<Pick<typeof bags.$inferSelect, 'name' | 'type' | 'color'>>;
+    const updates: BagUpdate = {};
     if (name !== undefined) updates.name = name;
     if (type !== undefined) updates.type = type;
     if (color !== undefined) updates.color = color;

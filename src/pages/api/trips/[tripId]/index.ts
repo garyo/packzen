@@ -63,7 +63,8 @@ export const PATCH: APIRoute = async ({ request, locals, params }) => {
     const { name, destination, start_date, end_date, notes } = body;
 
     // Build update object dynamically based on what was provided
-    const updates: any = { updated_at: new Date() };
+    type TripUpdate = Partial<Pick<typeof trips.$inferSelect, 'name' | 'destination' | 'start_date' | 'end_date' | 'notes'>>;
+    const updates: TripUpdate & { updated_at: Date } = { updated_at: new Date() };
     if (name !== undefined) updates.name = name;
     if (destination !== undefined) updates.destination = destination;
     if (start_date !== undefined) updates.start_date = start_date;

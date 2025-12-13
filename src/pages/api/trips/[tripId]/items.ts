@@ -151,7 +151,8 @@ export const PATCH: APIRoute = async ({ request, locals, params }) => {
     const { id, is_packed, quantity, bag_id, category_name, name } = body;
 
     // Build update object dynamically based on what was provided
-    const updates: any = { updated_at: new Date() };
+    type TripItemUpdate = Partial<Pick<typeof tripItems.$inferSelect, 'name' | 'category_name' | 'quantity' | 'bag_id' | 'is_packed'>>;
+    const updates: TripItemUpdate & { updated_at: Date } = { updated_at: new Date() };
     if (is_packed !== undefined) updates.is_packed = is_packed;
     if (quantity !== undefined) updates.quantity = quantity;
     if (bag_id !== undefined) updates.bag_id = bag_id;

@@ -2,6 +2,7 @@ import type { APIRoute } from 'astro';
 import { eq, and } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import { masterItems, categories } from '../../../../db/schema';
+import { masterItemUpdateSchema, validateRequestSafe } from '../../../lib/validation';
 
 export const GET: APIRoute = async ({ locals, params }) => {
   try {
@@ -71,10 +72,21 @@ export const PATCH: APIRoute = async ({ request, locals, params }) => {
     }
 
     const body = await request.json();
-    const { name, description, category_id, default_quantity } = body;
+
+    // Validate and sanitize input
+    const validation = validateRequestSafe(masterItemUpdateSchema, body);
+    if (!validation.success) {
+      return new Response(JSON.stringify({ error: validation.error }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    const { name, description, category_id, default_quantity } = validation.data;
 
     // Build update object dynamically
-    const updates: any = { updated_at: new Date() };
+    type MasterItemUpdate = Partial<Pick<typeof masterItems.$inferSelect, 'name' | 'description' | 'category_id' | 'default_quantity'>>;
+    const updates: MasterItemUpdate & { updated_at: Date } = { updated_at: new Date() };
     if (name !== undefined) updates.name = name;
     if (description !== undefined) updates.description = description;
     if (category_id !== undefined) updates.category_id = category_id;

@@ -1,11 +1,42 @@
 import { getSessionToken } from './clerk';
 import type { ApiResponse } from './types';
+import { getCsrfHeaderName } from './csrf';
 
 const API_BASE_URL = '/api';
 
 interface RequestOptions extends RequestInit {
   params?: Record<string, string>;
   skipErrorHandling?: boolean; // Allow callers to handle errors themselves
+}
+
+// CSRF token cache
+let csrfToken: string | null = null;
+
+/**
+ * Fetch CSRF token from the server
+ * Caches the token for subsequent requests
+ */
+async function getCsrfToken(): Promise<string> {
+  if (csrfToken) {
+    return csrfToken;
+  }
+
+  try {
+    const response = await fetch('/api/csrf-token', {
+      credentials: 'same-origin',
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch CSRF token');
+    }
+
+    const data = await response.json();
+    csrfToken = data.token;
+    return csrfToken;
+  } catch (error) {
+    console.error('Error fetching CSRF token:', error);
+    throw error;
+  }
 }
 
 async function makeRequest<T>(
@@ -23,11 +54,18 @@ async function makeRequest<T>(
       });
     }
 
+    // Get CSRF token for state-changing requests
+    const method = options.method?.toUpperCase();
+    const needsCsrf = method === 'POST' || method === 'PUT' || method === 'PATCH' || method === 'DELETE';
+    const csrfTokenValue = needsCsrf ? await getCsrfToken() : null;
+
     const response = await fetch(url.toString(), {
       ...options,
+      credentials: 'same-origin',
       headers: {
         'Content-Type': 'application/json',
         ...(token && { Authorization: `Bearer ${token}` }),
+        ...(csrfTokenValue && { [getCsrfHeaderName()]: csrfTokenValue }),
         ...options.headers,
       },
     });
@@ -45,6 +83,15 @@ async function makeRequest<T>(
             window.location.href = '/sign-in';
           }, 1000);
         }
+      }
+
+      // Handle 403 CSRF errors by refreshing token and retrying once
+      if (response.status === 403 && errorMessage.includes('CSRF') && !options.skipErrorHandling) {
+        // Clear cached token and retry once
+        csrfToken = null;
+        console.warn('CSRF token validation failed, refreshing token and retrying...');
+        // Retry the request with a fresh token
+        return makeRequest<T>(endpoint, { ...options, skipErrorHandling: true });
       }
 
       return {

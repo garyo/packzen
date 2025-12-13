@@ -2,6 +2,7 @@ import type { APIRoute } from 'astro';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import { masterItems, categories } from '../../../../db/schema';
+import { masterItemCreateSchema, validateRequestSafe } from '../../../lib/validation';
 
 export const GET: APIRoute = async ({ locals }) => {
   try {
@@ -47,14 +48,17 @@ export const POST: APIRoute = async ({ request, locals }) => {
 
     const userId = locals.userId;
     const body = await request.json();
-    const { name, description, category_id, default_quantity } = body;
 
-    if (!name) {
-      return new Response(JSON.stringify({ error: 'Name is required' }), {
+    // Validate and sanitize input
+    const validation = validateRequestSafe(masterItemCreateSchema, body);
+    if (!validation.success) {
+      return new Response(JSON.stringify({ error: validation.error }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
       });
     }
+
+    const { name, description, category_id, default_quantity } = validation.data;
 
     const newItem = await db
       .insert(masterItems)

@@ -1,5 +1,6 @@
 import yaml from 'js-yaml';
 import type { Trip, Bag, TripItem, Category, MasterItem } from './types';
+import { yamlTripExportSchema, yamlFullBackupSchema, validateRequestSafe } from './validation';
 
 export interface TripExport {
   trip: {
@@ -106,41 +107,43 @@ export function tripToYAML(
 
 /**
  * Parse YAML and return trip data structure
+ * Now includes comprehensive validation and sanitization
  */
 export function yamlToTrip(yamlString: string): TripExport {
   try {
-    const parsed = yaml.load(yamlString) as TripExport;
+    // Parse YAML with safe loader
+    const parsed = yaml.load(yamlString, { schema: yaml.DEFAULT_SCHEMA });
 
-    if (!parsed.trip || !parsed.trip.name) {
-      throw new Error('Invalid trip data: missing trip name');
+    // Validate and sanitize the parsed data
+    const validation = validateRequestSafe(yamlTripExportSchema, parsed);
+
+    if (!validation.success) {
+      throw new Error(`Invalid trip YAML structure: ${validation.error}`);
     }
 
+    // Return validated and sanitized data
     return {
       trip: {
-        name: parsed.trip.name || '',
-        destination: parsed.trip.destination || '',
-        start_date: parsed.trip.start_date || '',
-        end_date: parsed.trip.end_date || '',
-        notes: parsed.trip.notes || null,
+        name: validation.data.trip.name,
+        destination: validation.data.trip.destination || '',
+        start_date: validation.data.trip.start_date || '',
+        end_date: validation.data.trip.end_date || '',
+        notes: validation.data.trip.notes || null,
       },
-      bags: Array.isArray(parsed.bags)
-        ? parsed.bags.map((bag) => ({
-            name: bag.name || '',
-            type: bag.type || 'carry_on',
-            color: bag.color || null,
-            sort_order: bag.sort_order || 0,
-          }))
-        : [],
-      items: Array.isArray(parsed.items)
-        ? parsed.items.map((item) => ({
-            name: item.name || '',
-            category_name: item.category_name || null,
-            quantity: item.quantity || 1,
-            bag_name: item.bag_name || null,
-            is_packed: item.is_packed || false,
-            notes: item.notes || null,
-          }))
-        : [],
+      bags: validation.data.bags.map((bag) => ({
+        name: bag.name,
+        type: bag.type,
+        color: bag.color || null,
+        sort_order: bag.sort_order,
+      })),
+      items: validation.data.items.map((item) => ({
+        name: item.name,
+        category_name: item.category_name || null,
+        quantity: item.quantity,
+        bag_name: item.bag_name || null,
+        is_packed: item.is_packed,
+        notes: item.notes || null,
+      })),
     };
   } catch (error) {
     throw new Error(`Failed to parse YAML: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -208,60 +211,56 @@ export function fullBackupToYAML(
 
 /**
  * Parse full backup YAML
+ * Now includes comprehensive validation and sanitization
  */
 export function yamlToFullBackup(yamlString: string): FullBackup {
   try {
-    const parsed = yaml.load(yamlString) as FullBackup;
+    // Parse YAML with safe loader
+    const parsed = yaml.load(yamlString, { schema: yaml.DEFAULT_SCHEMA });
 
-    if (!parsed.version) {
-      throw new Error('Invalid backup: missing version');
+    // Validate and sanitize the parsed data
+    const validation = validateRequestSafe(yamlFullBackupSchema, parsed);
+
+    if (!validation.success) {
+      throw new Error(`Invalid backup YAML structure: ${validation.error}`);
     }
 
+    // Return validated and sanitized data
     return {
-      exportDate: parsed.exportDate || new Date().toISOString(),
-      version: parsed.version,
-      categories: Array.isArray(parsed.categories)
-        ? parsed.categories.map((cat) => ({
-            name: cat.name || '',
-            icon: cat.icon || null,
-            sort_order: cat.sort_order || 0,
-          }))
-        : [],
-      masterItems: Array.isArray(parsed.masterItems)
-        ? parsed.masterItems.map((item) => ({
-            name: item.name || '',
-            description: item.description || null,
-            category_name: item.category_name || null,
-            default_quantity: item.default_quantity || 1,
-          }))
-        : [],
-      trips: Array.isArray(parsed.trips)
-        ? parsed.trips.map((trip) => ({
-            name: trip.name || '',
-            destination: trip.destination || '',
-            start_date: trip.start_date || '',
-            end_date: trip.end_date || '',
-            notes: trip.notes || null,
-            bags: Array.isArray(trip.bags)
-              ? trip.bags.map((bag) => ({
-                  name: bag.name || '',
-                  type: bag.type || 'carry_on',
-                  color: bag.color || null,
-                  sort_order: bag.sort_order || 0,
-                }))
-              : [],
-            items: Array.isArray(trip.items)
-              ? trip.items.map((item) => ({
-                  name: item.name || '',
-                  category_name: item.category_name || null,
-                  quantity: item.quantity || 1,
-                  bag_name: item.bag_name || null,
-                  is_packed: item.is_packed || false,
-                  notes: item.notes || null,
-                }))
-              : [],
-          }))
-        : [],
+      exportDate: validation.data.exportDate || new Date().toISOString(),
+      version: validation.data.version,
+      categories: validation.data.categories.map((cat) => ({
+        name: cat.name,
+        icon: cat.icon || null,
+        sort_order: cat.sort_order,
+      })),
+      masterItems: validation.data.masterItems.map((item) => ({
+        name: item.name,
+        description: item.description || null,
+        category_name: item.category_name || null,
+        default_quantity: item.default_quantity,
+      })),
+      trips: validation.data.trips.map((trip) => ({
+        name: trip.name,
+        destination: trip.destination || '',
+        start_date: trip.start_date || '',
+        end_date: trip.end_date || '',
+        notes: trip.notes || null,
+        bags: trip.bags.map((bag) => ({
+          name: bag.name,
+          type: bag.type,
+          color: bag.color || null,
+          sort_order: bag.sort_order,
+        })),
+        items: trip.items.map((item) => ({
+          name: item.name,
+          category_name: item.category_name || null,
+          quantity: item.quantity,
+          bag_name: item.bag_name || null,
+          is_packed: item.is_packed,
+          notes: item.notes || null,
+        })),
+      })),
     };
   } catch (error) {
     throw new Error(`Failed to parse backup YAML: ${error instanceof Error ? error.message : 'Unknown error'}`);
