@@ -25,6 +25,7 @@ interface PackingPageHeaderProps {
   onExport: () => void;
   onImport: () => void;
   onClearAll: () => void;
+  onDeleteTrip: () => void;
 }
 
 export function PackingPageHeader(props: PackingPageHeaderProps) {
@@ -91,8 +92,8 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
                   <Button variant="secondary" size="sm" onClick={props.onManageBags}>
                     Bags
                   </Button>
-                  <Button variant="secondary" size="sm" onClick={props.onAddFromMaster}>
-                    + From All Items
+                  <Button size="sm" onClick={props.onAddFromMaster}>
+                    Add from All Items
                   </Button>
                   <Button variant="secondary" size="sm" onClick={props.onToggleSelectMode}>
                     Select
@@ -105,8 +106,8 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
                   >
                     {props.sortBy() === 'bag' ? '👜→📁' : '📁→👜'}
                   </Button>
-                  <Button size="sm" onClick={props.onAddItem}>
-                    + Add
+                  <Button variant="secondary" size="sm" onClick={props.onAddItem}>
+                    Add New
                   </Button>
                   <div class="relative" ref={menuRef}>
                     <Button variant="secondary" size="sm" onClick={() => setShowMenu(!showMenu())}>
@@ -140,6 +141,15 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
                           class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 text-red-600"
                         >
                           Clear All (Unpack)
+                        </button>
+                        <button
+                          onClick={() => {
+                            props.onDeleteTrip();
+                            setShowMenu(false);
+                          }}
+                          class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 text-red-600"
+                        >
+                          Delete Trip
                         </button>
                       </div>
                     </Show>

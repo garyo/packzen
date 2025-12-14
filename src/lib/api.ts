@@ -155,6 +155,10 @@ export const endpoints = {
   masterItems: `${API_BASE_URL}/master-items`,
   masterItem: (id: string) => `${API_BASE_URL}/master-items/${id}`,
 
+  // Bag Templates
+  bagTemplates: `${API_BASE_URL}/bag-templates`,
+  bagTemplate: (id: string) => `${API_BASE_URL}/bag-templates/${id}`,
+
   // Trips
   trips: `${API_BASE_URL}/trips`,
   trip: (id: string) => `${API_BASE_URL}/trips/${id}`,

@@ -166,6 +166,20 @@ export function PackingPage(props: PackingPageProps) {
     }
   };
 
+  const handleDeleteTrip = async () => {
+    const tripName = trip()?.name || 'this trip';
+    if (!confirm(`Delete ${tripName}? All items and bags will be permanently deleted.`)) return;
+
+    const response = await api.delete(endpoints.trip(props.tripId));
+    if (response.success) {
+      showToast('success', 'Trip deleted');
+      // Navigate back to trips list
+      window.location.href = '/trips';
+    } else {
+      showToast('error', response.error || 'Failed to delete trip');
+    }
+  };
+
   const packedCount = () => items()?.filter((i) => i.is_packed).length || 0;
   const totalCount = () => items()?.length || 0;
   const progress = () => getPackingProgress(packedCount(), totalCount());
@@ -189,6 +203,7 @@ export function PackingPage(props: PackingPageProps) {
         onExport={handleExport}
         onImport={() => setShowImport(true)}
         onClearAll={handleClearAll}
+        onDeleteTrip={handleDeleteTrip}
       />
 
       {/* Packing List */}
@@ -201,7 +216,16 @@ export function PackingPage(props: PackingPageProps) {
                 icon="📦"
                 title="No items yet"
                 description="Add items to your packing list to get started"
-                action={<Button onClick={handleAddItem}>Add First Item</Button>}
+                action={
+                  <div class="flex gap-2">
+                    <Button onClick={() => setShowAddFromMaster(true)}>
+                      Add from All Items
+                    </Button>
+                    <Button variant="secondary" onClick={handleAddItem}>
+                      Add Manually
+                    </Button>
+                  </div>
+                }
               />
             }
           >
@@ -229,6 +253,13 @@ export function PackingPage(props: PackingPageProps) {
                 onToggleItemSelection={toggleItemSelection}
               />
             </Show>
+
+            {/* Add More Items Button */}
+            <div class="mt-6 flex justify-center">
+              <Button onClick={() => setShowAddFromMaster(true)}>
+                Add More from All Items
+              </Button>
+            </div>
           </Show>
         </Show>
       </main>
@@ -267,7 +298,7 @@ export function PackingPage(props: PackingPageProps) {
         />
       </Show>
 
-      {/* Add from Master List Modal */}
+      {/* Add from All Items Modal */}
       <Show when={showAddFromMaster()}>
         <AddFromMasterList
           tripId={props.tripId}

@@ -69,6 +69,24 @@ export const bags = sqliteTable('bags', {
     .$defaultFn(() => new Date()),
 });
 
+// Bag Templates table (reusable bag templates for users)
+export const bagTemplates = sqliteTable('bag_templates', {
+  id: text('id')
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  clerk_user_id: text('clerk_user_id').notNull(),
+  name: text('name').notNull(), // "Red Suitcase", "Weekend Carry-on"
+  type: text('type').notNull(), // "carry_on", "checked", "personal", "custom"
+  color: text('color'), // predefined color values
+  sort_order: integer('sort_order').notNull().default(0),
+  created_at: integer('created_at', { mode: 'timestamp' })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  updated_at: integer('updated_at', { mode: 'timestamp' })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
 // Trip Items table (items copied/added to specific trips)
 export const tripItems = sqliteTable('trip_items', {
   id: text('id')
@@ -106,6 +124,9 @@ export type NewTrip = typeof trips.$inferInsert;
 
 export type Bag = typeof bags.$inferSelect;
 export type NewBag = typeof bags.$inferInsert;
+
+export type BagTemplate = typeof bagTemplates.$inferSelect;
+export type NewBagTemplate = typeof bagTemplates.$inferInsert;
 
 export type TripItem = typeof tripItems.$inferSelect;
 export type NewTripItem = typeof tripItems.$inferInsert;

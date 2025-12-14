@@ -8,6 +8,8 @@ export type {
   NewTrip,
   Bag,
   NewBag,
+  BagTemplate,
+  NewBagTemplate,
   TripItem,
   NewTripItem,
 } from '../../db/schema';

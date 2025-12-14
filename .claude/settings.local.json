@@ -21,7 +21,8 @@
       "Bash(curl:*)",
       "Bash(wc:*)",
       "Bash(bunx tsc:*)",
-      "Bash(bun x tsc:*)"
+      "Bash(bun x tsc:*)",
+      "Bash(ls:*)"
     ]
   }
 }

@@ -1,13 +1,14 @@
 import { createSignal, createResource, Show, onMount } from 'solid-js';
 import { authStore } from '../../stores/auth';
 import { api, endpoints } from '../../lib/api';
-import type { Category, MasterItemWithCategory } from '../../lib/types';
+import type { Category, MasterItemWithCategory, BagTemplate } from '../../lib/types';
 import { Button } from '../ui/Button';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
 import { EmptyState } from '../ui/EmptyState';
 import { Toast, showToast } from '../ui/Toast';
 import { ItemForm } from './ItemForm';
 import { CategoryManager } from './CategoryManager';
+import { BagTemplateManager } from '../bag-templates/BagTemplateManager';
 import { AllItemsPageHeader } from './AllItemsPageHeader';
 import { ItemsList } from './ItemsList';
 import { fetchWithErrorHandling } from '../../lib/resource-helpers';
@@ -15,6 +16,7 @@ import { fetchWithErrorHandling } from '../../lib/resource-helpers';
 export function AllItemsPage() {
   const [showItemForm, setShowItemForm] = createSignal(false);
   const [showCategoryManager, setShowCategoryManager] = createSignal(false);
+  const [showBagTemplateManager, setShowBagTemplateManager] = createSignal(false);
   const [editingItem, setEditingItem] = createSignal<MasterItemWithCategory | null>(null);
 
   // Fetch categories
@@ -30,6 +32,14 @@ export function AllItemsPage() {
     return fetchWithErrorHandling(
       () => api.get<MasterItemWithCategory[]>(endpoints.masterItems),
       'Failed to load items'
+    );
+  });
+
+  // Fetch bag templates
+  const [bagTemplates, { refetch: refetchBagTemplates }] = createResource<BagTemplate[]>(async () => {
+    return fetchWithErrorHandling(
+      () => api.get<BagTemplate[]>(endpoints.bagTemplates),
+      'Failed to load bags'
     );
   });
 
@@ -71,6 +81,10 @@ export function AllItemsPage() {
     refetchItems();
   };
 
+  const handleBagTemplatesChanged = () => {
+    refetchBagTemplates();
+  };
+
   return (
     <div class="min-h-screen bg-gray-50">
       <Toast />
@@ -80,6 +94,7 @@ export function AllItemsPage() {
         categories={categories}
         onAddItem={handleAddItem}
         onManageCategories={() => setShowCategoryManager(true)}
+        onManageBagTemplates={() => setShowBagTemplateManager(true)}
         onDataChanged={handleDataChanged}
       />
 
@@ -125,6 +140,14 @@ export function AllItemsPage() {
           categories={categories() || []}
           onClose={() => setShowCategoryManager(false)}
           onSaved={handleDataChanged}
+        />
+      </Show>
+
+      <Show when={showBagTemplateManager()}>
+        <BagTemplateManager
+          templates={bagTemplates() || []}
+          onClose={() => setShowBagTemplateManager(false)}
+          onSaved={handleBagTemplatesChanged}
         />
       </Show>
 

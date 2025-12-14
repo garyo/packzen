@@ -7,6 +7,7 @@ import { LoadingSpinner } from '../ui/LoadingSpinner';
 import { EmptyState } from '../ui/EmptyState';
 import { Toast, showToast } from '../ui/Toast';
 import { TripForm } from './TripForm';
+import { TripFormWithBags } from './TripFormWithBags';
 import { NewTripImportModal } from './NewTripImportModal';
 import { formatDate, getTripStatus } from '../../lib/utils';
 import { fetchWithErrorHandling } from '../../lib/resource-helpers';
@@ -182,17 +183,27 @@ export function TripsPage() {
       </main>
 
       <Show when={showForm()}>
-        <TripForm
-          trip={editingTrip()}
-          onClose={() => {
-            setShowForm(false);
-            setEditingTrip(null);
-          }}
-          onSaved={() => {
-            setShowForm(false);
-            refetch();
-          }}
-        />
+        {editingTrip() ? (
+          <TripForm
+            trip={editingTrip()}
+            onClose={() => {
+              setShowForm(false);
+              setEditingTrip(null);
+            }}
+            onSaved={() => {
+              setShowForm(false);
+              refetch();
+            }}
+          />
+        ) : (
+          <TripFormWithBags
+            onClose={() => setShowForm(false)}
+            onSaved={(tripId) => {
+              // Navigate to the newly created trip's packing page
+              window.location.href = `/trips/${tripId}/pack`;
+            }}
+          />
+        )}
       </Show>
 
       <Show when={showImport()}>

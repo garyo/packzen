@@ -15,6 +15,7 @@ interface AllItemsPageHeaderProps {
   categories: Accessor<Category[] | undefined>;
   onAddItem: () => void;
   onManageCategories: () => void;
+  onManageBagTemplates: () => void;
   onDataChanged: () => void;
 }
 
@@ -50,6 +51,9 @@ export function AllItemsPageHeader(props: AllItemsPageHeaderProps) {
           <div class="flex gap-2">
             <Button variant="secondary" size="sm" onClick={props.onManageCategories}>
               Categories
+            </Button>
+            <Button variant="secondary" size="sm" onClick={props.onManageBagTemplates}>
+              My Bags
             </Button>
             <CSVImportExport
               items={props.items}

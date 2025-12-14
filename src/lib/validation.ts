@@ -118,6 +118,21 @@ export const bagUpdateSchema = z.object({
   color: z.enum(['blue', 'red', 'green', 'yellow', 'purple', 'gray', 'black']).nullable().optional(),
 });
 
+// Bag Template schemas
+export const bagTemplateCreateSchema = z.object({
+  name: sanitizeString(MAX_NAME_LENGTH),
+  type: z.enum(['carry_on', 'checked', 'personal', 'custom']),
+  color: z.enum(['blue', 'red', 'green', 'yellow', 'purple', 'gray', 'black']).nullable().optional(),
+  sort_order: z.number().int().min(0).optional(),
+});
+
+export const bagTemplateUpdateSchema = z.object({
+  name: sanitizeString(MAX_NAME_LENGTH).optional(),
+  type: z.enum(['carry_on', 'checked', 'personal', 'custom']).optional(),
+  color: z.enum(['blue', 'red', 'green', 'yellow', 'purple', 'gray', 'black']).nullable().optional(),
+  sort_order: z.number().int().min(0).optional(),
+});
+
 // Trip Item schemas
 export const tripItemCreateSchema = z.object({
   name: sanitizeString(MAX_NAME_LENGTH),
@@ -145,6 +160,8 @@ export type TripCreate = z.infer<typeof tripCreateSchema>;
 export type TripUpdate = z.infer<typeof tripUpdateSchema>;
 export type BagCreate = z.infer<typeof bagCreateSchema>;
 export type BagUpdate = z.infer<typeof bagUpdateSchema>;
+export type BagTemplateCreate = z.infer<typeof bagTemplateCreateSchema>;
+export type BagTemplateUpdate = z.infer<typeof bagTemplateUpdateSchema>;
 export type TripItemCreate = z.infer<typeof tripItemCreateSchema>;
 export type TripItemUpdate = z.infer<typeof tripItemUpdateSchema>;
 

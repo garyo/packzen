@@ -101,7 +101,7 @@ export function DashboardPage() {
                 <QuickLink
                   href="/all-items"
                   icon="📦"
-                  title="Master Items"
+                  title="All Items"
                   description="Manage your reusable item templates"
                 />
                 <QuickLink
