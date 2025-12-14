@@ -1,14 +1,16 @@
-name: Deploy to Production
+name: Build and Deploy
 
 on:
   push:
     branches:
       - main
+    tags:
+      - 'v*'
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
-    name: Deploy to Cloudflare Pages
+    name: Build and Deploy
 
     steps:
       - name: Checkout code
@@ -31,10 +33,16 @@ jobs:
           PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.PUBLIC_CLERK_PUBLISHABLE_KEY }}
 
       - name: Deploy to Cloudflare
+        if: startsWith(github.ref, 'refs/tags/')
         run: npx wrangler deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
+      - name: Build complete
+        if: startsWith(github.ref, 'refs/heads/')
+        run: echo "✅ Build successful (not deploying - only tags trigger deployment)"
+
       - name: Deployment complete
+        if: startsWith(github.ref, 'refs/tags/')
         run: echo "✅ Successfully deployed to https://packzen.org"

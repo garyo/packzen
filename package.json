@@ -14,7 +14,9 @@
     "db:migrate": "wrangler d1 migrations apply packzen-db --local",
     "db:migrate:prod": "wrangler d1 migrations apply packzen-db --remote",
     "db:studio": "drizzle-kit studio",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "prepare": "node scripts/setup-git-hooks.js"
   },
   "dependencies": {
     "@astrojs/cloudflare": "^12.6.12",
