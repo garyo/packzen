@@ -1,5 +1,5 @@
 import yaml from 'js-yaml';
-import type { Trip, Bag, TripItem, Category, MasterItem } from './types';
+import type { Trip, Bag, TripItem, Category, MasterItem, BagTemplate } from './types';
 import { yamlTripExportSchema, yamlFullBackupSchema, validateRequestSafe } from './validation';
 
 export interface TripExport {
@@ -39,6 +39,12 @@ export interface FullBackup {
     description: string | null;
     category_name: string | null;
     default_quantity: number;
+  }>;
+  bagTemplates: Array<{
+    name: string;
+    type: string;
+    color: string | null;
+    sort_order: number;
   }>;
   trips: Array<{
     name: string;
@@ -156,6 +162,7 @@ export function yamlToTrip(yamlString: string): TripExport {
 export function fullBackupToYAML(
   categories: Category[],
   masterItems: (MasterItem & { category_name?: string | null })[],
+  bagTemplates: BagTemplate[],
   trips: Array<{
     trip: Trip;
     bags: Bag[];
@@ -175,6 +182,12 @@ export function fullBackupToYAML(
       description: item.description,
       category_name: item.category_name || null,
       default_quantity: item.default_quantity,
+    })),
+    bagTemplates: bagTemplates.map((template) => ({
+      name: template.name,
+      type: template.type,
+      color: template.color,
+      sort_order: template.sort_order,
     })),
     trips: trips.map(({ trip, bags, items }) => ({
       name: trip.name,
@@ -239,6 +252,12 @@ export function yamlToFullBackup(yamlString: string): FullBackup {
         description: item.description || null,
         category_name: item.category_name || null,
         default_quantity: item.default_quantity,
+      })),
+      bagTemplates: validation.data.bagTemplates.map((template) => ({
+        name: template.name,
+        type: template.type,
+        color: template.color || null,
+        sort_order: template.sort_order,
       })),
       trips: validation.data.trips.map((trip) => ({
         name: trip.name,

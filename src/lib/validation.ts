@@ -20,6 +20,11 @@ const MAX_QUANTITY = 9999;
 // ISO 8601 date string regex (YYYY-MM-DD format)
 const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
+// Color name type and values
+export type ColorName = 'blue' | 'red' | 'green' | 'yellow' | 'purple' | 'gray' | 'black';
+const COLOR_NAMES: ColorName[] = ['blue', 'red', 'green', 'yellow', 'purple', 'gray', 'black'];
+const HEX_COLOR_REGEX = /^#[0-9A-Fa-f]{6}$/;
+
 // Sanitization helpers
 /**
  * Sanitize string input to prevent XSS and injection attacks
@@ -39,11 +44,32 @@ function sanitizeString(maxLength: number = MAX_NAME_LENGTH) {
 
 /**
  * Validate ISO date string
+ * Allows empty strings (converted to empty string), null, or valid ISO dates
  */
 function isoDateString() {
   return z
     .string()
-    .regex(ISO_DATE_REGEX, 'Must be a valid ISO date string (YYYY-MM-DD)')
+    .transform((val) => val.trim())
+    .refine((val) => val === '' || ISO_DATE_REGEX.test(val), {
+      message: 'Must be a valid ISO date string (YYYY-MM-DD) or empty',
+    })
+    .nullable()
+    .optional();
+}
+
+/**
+ * Validate color - accepts either color names or hex colors
+ */
+function colorString() {
+  return z
+    .string()
+    .trim()
+    .refine(
+      (val) => COLOR_NAMES.includes(val as ColorName) || HEX_COLOR_REGEX.test(val),
+      {
+        message: `Must be a color name (${COLOR_NAMES.join(', ')}) or hex color (#RRGGBB)`,
+      }
+    )
     .nullable()
     .optional();
 }
@@ -107,7 +133,7 @@ export const tripUpdateSchema = z.object({
 export const bagCreateSchema = z.object({
   name: sanitizeString(MAX_NAME_LENGTH),
   type: z.enum(['carry_on', 'checked', 'personal', 'custom']),
-  color: z.enum(['blue', 'red', 'green', 'yellow', 'purple', 'gray', 'black']).nullable().optional(),
+  color: colorString(),
   sort_order: z.number().int().min(0).optional(),
 });
 
@@ -115,21 +141,21 @@ export const bagUpdateSchema = z.object({
   bag_id: z.string().uuid(),
   name: sanitizeString(MAX_NAME_LENGTH).optional(),
   type: z.enum(['carry_on', 'checked', 'personal', 'custom']).optional(),
-  color: z.enum(['blue', 'red', 'green', 'yellow', 'purple', 'gray', 'black']).nullable().optional(),
+  color: colorString(),
 });
 
 // Bag Template schemas
 export const bagTemplateCreateSchema = z.object({
   name: sanitizeString(MAX_NAME_LENGTH),
   type: z.enum(['carry_on', 'checked', 'personal', 'custom']),
-  color: z.enum(['blue', 'red', 'green', 'yellow', 'purple', 'gray', 'black']).nullable().optional(),
+  color: colorString(),
   sort_order: z.number().int().min(0).optional(),
 });
 
 export const bagTemplateUpdateSchema = z.object({
   name: sanitizeString(MAX_NAME_LENGTH).optional(),
   type: z.enum(['carry_on', 'checked', 'personal', 'custom']).optional(),
-  color: z.enum(['blue', 'red', 'green', 'yellow', 'purple', 'gray', 'black']).nullable().optional(),
+  color: colorString(),
   sort_order: z.number().int().min(0).optional(),
 });
 
@@ -195,7 +221,7 @@ export function validateRequestSafe<T>(
 const yamlBagSchema = z.object({
   name: sanitizeString(MAX_NAME_LENGTH),
   type: z.enum(['carry_on', 'checked', 'personal', 'custom']),
-  color: z.string().trim().regex(/^#[0-9A-Fa-f]{6}$/).nullable().optional(),
+  color: colorString(),
   sort_order: z.number().int().min(0).default(0),
 });
 
@@ -233,6 +259,13 @@ const yamlMasterItemSchema = z.object({
   default_quantity: z.number().int().min(MIN_QUANTITY).max(MAX_QUANTITY).default(1),
 });
 
+const yamlBagTemplateSchema = z.object({
+  name: sanitizeString(MAX_NAME_LENGTH),
+  type: z.enum(['carry_on', 'checked', 'personal', 'custom']),
+  color: colorString(),
+  sort_order: z.number().int().min(0).default(0),
+});
+
 const yamlFullTripSchema = z.object({
   name: sanitizeString(MAX_NAME_LENGTH),
   destination: sanitizeString(MAX_NAME_LENGTH).nullable().optional(),
@@ -250,6 +283,7 @@ export const yamlFullBackupSchema = z.object({
   }),
   categories: z.array(yamlCategorySchema).default([]),
   masterItems: z.array(yamlMasterItemSchema).default([]),
+  bagTemplates: z.array(yamlBagTemplateSchema).default([]),
   trips: z.array(yamlFullTripSchema).default([]),
 });
 

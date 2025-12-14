@@ -7,7 +7,7 @@
 
 import { createSignal, onMount, onCleanup, type Accessor } from 'solid-js';
 import { api, endpoints } from '../../lib/api';
-import type { Trip, MasterItem, Category, Bag, TripItem } from '../../lib/types';
+import type { Trip, MasterItem, Category, Bag, TripItem, BagTemplate } from '../../lib/types';
 import { showToast } from '../ui/Toast';
 import { fullBackupToYAML, yamlToFullBackup, downloadYAML } from '../../lib/yaml';
 
@@ -49,6 +49,9 @@ export function BackupManager(props: BackupManagerProps) {
       const categoriesList = props.categories() || [];
       const itemsList = props.masterItems() || [];
 
+      const bagTemplatesResponse = await api.get<BagTemplate[]>(endpoints.bagTemplates);
+      const bagTemplatesList = bagTemplatesResponse.data || [];
+
       const tripsResponse = await api.get<Trip[]>(endpoints.trips);
       const tripsList = tripsResponse.data || [];
 
@@ -64,7 +67,7 @@ export function BackupManager(props: BackupManagerProps) {
         })
       );
 
-      const yamlContent = fullBackupToYAML(categoriesList, itemsList, tripsWithData);
+      const yamlContent = fullBackupToYAML(categoriesList, itemsList, bagTemplatesList, tripsWithData);
       const filename = `packzen-backup-${new Date().toISOString().split('T')[0]}.yaml`;
       downloadYAML(yamlContent, filename);
       showToast('success', 'Full backup exported successfully');
@@ -140,6 +143,32 @@ export function BackupManager(props: BackupManagerProps) {
             description: item.description,
             category_id: categoryId,
             default_quantity: item.default_quantity,
+          });
+        }
+      }
+
+      // Import bag templates
+      const bagTemplatesResponse = await api.get<BagTemplate[]>(endpoints.bagTemplates);
+      const existingBagTemplates = bagTemplatesResponse.data || [];
+
+      for (const template of backup.bagTemplates) {
+        const existingTemplate = existingBagTemplates.find(
+          (t) => t.name.toLowerCase() === template.name.toLowerCase()
+        );
+
+        if (existingTemplate) {
+          await api.patch(endpoints.bagTemplate(existingTemplate.id), {
+            name: template.name,
+            type: template.type,
+            color: template.color,
+            sort_order: template.sort_order,
+          });
+        } else {
+          await api.post(endpoints.bagTemplates, {
+            name: template.name,
+            type: template.type,
+            color: template.color,
+            sort_order: template.sort_order,
           });
         }
       }

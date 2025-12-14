@@ -62,7 +62,7 @@ export const bags = sqliteTable('bags', {
     .references(() => trips.id, { onDelete: 'cascade' }),
   name: text('name').notNull(), // "Carry-on", "Checked", "Personal Item"
   type: text('type').notNull(), // "carry_on", "checked", "personal", "custom"
-  color: text('color'), // hex color for visual distinction
+  color: text('color'), // color name ('blue', 'red', etc.) or hex color (#FF0000)
   sort_order: integer('sort_order').notNull().default(0),
   created_at: integer('created_at', { mode: 'timestamp' })
     .notNull()
@@ -77,7 +77,7 @@ export const bagTemplates = sqliteTable('bag_templates', {
   clerk_user_id: text('clerk_user_id').notNull(),
   name: text('name').notNull(), // "Red Suitcase", "Weekend Carry-on"
   type: text('type').notNull(), // "carry_on", "checked", "personal", "custom"
-  color: text('color'), // predefined color values
+  color: text('color'), // color name ('blue', 'red', etc.) or hex color (#FF0000)
   sort_order: integer('sort_order').notNull().default(0),
   created_at: integer('created_at', { mode: 'timestamp' })
     .notNull()

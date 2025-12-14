@@ -150,24 +150,6 @@ export function AllItemsPage() {
           onSaved={handleBagTemplatesChanged}
         />
       </Show>
-
-      {/* Back Button */}
-      <div class="fixed bottom-4 left-4">
-        <a
-          href="/dashboard"
-          class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 shadow-md hover:bg-gray-50"
-        >
-          <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M15 19l-7-7 7-7"
-            />
-          </svg>
-          Back
-        </a>
-      </div>
     </div>
   );
 }
