@@ -3,35 +3,37 @@ import { eq, and, asc } from 'drizzle-orm';
 import { z } from 'zod';
 import { bags, trips } from '../../../../../db/schema';
 import { bagCreateSchema, bagUpdateSchema, validateRequestSafe } from '../../../../lib/validation';
-import { createGetHandler, createPostHandler, createPatchHandler, createDeleteHandler } from '../../../../lib/api-helpers';
+import {
+  createGetHandler,
+  createPostHandler,
+  createPatchHandler,
+  createDeleteHandler,
+} from '../../../../lib/api-helpers';
 
-export const GET: APIRoute = createGetHandler(
-  async ({ db, userId, params }) => {
-    const { tripId } = params;
-    if (!tripId) {
-      throw new Error('Trip ID is required');
-    }
+export const GET: APIRoute = createGetHandler(async ({ db, userId, params }) => {
+  const { tripId } = params;
+  if (!tripId) {
+    throw new Error('Trip ID is required');
+  }
 
-    // Verify trip ownership
-    const trip = await db
-      .select()
-      .from(trips)
-      .where(and(eq(trips.id, tripId), eq(trips.clerk_user_id, userId)))
-      .get();
+  // Verify trip ownership
+  const trip = await db
+    .select()
+    .from(trips)
+    .where(and(eq(trips.id, tripId), eq(trips.clerk_user_id, userId)))
+    .get();
 
-    if (!trip) {
-      throw new Error('Trip not found');
-    }
+  if (!trip) {
+    throw new Error('Trip not found');
+  }
 
-    return await db
-      .select()
-      .from(bags)
-      .where(eq(bags.trip_id, tripId))
-      .orderBy(asc(bags.sort_order))
-      .all();
-  },
-  'fetch bags'
-);
+  return await db
+    .select()
+    .from(bags)
+    .where(eq(bags.trip_id, tripId))
+    .orderBy(asc(bags.sort_order))
+    .all();
+}, 'fetch bags');
 
 export const POST: APIRoute = createPostHandler<
   z.infer<typeof bagCreateSchema>,
@@ -113,38 +115,35 @@ export const PATCH: APIRoute = createPatchHandler<
   (data) => validateRequestSafe(bagUpdateSchema, data)
 );
 
-export const DELETE: APIRoute = createDeleteHandler(
-  async ({ db, userId, params, request }) => {
-    const { tripId } = params;
-    if (!tripId) {
-      return false;
-    }
+export const DELETE: APIRoute = createDeleteHandler(async ({ db, userId, params, request }) => {
+  const { tripId } = params;
+  if (!tripId) {
+    return false;
+  }
 
-    const body = await request.json();
-    const { bag_id } = body;
+  const body = await request.json();
+  const { bag_id } = body;
 
-    if (!bag_id) {
-      return false;
-    }
+  if (!bag_id) {
+    return false;
+  }
 
-    // Verify trip ownership
-    const trip = await db
-      .select()
-      .from(trips)
-      .where(and(eq(trips.id, tripId), eq(trips.clerk_user_id, userId)))
-      .get();
+  // Verify trip ownership
+  const trip = await db
+    .select()
+    .from(trips)
+    .where(and(eq(trips.id, tripId), eq(trips.clerk_user_id, userId)))
+    .get();
 
-    if (!trip) {
-      return false;
-    }
+  if (!trip) {
+    return false;
+  }
 
-    const deleted = await db
-      .delete(bags)
-      .where(and(eq(bags.id, bag_id), eq(bags.trip_id, tripId)))
-      .returning()
-      .get();
+  const deleted = await db
+    .delete(bags)
+    .where(and(eq(bags.id, bag_id), eq(bags.trip_id, tripId)))
+    .returning()
+    .get();
 
-    return !!deleted;
-  },
-  'delete bag'
-);
+  return !!deleted;
+}, 'delete bag');

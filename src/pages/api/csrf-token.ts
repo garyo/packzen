@@ -15,7 +15,7 @@ export const GET: APIRoute = async ({ request }) => {
 
   if (cookieHeader) {
     const cookies = Object.fromEntries(
-      cookieHeader.split(';').map(c => {
+      cookieHeader.split(';').map((c) => {
         const [key, ...value] = c.trim().split('=');
         return [key, value.join('=')];
       })

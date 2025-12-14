@@ -30,9 +30,7 @@ export function SelectModeActionBar(props: SelectModeActionBarProps) {
             >
               <option value="">Select a bag...</option>
               <option value="">No bag</option>
-              <For each={props.bags()}>
-                {(bag) => <option value={bag.id}>{bag.name}</option>}
-              </For>
+              <For each={props.bags()}>{(bag) => <option value={bag.id}>{bag.name}</option>}</For>
             </select>
           </div>
         </div>

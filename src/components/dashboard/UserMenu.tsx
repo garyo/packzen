@@ -68,7 +68,12 @@ export function UserMenu(props: UserMenuProps) {
         })
       );
 
-      const yamlContent = fullBackupToYAML(categoriesList, itemsList, bagTemplatesList, tripsWithData);
+      const yamlContent = fullBackupToYAML(
+        categoriesList,
+        itemsList,
+        bagTemplatesList,
+        tripsWithData
+      );
       const filename = `packzen-backup-${new Date().toISOString().split('T')[0]}.yaml`;
       downloadYAML(yamlContent, filename);
       showToast('success', 'Full backup exported successfully');
@@ -285,7 +290,7 @@ export function UserMenu(props: UserMenuProps) {
     <div class="relative" ref={menuRef}>
       <button
         onClick={() => setShowMenu(!showMenu())}
-        class="flex h-8 w-8 items-center justify-center rounded-full hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+        class="flex h-8 w-8 items-center justify-center rounded-full hover:opacity-80 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none"
         title="Account menu"
       >
         <Show
@@ -308,12 +313,10 @@ export function UserMenu(props: UserMenuProps) {
       </button>
 
       <Show when={showMenu()}>
-        <div class="absolute right-0 top-full z-20 mt-2 w-56 rounded-lg border border-gray-200 bg-white shadow-lg">
+        <div class="absolute top-full right-0 z-20 mt-2 w-56 rounded-lg border border-gray-200 bg-white shadow-lg">
           <Show when={user}>
             <div class="border-b border-gray-200 px-4 py-3">
-              <p class="text-sm font-medium text-gray-900">
-                {user!.firstName || user!.email}
-              </p>
+              <p class="text-sm font-medium text-gray-900">{user!.firstName || user!.email}</p>
               <p class="text-xs text-gray-500">{user!.email}</p>
             </div>
           </Show>

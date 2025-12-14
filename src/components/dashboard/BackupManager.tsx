@@ -67,7 +67,12 @@ export function BackupManager(props: BackupManagerProps) {
         })
       );
 
-      const yamlContent = fullBackupToYAML(categoriesList, itemsList, bagTemplatesList, tripsWithData);
+      const yamlContent = fullBackupToYAML(
+        categoriesList,
+        itemsList,
+        bagTemplatesList,
+        tripsWithData
+      );
       const filename = `packzen-backup-${new Date().toISOString().split('T')[0]}.yaml`;
       downloadYAML(yamlContent, filename);
       showToast('success', 'Full backup exported successfully');
@@ -284,7 +289,7 @@ export function BackupManager(props: BackupManagerProps) {
       </button>
 
       {showMenu() && (
-        <div class="absolute right-0 top-full z-20 mt-1 w-48 rounded-lg border border-gray-200 bg-white shadow-lg">
+        <div class="absolute top-full right-0 z-20 mt-1 w-48 rounded-lg border border-gray-200 bg-white shadow-lg">
           <button
             onClick={handleExport}
             class="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100"
@@ -293,12 +298,7 @@ export function BackupManager(props: BackupManagerProps) {
           </button>
           <label class="block w-full cursor-pointer px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
             Restore from Backup
-            <input
-              type="file"
-              accept=".yaml,.yml"
-              onChange={handleImport}
-              class="hidden"
-            />
+            <input type="file" accept=".yaml,.yml" onChange={handleImport} class="hidden" />
           </label>
         </div>
       )}

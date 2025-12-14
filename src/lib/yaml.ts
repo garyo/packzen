@@ -72,11 +72,7 @@ export interface FullBackup {
 /**
  * Convert a trip with its bags and items to YAML format
  */
-export function tripToYAML(
-  trip: Trip,
-  bags: Bag[],
-  items: TripItem[]
-): string {
+export function tripToYAML(trip: Trip, bags: Bag[], items: TripItem[]): string {
   const exportData: TripExport = {
     trip: {
       name: trip.name,
@@ -152,7 +148,9 @@ export function yamlToTrip(yamlString: string): TripExport {
       })),
     };
   } catch (error) {
-    throw new Error(`Failed to parse YAML: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    throw new Error(
+      `Failed to parse YAML: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
   }
 }
 
@@ -282,7 +280,9 @@ export function yamlToFullBackup(yamlString: string): FullBackup {
       })),
     };
   } catch (error) {
-    throw new Error(`Failed to parse backup YAML: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    throw new Error(
+      `Failed to parse backup YAML: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
   }
 }
 

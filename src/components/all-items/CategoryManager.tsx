@@ -157,12 +157,7 @@ export function CategoryManager(props: CategoryManagerProps) {
                         <Button type="submit" disabled={updating()} size="sm">
                           {updating() ? '...' : 'Save'}
                         </Button>
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          onClick={cancelEdit}
-                          size="sm"
-                        >
+                        <Button type="button" variant="secondary" onClick={cancelEdit} size="sm">
                           Cancel
                         </Button>
                       </div>
@@ -179,7 +174,12 @@ export function CategoryManager(props: CategoryManagerProps) {
                           class="p-1 text-gray-400 hover:text-blue-600"
                           title="Edit category"
                         >
-                          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <svg
+                            class="h-4 w-4"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
                             <path
                               stroke-linecap="round"
                               stroke-linejoin="round"
@@ -193,7 +193,12 @@ export function CategoryManager(props: CategoryManagerProps) {
                           class="p-1 text-gray-400 hover:text-red-600"
                           title="Delete category"
                         >
-                          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <svg
+                            class="h-4 w-4"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
                             <path
                               stroke-linecap="round"
                               stroke-linejoin="round"

@@ -25,13 +25,17 @@ const BAG_COLORS = [
 
 export function BagTemplateManager(props: BagTemplateManagerProps) {
   const [newName, setNewName] = createSignal('');
-  const [newType, setNewType] = createSignal<'carry_on' | 'checked' | 'personal' | 'custom'>('carry_on');
+  const [newType, setNewType] = createSignal<'carry_on' | 'checked' | 'personal' | 'custom'>(
+    'carry_on'
+  );
   const [newColor, setNewColor] = createSignal('blue');
   const [adding, setAdding] = createSignal(false);
 
   const [editingId, setEditingId] = createSignal<string | null>(null);
   const [editName, setEditName] = createSignal('');
-  const [editType, setEditType] = createSignal<'carry_on' | 'checked' | 'personal' | 'custom'>('carry_on');
+  const [editType, setEditType] = createSignal<'carry_on' | 'checked' | 'personal' | 'custom'>(
+    'carry_on'
+  );
   const [editColor, setEditColor] = createSignal('blue');
   const [updating, setUpdating] = createSignal(false);
 
@@ -125,7 +129,10 @@ export function BagTemplateManager(props: BagTemplateManagerProps) {
         {/* Add New Template Form */}
         <div>
           <h3 class="mb-3 font-semibold text-gray-900">Add New Bag</h3>
-          <form onSubmit={handleAdd} class="space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+          <form
+            onSubmit={handleAdd}
+            class="space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-3"
+          >
             <div>
               <label class="mb-1 block text-sm font-medium text-gray-700">Bag Type</label>
               <select
@@ -223,9 +230,7 @@ export function BagTemplateManager(props: BagTemplateManagerProps) {
                         </div>
 
                         <div>
-                          <label class="mb-1 block text-sm font-medium text-gray-700">
-                            Color
-                          </label>
+                          <label class="mb-1 block text-sm font-medium text-gray-700">Color</label>
                           <div class="flex gap-2">
                             <For each={BAG_COLORS}>
                               {(color) => (
@@ -248,12 +253,7 @@ export function BagTemplateManager(props: BagTemplateManagerProps) {
                           <Button type="submit" size="sm" disabled={updating()}>
                             {updating() ? 'Saving...' : 'Save'}
                           </Button>
-                          <Button
-                            type="button"
-                            variant="secondary"
-                            size="sm"
-                            onClick={cancelEdit}
-                          >
+                          <Button type="button" variant="secondary" size="sm" onClick={cancelEdit}>
                             Cancel
                           </Button>
                         </div>
@@ -281,7 +281,12 @@ export function BagTemplateManager(props: BagTemplateManagerProps) {
                             class="p-1 text-gray-400 hover:text-blue-600"
                             title="Edit bag"
                           >
-                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg
+                              class="h-4 w-4"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
                               <path
                                 stroke-linecap="round"
                                 stroke-linejoin="round"
@@ -295,7 +300,12 @@ export function BagTemplateManager(props: BagTemplateManagerProps) {
                             class="p-1 text-gray-400 hover:text-red-600"
                             title="Delete bag"
                           >
-                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg
+                              class="h-4 w-4"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
                               <path
                                 stroke-linecap="round"
                                 stroke-linejoin="round"

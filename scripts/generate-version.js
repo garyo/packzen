@@ -19,7 +19,7 @@ function getGitInfo() {
 
     // Check for uncommitted changes (excluding untracked files)
     const gitStatus = execSync('git status --porcelain', { encoding: 'utf8' }).trim();
-    const hasChanges = gitStatus.split('\n').some(line => line && !line.startsWith('??'));
+    const hasChanges = gitStatus.split('\n').some((line) => line && !line.startsWith('??'));
     if (hasChanges) {
       commitHash += '+';
     }
@@ -27,7 +27,10 @@ function getGitInfo() {
     // Try to get git tag, fallback to commit hash if no tag
     let version;
     try {
-      version = execSync('git describe --tags --exact-match', { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] }).trim();
+      version = execSync('git describe --tags --exact-match', {
+        encoding: 'utf8',
+        stdio: ['pipe', 'pipe', 'ignore'],
+      }).trim();
     } catch {
       // No exact tag, use commit hash
       version = commitHash;

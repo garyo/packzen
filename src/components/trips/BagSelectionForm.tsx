@@ -34,7 +34,9 @@ const BAG_COLORS = [
 export function BagSelectionForm(props: BagSelectionFormProps) {
   const [showAddForm, setShowAddForm] = createSignal(false);
   const [newBagName, setNewBagName] = createSignal('');
-  const [newBagType, setNewBagType] = createSignal<'carry_on' | 'checked' | 'personal' | 'custom'>('carry_on');
+  const [newBagType, setNewBagType] = createSignal<'carry_on' | 'checked' | 'personal' | 'custom'>(
+    'carry_on'
+  );
   const [newBagColor, setNewBagColor] = createSignal('blue');
 
   const handleAddCustomBag = (e: Event) => {

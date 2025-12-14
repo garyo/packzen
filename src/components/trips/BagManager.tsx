@@ -244,7 +244,12 @@ export function BagManager(props: BagManagerProps) {
                               class="p-1 text-gray-400 hover:text-blue-600"
                               title="Edit bag"
                             >
-                              <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <svg
+                                class="h-4 w-4"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                              >
                                 <path
                                   stroke-linecap="round"
                                   stroke-linejoin="round"
@@ -258,7 +263,12 @@ export function BagManager(props: BagManagerProps) {
                               class="p-1 text-gray-400 hover:text-red-600"
                               title="Delete bag"
                             >
-                              <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <svg
+                                class="h-4 w-4"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                              >
                                 <path
                                   stroke-linecap="round"
                                   stroke-linejoin="round"

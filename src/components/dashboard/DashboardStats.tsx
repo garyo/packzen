@@ -54,10 +54,7 @@ function StatCard(props: StatCardProps) {
         <div class="text-4xl">{props.icon}</div>
       </div>
       <div class="mt-4">
-        <a
-          href={props.linkTo}
-          class="text-sm font-medium text-blue-600 hover:text-blue-500"
-        >
+        <a href={props.linkTo} class="text-sm font-medium text-blue-600 hover:text-blue-500">
           {props.linkText} →
         </a>
       </div>

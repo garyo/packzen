@@ -5,27 +5,24 @@ import { masterItems, categories } from '../../../../db/schema';
 import { masterItemCreateSchema, validateRequestSafe } from '../../../lib/validation';
 import { createGetHandler, createPostHandler } from '../../../lib/api-helpers';
 
-export const GET: APIRoute = createGetHandler(
-  async ({ db, userId }) => {
-    return await db
-      .select({
-        id: masterItems.id,
-        clerk_user_id: masterItems.clerk_user_id,
-        category_id: masterItems.category_id,
-        name: masterItems.name,
-        description: masterItems.description,
-        default_quantity: masterItems.default_quantity,
-        created_at: masterItems.created_at,
-        updated_at: masterItems.updated_at,
-        category_name: categories.name,
-      })
-      .from(masterItems)
-      .leftJoin(categories, eq(masterItems.category_id, categories.id))
-      .where(eq(masterItems.clerk_user_id, userId))
-      .all();
-  },
-  'fetch master items'
-);
+export const GET: APIRoute = createGetHandler(async ({ db, userId }) => {
+  return await db
+    .select({
+      id: masterItems.id,
+      clerk_user_id: masterItems.clerk_user_id,
+      category_id: masterItems.category_id,
+      name: masterItems.name,
+      description: masterItems.description,
+      default_quantity: masterItems.default_quantity,
+      created_at: masterItems.created_at,
+      updated_at: masterItems.updated_at,
+      category_name: categories.name,
+    })
+    .from(masterItems)
+    .leftJoin(categories, eq(masterItems.category_id, categories.id))
+    .where(eq(masterItems.clerk_user_id, userId))
+    .all();
+}, 'fetch master items');
 
 type MasterItemWithCategory = {
   id: string;

@@ -64,17 +64,19 @@ export function PackingListBagView(props: PackingListBagViewProps) {
       <For each={itemsByBag().allBags}>
         {(bag) => {
           const bagCategories = () => itemsByBag().grouped.get(bag.id) || new Map();
-          const allBagItems = () =>
-            Array.from(bagCategories().values()).flat();
+          const allBagItems = () => Array.from(bagCategories().values()).flat();
           const totalItems = () => allBagItems().length;
           const packedItems = () => allBagItems().filter((item) => item.is_packed).length;
           return (
             <Show when={totalItems() > 0}>
               <div>
-                <div class="mb-3 md:mb-1.5 flex items-center gap-2">
-                  <Show when={bag.id !== null} fallback={<span class="text-lg md:text-base">👕</span>}>
+                <div class="mb-3 flex items-center gap-2 md:mb-1.5">
+                  <Show
+                    when={bag.id !== null}
+                    fallback={<span class="text-lg md:text-base">👕</span>}
+                  >
                     <div
-                      class={`h-3 w-3 md:h-2.5 md:w-2.5 rounded-full ${
+                      class={`h-3 w-3 rounded-full md:h-2.5 md:w-2.5 ${
                         bag.color === 'blue'
                           ? 'bg-blue-500'
                           : bag.color === 'red'
@@ -91,15 +93,15 @@ export function PackingListBagView(props: PackingListBagViewProps) {
                       }`}
                     />
                   </Show>
-                  <h2 class="text-lg md:text-base font-semibold text-gray-900">{bag.name}</h2>
-                  <span class="text-sm md:text-xs text-gray-500">
+                  <h2 class="text-lg font-semibold text-gray-900 md:text-base">{bag.name}</h2>
+                  <span class="text-sm text-gray-500 md:text-xs">
                     {packedItems()} / {totalItems()}
                   </span>
                 </div>
                 <For each={Array.from(bagCategories().entries())}>
                   {([category, categoryItems]) => (
                     <div class="mb-4 md:mb-2">
-                      <h3 class="mb-2 md:mb-1 px-1 text-sm md:text-xs font-medium text-gray-600">
+                      <h3 class="mb-2 px-1 text-sm font-medium text-gray-600 md:mb-1 md:text-xs">
                         {category}
                       </h3>
                       <div

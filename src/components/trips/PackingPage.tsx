@@ -215,9 +215,7 @@ export function PackingPage(props: PackingPageProps) {
                 description="Add items to your packing list to get started"
                 action={
                   <div class="flex gap-2">
-                    <Button onClick={() => setShowAddFromMaster(true)}>
-                      Add from All Items
-                    </Button>
+                    <Button onClick={() => setShowAddFromMaster(true)}>Add from All Items</Button>
                     <Button variant="secondary" onClick={handleAddItem}>
                       Add Manually
                     </Button>
@@ -253,9 +251,7 @@ export function PackingPage(props: PackingPageProps) {
 
             {/* Add More Items Button */}
             <div class="mt-6 flex justify-center">
-              <Button onClick={() => setShowAddFromMaster(true)}>
-                Add More from All Items
-              </Button>
+              <Button onClick={() => setShowAddFromMaster(true)}>Add More from All Items</Button>
             </div>
           </Show>
         </Show>

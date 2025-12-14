@@ -62,7 +62,8 @@ async function makeRequest<T>(
 
     // Get CSRF token for state-changing requests
     const method = options.method?.toUpperCase();
-    const needsCsrf = method === 'POST' || method === 'PUT' || method === 'PATCH' || method === 'DELETE';
+    const needsCsrf =
+      method === 'POST' || method === 'PUT' || method === 'PATCH' || method === 'DELETE';
     const csrfTokenValue = needsCsrf ? await getCsrfToken() : null;
 
     const response = await fetch(url.toString(), {

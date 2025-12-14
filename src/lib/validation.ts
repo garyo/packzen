@@ -64,12 +64,9 @@ function colorString() {
   return z
     .string()
     .trim()
-    .refine(
-      (val) => COLOR_NAMES.includes(val as ColorName) || HEX_COLOR_REGEX.test(val),
-      {
-        message: `Must be a color name (${COLOR_NAMES.join(', ')}) or hex color (#RRGGBB)`,
-      }
-    )
+    .refine((val) => COLOR_NAMES.includes(val as ColorName) || HEX_COLOR_REGEX.test(val), {
+      message: `Must be a color name (${COLOR_NAMES.join(', ')}) or hex color (#RRGGBB)`,
+    })
     .nullable()
     .optional();
 }
@@ -92,24 +89,14 @@ export const masterItemCreateSchema = z.object({
   name: sanitizeString(MAX_NAME_LENGTH),
   description: sanitizeString(MAX_DESCRIPTION_LENGTH).nullable().optional(),
   category_id: z.string().uuid().nullable().optional(),
-  default_quantity: z
-    .number()
-    .int()
-    .min(MIN_QUANTITY)
-    .max(MAX_QUANTITY)
-    .default(1),
+  default_quantity: z.number().int().min(MIN_QUANTITY).max(MAX_QUANTITY).default(1),
 });
 
 export const masterItemUpdateSchema = z.object({
   name: sanitizeString(MAX_NAME_LENGTH).optional(),
   description: sanitizeString(MAX_DESCRIPTION_LENGTH).nullable().optional(),
   category_id: z.string().uuid().nullable().optional(),
-  default_quantity: z
-    .number()
-    .int()
-    .min(MIN_QUANTITY)
-    .max(MAX_QUANTITY)
-    .optional(),
+  default_quantity: z.number().int().min(MIN_QUANTITY).max(MAX_QUANTITY).optional(),
 });
 
 // Trip schemas
@@ -213,7 +200,9 @@ export function validateRequestSafe<T>(
   }
   return {
     success: false,
-    error: result.error.issues.map((e: z.ZodIssue) => `${e.path.join('.')}: ${e.message}`).join(', '),
+    error: result.error.issues
+      .map((e: z.ZodIssue) => `${e.path.join('.')}: ${e.message}`)
+      .join(', '),
   };
 }
 

@@ -3,29 +3,30 @@ import { eq, and } from 'drizzle-orm';
 import { z } from 'zod';
 import { trips } from '../../../../../db/schema';
 import { tripUpdateSchema, validateRequestSafe } from '../../../../lib/validation';
-import { createGetHandler, createPatchHandler, createDeleteHandler } from '../../../../lib/api-helpers';
+import {
+  createGetHandler,
+  createPatchHandler,
+  createDeleteHandler,
+} from '../../../../lib/api-helpers';
 
-export const GET: APIRoute = createGetHandler(
-  async ({ db, userId, params }) => {
-    const { tripId } = params;
-    if (!tripId) {
-      throw new Error('Trip ID is required');
-    }
+export const GET: APIRoute = createGetHandler(async ({ db, userId, params }) => {
+  const { tripId } = params;
+  if (!tripId) {
+    throw new Error('Trip ID is required');
+  }
 
-    const trip = await db
-      .select()
-      .from(trips)
-      .where(and(eq(trips.id, tripId), eq(trips.clerk_user_id, userId)))
-      .get();
+  const trip = await db
+    .select()
+    .from(trips)
+    .where(and(eq(trips.id, tripId), eq(trips.clerk_user_id, userId)))
+    .get();
 
-    if (!trip) {
-      throw new Error('Trip not found');
-    }
+  if (!trip) {
+    throw new Error('Trip not found');
+  }
 
-    return trip;
-  },
-  'fetch trip'
-);
+  return trip;
+}, 'fetch trip');
 
 export const PATCH: APIRoute = createPatchHandler<
   z.infer<typeof tripUpdateSchema>,
@@ -40,7 +41,9 @@ export const PATCH: APIRoute = createPatchHandler<
     const { name, destination, start_date, end_date, notes } = validatedData;
 
     // Build update object dynamically
-    type TripUpdate = Partial<Pick<typeof trips.$inferSelect, 'name' | 'destination' | 'start_date' | 'end_date' | 'notes'>>;
+    type TripUpdate = Partial<
+      Pick<typeof trips.$inferSelect, 'name' | 'destination' | 'start_date' | 'end_date' | 'notes'>
+    >;
     const updates: TripUpdate & { updated_at: Date } = { updated_at: new Date() };
     if (name !== undefined) updates.name = name;
     if (destination !== undefined) updates.destination = destination;
@@ -89,20 +92,17 @@ export const PUT: APIRoute = createPatchHandler<
   (data) => validateRequestSafe(tripUpdateSchema, data)
 );
 
-export const DELETE: APIRoute = createDeleteHandler(
-  async ({ db, userId, params, request }) => {
-    const { tripId } = params;
-    if (!tripId) {
-      return false;
-    }
+export const DELETE: APIRoute = createDeleteHandler(async ({ db, userId, params, request }) => {
+  const { tripId } = params;
+  if (!tripId) {
+    return false;
+  }
 
-    const deleted = await db
-      .delete(trips)
-      .where(and(eq(trips.id, tripId), eq(trips.clerk_user_id, userId)))
-      .returning()
-      .get();
+  const deleted = await db
+    .delete(trips)
+    .where(and(eq(trips.id, tripId), eq(trips.clerk_user_id, userId)))
+    .returning()
+    .get();
 
-    return !!deleted;
-  },
-  'delete trip'
-);
+  return !!deleted;
+}, 'delete trip');

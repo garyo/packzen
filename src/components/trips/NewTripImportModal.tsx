@@ -96,7 +96,8 @@ export function NewTripImportModal(props: NewTripImportModalProps) {
       <div class="space-y-4">
         <div>
           <p class="mb-3 text-sm text-gray-600">
-            Select a YAML file to import as a new trip. This will create a new trip with all its bags and items.
+            Select a YAML file to import as a new trip. This will create a new trip with all its
+            bags and items.
           </p>
           <input
             type="file"

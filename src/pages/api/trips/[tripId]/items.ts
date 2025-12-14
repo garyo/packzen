@@ -2,36 +2,42 @@ import type { APIRoute } from 'astro';
 import { eq, and, asc } from 'drizzle-orm';
 import { z } from 'zod';
 import { tripItems, trips, bags } from '../../../../../db/schema';
-import { tripItemCreateSchema, tripItemUpdateSchema, validateRequestSafe } from '../../../../lib/validation';
-import { createGetHandler, createPostHandler, createPatchHandler, createDeleteHandler } from '../../../../lib/api-helpers';
+import {
+  tripItemCreateSchema,
+  tripItemUpdateSchema,
+  validateRequestSafe,
+} from '../../../../lib/validation';
+import {
+  createGetHandler,
+  createPostHandler,
+  createPatchHandler,
+  createDeleteHandler,
+} from '../../../../lib/api-helpers';
 
-export const GET: APIRoute = createGetHandler(
-  async ({ db, userId, params }) => {
-    const { tripId } = params;
-    if (!tripId) {
-      throw new Error('Trip ID is required');
-    }
+export const GET: APIRoute = createGetHandler(async ({ db, userId, params }) => {
+  const { tripId } = params;
+  if (!tripId) {
+    throw new Error('Trip ID is required');
+  }
 
-    // Verify trip ownership
-    const trip = await db
-      .select()
-      .from(trips)
-      .where(and(eq(trips.id, tripId), eq(trips.clerk_user_id, userId)))
-      .get();
+  // Verify trip ownership
+  const trip = await db
+    .select()
+    .from(trips)
+    .where(and(eq(trips.id, tripId), eq(trips.clerk_user_id, userId)))
+    .get();
 
-    if (!trip) {
-      throw new Error('Trip not found');
-    }
+  if (!trip) {
+    throw new Error('Trip not found');
+  }
 
-    return await db
-      .select()
-      .from(tripItems)
-      .where(eq(tripItems.trip_id, tripId))
-      .orderBy(asc(tripItems.name))
-      .all();
-  },
-  'fetch trip items'
-);
+  return await db
+    .select()
+    .from(tripItems)
+    .where(eq(tripItems.trip_id, tripId))
+    .orderBy(asc(tripItems.name))
+    .all();
+}, 'fetch trip items');
 
 export const POST: APIRoute = createPostHandler<
   z.infer<typeof tripItemCreateSchema>,
@@ -124,7 +130,12 @@ export const PATCH: APIRoute = createPatchHandler<
     }
 
     // Build update object dynamically
-    type TripItemUpdate = Partial<Pick<typeof tripItems.$inferSelect, 'name' | 'category_name' | 'quantity' | 'bag_id' | 'is_packed'>>;
+    type TripItemUpdate = Partial<
+      Pick<
+        typeof tripItems.$inferSelect,
+        'name' | 'category_name' | 'quantity' | 'bag_id' | 'is_packed'
+      >
+    >;
     const updates: TripItemUpdate & { updated_at: Date } = { updated_at: new Date() };
     if (is_packed !== undefined) updates.is_packed = is_packed;
     if (quantity !== undefined) updates.quantity = quantity;
@@ -143,34 +154,31 @@ export const PATCH: APIRoute = createPatchHandler<
   (data) => validateRequestSafe(tripItemUpdateSchema, data)
 );
 
-export const DELETE: APIRoute = createDeleteHandler(
-  async ({ db, userId, params, request }) => {
-    const { tripId } = params;
-    if (!tripId) {
-      return false;
-    }
+export const DELETE: APIRoute = createDeleteHandler(async ({ db, userId, params, request }) => {
+  const { tripId } = params;
+  if (!tripId) {
+    return false;
+  }
 
-    const body = await request.json();
-    const { id } = body;
+  const body = await request.json();
+  const { id } = body;
 
-    // Verify trip ownership
-    const trip = await db
-      .select()
-      .from(trips)
-      .where(and(eq(trips.id, tripId), eq(trips.clerk_user_id, userId)))
-      .get();
+  // Verify trip ownership
+  const trip = await db
+    .select()
+    .from(trips)
+    .where(and(eq(trips.id, tripId), eq(trips.clerk_user_id, userId)))
+    .get();
 
-    if (!trip) {
-      return false;
-    }
+  if (!trip) {
+    return false;
+  }
 
-    const deleted = await db
-      .delete(tripItems)
-      .where(and(eq(tripItems.id, id), eq(tripItems.trip_id, tripId)))
-      .returning()
-      .get();
+  const deleted = await db
+    .delete(tripItems)
+    .where(and(eq(tripItems.id, id), eq(tripItems.trip_id, tripId)))
+    .returning()
+    .get();
 
-    return !!deleted;
-  },
-  'delete trip item'
-);
+  return !!deleted;
+}, 'delete trip item');

@@ -64,9 +64,7 @@ export function UpcomingTripsList(props: UpcomingTripsListProps) {
         }
       >
         <div class="space-y-4">
-          <For each={upcomingTrips()}>
-            {(trip) => <TripCard trip={trip} />}
-          </For>
+          <For each={upcomingTrips()}>{(trip) => <TripCard trip={trip} />}</For>
         </div>
       </Show>
     </div>
@@ -90,7 +88,10 @@ function TripCard(props: TripCardProps) {
             <p class="mt-1 text-sm text-gray-600">📍 {props.trip.destination}</p>
           </Show>
           <p class="mt-1 text-sm text-gray-500">
-            <Show when={props.trip.start_date} fallback={<span class="text-gray-400">No date set</span>}>
+            <Show
+              when={props.trip.start_date}
+              fallback={<span class="text-gray-400">No date set</span>}
+            >
               {formatDate(props.trip.start_date!)}
               <Show when={props.trip.end_date && props.trip.end_date !== props.trip.start_date}>
                 {' '}

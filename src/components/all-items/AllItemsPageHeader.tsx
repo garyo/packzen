@@ -45,8 +45,8 @@ export function AllItemsPageHeader(props: AllItemsPageHeaderProps) {
               </svg>
             </a>
             <div>
-              <h1 class="text-2xl md:text-lg font-bold text-gray-900">All Items</h1>
-              <p class="text-sm md:text-xs text-gray-600">Your reusable packing essentials</p>
+              <h1 class="text-2xl font-bold text-gray-900 md:text-lg">All Items</h1>
+              <p class="text-sm text-gray-600 md:text-xs">Your reusable packing essentials</p>
             </div>
           </div>
           <div class="flex gap-2">

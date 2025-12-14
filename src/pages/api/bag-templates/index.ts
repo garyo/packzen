@@ -5,17 +5,14 @@ import { bagTemplates } from '../../../../db/schema';
 import { bagTemplateCreateSchema, validateRequestSafe } from '../../../lib/validation';
 import { createGetHandler, createPostHandler } from '../../../lib/api-helpers';
 
-export const GET: APIRoute = createGetHandler(
-  async ({ db, userId }) => {
-    return await db
-      .select()
-      .from(bagTemplates)
-      .where(eq(bagTemplates.clerk_user_id, userId))
-      .orderBy(asc(bagTemplates.sort_order))
-      .all();
-  },
-  'fetch bag templates'
-);
+export const GET: APIRoute = createGetHandler(async ({ db, userId }) => {
+  return await db
+    .select()
+    .from(bagTemplates)
+    .where(eq(bagTemplates.clerk_user_id, userId))
+    .orderBy(asc(bagTemplates.sort_order))
+    .all();
+}, 'fetch bag templates');
 
 export const POST: APIRoute = createPostHandler<
   z.infer<typeof bagTemplateCreateSchema>,

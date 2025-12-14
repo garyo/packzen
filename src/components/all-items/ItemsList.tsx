@@ -43,11 +43,11 @@ export function ItemsList(props: ItemsListProps) {
 
       {/* Uncategorized */}
       <Show when={uncategorizedItems().length > 0}>
-        <div class="rounded-lg bg-white p-4 md:p-2 shadow-sm">
-          <h2 class="mb-4 md:mb-2 text-lg md:text-base font-semibold text-gray-900">
+        <div class="rounded-lg bg-white p-4 shadow-sm md:p-2">
+          <h2 class="mb-4 text-lg font-semibold text-gray-900 md:mb-2 md:text-base">
             Uncategorized ({uncategorizedItems().length})
           </h2>
-          <div class="grid grid-cols-1 gap-3 md:gap-2 md:grid-cols-2 lg:grid-cols-3">
+          <div class="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-2 lg:grid-cols-3">
             <For each={uncategorizedItems()}>
               {(item) => (
                 <ItemCard
@@ -73,13 +73,13 @@ interface CategorySectionProps {
 
 function CategorySection(props: CategorySectionProps) {
   return (
-    <div class="rounded-lg bg-white p-4 md:p-2 shadow-sm">
-      <div class="mb-4 md:mb-2 flex items-center gap-2">
+    <div class="rounded-lg bg-white p-4 shadow-sm md:p-2">
+      <div class="mb-4 flex items-center gap-2 md:mb-2">
         <span class="text-2xl md:text-xl">{props.category.icon || '📦'}</span>
-        <h2 class="text-lg md:text-base font-semibold text-gray-900">{props.category.name}</h2>
-        <span class="text-sm md:text-xs text-gray-500">({props.items.length})</span>
+        <h2 class="text-lg font-semibold text-gray-900 md:text-base">{props.category.name}</h2>
+        <span class="text-sm text-gray-500 md:text-xs">({props.items.length})</span>
       </div>
-      <div class="grid grid-cols-1 gap-3 md:gap-2 md:grid-cols-2 lg:grid-cols-3">
+      <div class="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-2 lg:grid-cols-3">
         <For each={props.items}>
           {(item) => (
             <ItemCard
@@ -103,16 +103,16 @@ interface ItemCardProps {
 function ItemCard(props: ItemCardProps) {
   return (
     <div
-      class="rounded-lg border border-gray-200 p-3 md:p-2 transition-colors hover:border-blue-500 cursor-pointer"
+      class="cursor-pointer rounded-lg border border-gray-200 p-3 transition-colors hover:border-blue-500 md:p-2"
       onClick={props.onEdit}
     >
       <div class="flex items-start justify-between">
         <div class="flex-1">
-          <h3 class="font-medium md:text-sm text-gray-900">{props.item.name}</h3>
+          <h3 class="font-medium text-gray-900 md:text-sm">{props.item.name}</h3>
           {props.item.description && (
-            <p class="mt-1 md:mt-0.5 text-sm md:text-xs text-gray-600">{props.item.description}</p>
+            <p class="mt-1 text-sm text-gray-600 md:mt-0.5 md:text-xs">{props.item.description}</p>
           )}
-          <p class="mt-1 md:mt-0.5 text-xs text-gray-500">Qty: {props.item.default_quantity}</p>
+          <p class="mt-1 text-xs text-gray-500 md:mt-0.5">Qty: {props.item.default_quantity}</p>
         </div>
         <div class="ml-2 flex gap-1">
           <button

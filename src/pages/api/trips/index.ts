@@ -5,17 +5,14 @@ import { trips } from '../../../../db/schema';
 import { tripCreateSchema, validateRequestSafe } from '../../../lib/validation';
 import { createGetHandler, createPostHandler } from '../../../lib/api-helpers';
 
-export const GET: APIRoute = createGetHandler(
-  async ({ db, userId }) => {
-    return await db
-      .select()
-      .from(trips)
-      .where(eq(trips.clerk_user_id, userId))
-      .orderBy(desc(trips.start_date))
-      .all();
-  },
-  'fetch trips'
-);
+export const GET: APIRoute = createGetHandler(async ({ db, userId }) => {
+  return await db
+    .select()
+    .from(trips)
+    .where(eq(trips.clerk_user_id, userId))
+    .orderBy(desc(trips.start_date))
+    .all();
+}, 'fetch trips');
 
 export const POST: APIRoute = createPostHandler<
   z.infer<typeof tripCreateSchema>,

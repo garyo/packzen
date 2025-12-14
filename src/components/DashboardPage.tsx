@@ -84,14 +84,13 @@ export function DashboardPage() {
 
         {/* Main Content */}
         <main class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-          <Show when={!trips.loading && !masterItems.loading && !categories.loading} fallback={<LoadingSpinner />}>
+          <Show
+            when={!trips.loading && !masterItems.loading && !categories.loading}
+            fallback={<LoadingSpinner />}
+          >
             <div class="space-y-8">
               {/* Statistics */}
-              <DashboardStats
-                trips={trips}
-                masterItems={masterItems}
-                categories={categories}
-              />
+              <DashboardStats trips={trips} masterItems={masterItems} categories={categories} />
 
               {/* Upcoming Trips */}
               <UpcomingTripsList trips={trips} />

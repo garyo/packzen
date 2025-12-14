@@ -229,7 +229,12 @@ export function TripsPage() {
   );
 }
 
-function TripCard(props: { trip: Trip; onEdit: () => void; onCopy: () => void; onDelete: () => void }) {
+function TripCard(props: {
+  trip: Trip;
+  onEdit: () => void;
+  onCopy: () => void;
+  onDelete: () => void;
+}) {
   const statusColors = {
     upcoming: 'bg-blue-100 text-blue-800',
     active: 'bg-green-100 text-green-800',
@@ -246,7 +251,7 @@ function TripCard(props: { trip: Trip; onEdit: () => void; onCopy: () => void; o
       <div class="mb-3 flex items-start justify-between">
         <div class="flex-1">
           <h3 class="text-lg font-semibold text-gray-900">{props.trip.name}</h3>
-          <p class="mt-1 text-sm text-gray-600 min-h-[1.25rem]">
+          <p class="mt-1 min-h-[1.25rem] text-sm text-gray-600">
             {props.trip.destination && <>📍 {props.trip.destination}</>}
           </p>
         </div>

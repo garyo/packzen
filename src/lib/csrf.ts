@@ -18,7 +18,7 @@ const TOKEN_LENGTH = 32;
 export function generateCsrfToken(): string {
   const array = new Uint8Array(TOKEN_LENGTH);
   crypto.getRandomValues(array);
-  return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+  return Array.from(array, (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
 /**
@@ -33,7 +33,7 @@ export function validateCsrfToken(request: Request): boolean {
   }
 
   const cookies = Object.fromEntries(
-    cookieHeader.split(';').map(c => {
+    cookieHeader.split(';').map((c) => {
       const [key, ...value] = c.trim().split('=');
       return [key, value.join('=')];
     })

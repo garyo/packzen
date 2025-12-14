@@ -58,9 +58,13 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
   return (
     <header class="sticky top-0 z-10 border-b border-gray-200 bg-white">
       <div class="container mx-auto px-4 py-4 md:py-2">
-        <div class="mb-3 md:mb-2 flex items-center justify-between">
+        <div class="mb-3 flex items-center justify-between md:mb-2">
           <div class="flex items-center gap-2">
-            <a href="/dashboard" class="flex items-center text-gray-600 hover:text-gray-900" title="Home">
+            <a
+              href="/dashboard"
+              class="flex items-center text-gray-600 hover:text-gray-900"
+              title="Home"
+            >
               <svg
                 class="h-6 w-6 md:h-5 md:w-5"
                 fill="none"
@@ -75,7 +79,11 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
                 />
               </svg>
             </a>
-            <a href="/trips" class="flex items-center text-gray-600 hover:text-gray-900" title="Back to Trips">
+            <a
+              href="/trips"
+              class="flex items-center text-gray-600 hover:text-gray-900"
+              title="Back to Trips"
+            >
               <svg
                 class="h-5 w-5 md:h-4 md:w-4"
                 fill="none"
@@ -91,10 +99,10 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
               </svg>
             </a>
             <div>
-              <h1 class="text-2xl md:text-lg font-bold text-gray-900">
+              <h1 class="text-2xl font-bold text-gray-900 md:text-lg">
                 {props.trip()?.name || 'Packing'}
               </h1>
-              <p class="text-sm md:text-xs text-gray-600">
+              <p class="text-sm text-gray-600 md:text-xs">
                 {props.packedCount()} of {props.totalCount()} packed
               </p>
             </div>
@@ -129,7 +137,7 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
                       ⋮
                     </Button>
                     <Show when={showMenu()}>
-                      <div class="absolute right-0 top-full z-20 mt-1 w-48 rounded-lg border border-gray-200 bg-white shadow-lg">
+                      <div class="absolute top-full right-0 z-20 mt-1 w-48 rounded-lg border border-gray-200 bg-white shadow-lg">
                         <button
                           onClick={() => {
                             props.onExport();
@@ -153,7 +161,7 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
                             props.onClearAll();
                             setShowMenu(false);
                           }}
-                          class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 text-red-600"
+                          class="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-gray-100"
                         >
                           Clear All (Unpack)
                         </button>
@@ -162,7 +170,7 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
                             props.onDeleteTrip();
                             setShowMenu(false);
                           }}
-                          class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 text-red-600"
+                          class="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-gray-100"
                         >
                           Delete Trip
                         </button>

@@ -23,23 +23,23 @@ interface PackingItemCardProps {
 export function PackingItemCard(props: PackingItemCardProps) {
   return (
     <div
-      class={`flex items-center gap-4 md:gap-2 rounded-lg bg-white p-4 md:p-2 shadow-sm ${props.item.is_packed ? 'opacity-60' : ''} ${props.selectMode && props.isSelected ? 'ring-2 ring-blue-500' : ''} `}
+      class={`flex items-center gap-4 rounded-lg bg-white p-4 shadow-sm md:gap-2 md:p-2 ${props.item.is_packed ? 'opacity-60' : ''} ${props.selectMode && props.isSelected ? 'ring-2 ring-blue-500' : ''} `}
     >
       <Show when={!props.selectMode}>
         <input
           type="checkbox"
           checked={props.item.is_packed}
           onChange={props.onTogglePacked}
-          class="h-8 w-8 md:h-6 md:w-6 cursor-pointer rounded border-2 border-gray-300 text-green-600 focus:ring-2 focus:ring-green-500"
+          class="h-8 w-8 cursor-pointer rounded border-2 border-gray-300 text-green-600 focus:ring-2 focus:ring-green-500 md:h-6 md:w-6"
         />
       </Show>
       <div class="flex-1">
         <p
-          class={`text-lg md:text-base font-medium ${props.item.is_packed ? 'text-gray-500 line-through' : 'text-gray-900'}`}
+          class={`text-lg font-medium md:text-base ${props.item.is_packed ? 'text-gray-500 line-through' : 'text-gray-900'}`}
         >
           {props.item.name}
         </p>
-        <div class="mt-1 md:mt-0.5 flex gap-3 md:gap-2 text-sm md:text-xs text-gray-500">
+        <div class="mt-1 flex gap-3 text-sm text-gray-500 md:mt-0.5 md:gap-2 md:text-xs">
           {props.showBagInfo && props.bag && <span>👜 {props.bag.name}</span>}
           {props.showCategoryInfo && props.item.category_name && (
             <span>📁 {props.item.category_name}</span>

@@ -60,7 +60,7 @@ export function CSVImportExport(props: CSVImportExportProps) {
         if (!category) {
           const response = await api.post(endpoints.categories, { name: categoryName });
           if (response.success && response.data) {
-            category = response.data as typeof existingCategories[number];
+            category = response.data as (typeof existingCategories)[number];
             existingCategories.push(category);
             createdCategoriesCount++;
           }

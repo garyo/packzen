@@ -36,12 +36,14 @@ export function AllItemsPage() {
   });
 
   // Fetch bag templates
-  const [bagTemplates, { refetch: refetchBagTemplates }] = createResource<BagTemplate[]>(async () => {
-    return fetchWithErrorHandling(
-      () => api.get<BagTemplate[]>(endpoints.bagTemplates),
-      'Failed to load bags'
-    );
-  });
+  const [bagTemplates, { refetch: refetchBagTemplates }] = createResource<BagTemplate[]>(
+    async () => {
+      return fetchWithErrorHandling(
+        () => api.get<BagTemplate[]>(endpoints.bagTemplates),
+        'Failed to load bags'
+      );
+    }
+  );
 
   // Initialize auth on mount
   onMount(async () => {

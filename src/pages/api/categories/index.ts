@@ -5,16 +5,9 @@ import { categories } from '../../../../db/schema';
 import { categoryCreateSchema, validateRequestSafe } from '../../../lib/validation';
 import { createGetHandler, createPostHandler } from '../../../lib/api-helpers';
 
-export const GET: APIRoute = createGetHandler(
-  async ({ db, userId }) => {
-    return await db
-      .select()
-      .from(categories)
-      .where(eq(categories.clerk_user_id, userId))
-      .all();
-  },
-  'fetch categories'
-);
+export const GET: APIRoute = createGetHandler(async ({ db, userId }) => {
+  return await db.select().from(categories).where(eq(categories.clerk_user_id, userId)).all();
+}, 'fetch categories');
 
 export const POST: APIRoute = createPostHandler<
   z.infer<typeof categoryCreateSchema>,

@@ -41,11 +41,7 @@ export const POST: APIRoute = createPostHandler<Record<string, never>, typeof tr
         .get();
 
       // Get all bags from original trip
-      const originalBags = await db
-        .select()
-        .from(bags)
-        .where(eq(bags.trip_id, tripId))
-        .all();
+      const originalBags = await db.select().from(bags).where(eq(bags.trip_id, tripId)).all();
 
       // Copy bags and create mapping
       const bagIdMap = new Map<string, string>();

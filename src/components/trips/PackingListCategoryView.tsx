@@ -68,16 +68,16 @@ export function PackingListCategoryView(props: PackingListCategoryViewProps) {
           return (
             <Show when={totalItems() > 0}>
               <div>
-                <div class="mb-3 md:mb-1.5 flex items-center gap-2">
-                  <h2 class="text-lg md:text-base font-semibold text-gray-900">📁 {category}</h2>
-                  <span class="text-sm md:text-xs text-gray-500">({totalItems()})</span>
+                <div class="mb-3 flex items-center gap-2 md:mb-1.5">
+                  <h2 class="text-lg font-semibold text-gray-900 md:text-base">📁 {category}</h2>
+                  <span class="text-sm text-gray-500 md:text-xs">({totalItems()})</span>
                 </div>
                 <For each={Array.from(categoryBags.entries())}>
                   {([bagId, bagItems]) => {
                     const bag = () => itemsByCategory().allBags.find((b) => b.id === bagId);
                     return (
                       <div class="mb-4 md:mb-2">
-                        <h3 class="mb-2 md:mb-1 px-1 text-sm md:text-xs font-medium text-gray-600">
+                        <h3 class="mb-2 px-1 text-sm font-medium text-gray-600 md:mb-1 md:text-xs">
                           {bag()?.name || 'No bag'}
                         </h3>
                         <div
