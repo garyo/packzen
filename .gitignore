@@ -26,4 +26,7 @@ pnpm-debug.log*
 # jetbrains setting folder
 .idea/
 .env.production.local
+
+# auto-generated files
 src/lib/version.ts
+public/sw.js
