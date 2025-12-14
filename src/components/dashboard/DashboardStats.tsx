@@ -16,7 +16,7 @@ interface DashboardStatsProps {
 
 export function DashboardStats(props: DashboardStatsProps) {
   return (
-    <div class="grid grid-cols-1 gap-6 sm:grid-cols-3">
+    <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
       <StatCard
         title="Total Trips"
         value={props.trips()?.length || 0}
@@ -29,14 +29,7 @@ export function DashboardStats(props: DashboardStatsProps) {
         value={props.masterItems()?.length || 0}
         icon="📦"
         linkTo="/all-items"
-        linkText="Manage items"
-      />
-      <StatCard
-        title="Categories"
-        value={props.categories()?.length || 0}
-        icon="🏷️"
-        linkTo="/all-items"
-        linkText="Manage categories"
+        linkText="Manage items, categories and bags"
       />
     </div>
   );

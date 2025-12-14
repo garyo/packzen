@@ -18,6 +18,7 @@ import { PackingListCategoryView } from './PackingListCategoryView';
 import { SelectModeActionBar } from './SelectModeActionBar';
 import { fetchWithErrorHandling, fetchSingleWithErrorHandling } from '../../lib/resource-helpers';
 import { tripToYAML, downloadYAML } from '../../lib/yaml';
+import { deleteTripWithConfirm } from '../../lib/trip-actions';
 
 interface PackingPageProps {
   tripId: string;
@@ -167,17 +168,13 @@ export function PackingPage(props: PackingPageProps) {
   };
 
   const handleDeleteTrip = async () => {
-    const tripName = trip()?.name || 'this trip';
-    if (!confirm(`Delete ${tripName}? All items and bags will be permanently deleted.`)) return;
+    const currentTrip = trip();
+    if (!currentTrip) return;
 
-    const response = await api.delete(endpoints.trip(props.tripId));
-    if (response.success) {
-      showToast('success', 'Trip deleted');
+    await deleteTripWithConfirm(currentTrip.id, currentTrip.name, () => {
       // Navigate back to trips list
       window.location.href = '/trips';
-    } else {
-      showToast('error', response.error || 'Failed to delete trip');
-    }
+    });
   };
 
   const packedCount = () => items()?.filter((i) => i.is_packed).length || 0;

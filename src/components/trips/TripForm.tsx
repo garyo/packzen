@@ -53,7 +53,7 @@ export function TripForm(props: TripFormProps) {
   };
 
   return (
-    <Modal isOpen={true} onClose={props.onClose} title={props.trip ? 'Edit Trip' : 'New Trip'}>
+    <Modal onClose={props.onClose} title={props.trip ? 'Edit Trip' : 'New Trip'}>
       <form onSubmit={handleSubmit} class="space-y-4">
         <Input
           label="Trip Name *"

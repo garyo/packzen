@@ -11,6 +11,7 @@ import { TripFormWithBags } from './TripFormWithBags';
 import { NewTripImportModal } from './NewTripImportModal';
 import { formatDate, getTripStatus } from '../../lib/utils';
 import { fetchWithErrorHandling } from '../../lib/resource-helpers';
+import { deleteTripWithConfirm } from '../../lib/trip-actions';
 
 export function TripsPage() {
   const [showForm, setShowForm] = createSignal(false);
@@ -23,7 +24,20 @@ export function TripsPage() {
 
   onMount(async () => {
     await authStore.initAuth();
+
+    // Auto-open New Trip modal if ?new=true in URL
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('new') === 'true') {
+      setShowForm(true);
+      // Clear the URL parameter
+      window.history.replaceState({}, '', '/trips');
+    }
   });
+
+  const handleEdit = (trip: Trip) => {
+    setEditingTrip(trip);
+    setShowForm(true);
+  };
 
   const handleCopy = async (trip: Trip) => {
     try {
@@ -41,16 +55,8 @@ export function TripsPage() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Delete this trip? All items and bags will be deleted.')) return;
-
-    const response = await api.delete(endpoints.trip(id));
-    if (response.success) {
-      showToast('success', 'Trip deleted');
-      refetch();
-    } else {
-      showToast('error', response.error || 'Failed to delete trip');
-    }
+  const handleDelete = async (trip: Trip) => {
+    await deleteTripWithConfirm(trip.id, trip.name, () => refetch());
   };
 
   const upcomingTrips = () =>
@@ -133,8 +139,9 @@ export function TripsPage() {
                       {(trip) => (
                         <TripCard
                           trip={trip}
+                          onEdit={() => handleEdit(trip)}
                           onCopy={() => handleCopy(trip)}
-                          onDelete={() => handleDelete(trip.id)}
+                          onDelete={() => handleDelete(trip)}
                         />
                       )}
                     </For>
@@ -151,8 +158,9 @@ export function TripsPage() {
                       {(trip) => (
                         <TripCard
                           trip={trip}
+                          onEdit={() => handleEdit(trip)}
                           onCopy={() => handleCopy(trip)}
-                          onDelete={() => handleDelete(trip.id)}
+                          onDelete={() => handleDelete(trip)}
                         />
                       )}
                     </For>
@@ -169,8 +177,9 @@ export function TripsPage() {
                       {(trip) => (
                         <TripCard
                           trip={trip}
+                          onEdit={() => handleEdit(trip)}
                           onCopy={() => handleCopy(trip)}
-                          onDelete={() => handleDelete(trip.id)}
+                          onDelete={() => handleDelete(trip)}
                         />
                       )}
                     </For>
@@ -236,7 +245,7 @@ export function TripsPage() {
   );
 }
 
-function TripCard(props: { trip: Trip; onCopy: () => void; onDelete: () => void }) {
+function TripCard(props: { trip: Trip; onEdit: () => void; onCopy: () => void; onDelete: () => void }) {
   const statusColors = {
     upcoming: 'bg-blue-100 text-blue-800',
     active: 'bg-green-100 text-green-800',
@@ -253,9 +262,9 @@ function TripCard(props: { trip: Trip; onCopy: () => void; onDelete: () => void 
       <div class="mb-3 flex items-start justify-between">
         <div class="flex-1">
           <h3 class="text-lg font-semibold text-gray-900">{props.trip.name}</h3>
-          {props.trip.destination && (
-            <p class="mt-1 text-sm text-gray-600">📍 {props.trip.destination}</p>
-          )}
+          <p class="mt-1 text-sm text-gray-600 min-h-[1.25rem]">
+            {props.trip.destination && <>📍 {props.trip.destination}</>}
+          </p>
         </div>
         <span class={`rounded px-2 py-1 text-xs font-medium ${statusColors[status()]}`}>
           {status()}
@@ -281,14 +290,46 @@ function TripCard(props: { trip: Trip; onCopy: () => void; onDelete: () => void 
           Pack
         </a>
         <button
+          onClick={props.onEdit}
+          class="p-2 text-gray-400 hover:text-blue-600"
+          title="Edit this trip"
+        >
+          <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+            />
+          </svg>
+        </button>
+        <button
           onClick={props.onCopy}
-          class="px-3 py-2 text-sm text-gray-600 hover:text-blue-600"
+          class="p-2 text-gray-400 hover:text-blue-600"
           title="Copy this trip"
         >
-          Copy
+          <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+            />
+          </svg>
         </button>
-        <button onClick={props.onDelete} class="px-3 py-2 text-sm text-gray-600 hover:text-red-600">
-          Delete
+        <button
+          onClick={props.onDelete}
+          class="p-2 text-gray-400 hover:text-red-600"
+          title="Delete this trip"
+        >
+          <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+            />
+          </svg>
         </button>
       </div>
     </div>

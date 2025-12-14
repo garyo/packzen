@@ -91,25 +91,15 @@ export function DashboardPage() {
               <UpcomingTripsList trips={trips} />
 
               {/* Quick Links */}
-              <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                <QuickLink
-                  href="/trips"
-                  icon="✈️"
-                  title="View All Trips"
-                  description="Manage your trips and packing lists"
-                />
-                <QuickLink
-                  href="/all-items"
-                  icon="📦"
-                  title="All Items"
-                  description="Manage your reusable item templates"
-                />
-                <QuickLink
-                  href="/trips/new"
-                  icon="➕"
-                  title="Plan New Trip"
-                  description="Start planning your next adventure"
-                />
+              <div class="flex justify-center">
+                <div class="w-full max-w-md">
+                  <QuickLink
+                    href="/trips?new=true"
+                    icon="➕"
+                    title="Plan New Trip"
+                    description="Start planning your next adventure"
+                  />
+                </div>
               </div>
             </div>
           </Show>

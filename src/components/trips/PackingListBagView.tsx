@@ -64,8 +64,10 @@ export function PackingListBagView(props: PackingListBagViewProps) {
       <For each={itemsByBag().allBags}>
         {(bag) => {
           const bagCategories = () => itemsByBag().grouped.get(bag.id) || new Map();
-          const totalItems = () =>
-            Array.from(bagCategories().values()).reduce((sum, items) => sum + items.length, 0);
+          const allBagItems = () =>
+            Array.from(bagCategories().values()).flat();
+          const totalItems = () => allBagItems().length;
+          const packedItems = () => allBagItems().filter((item) => item.is_packed).length;
           return (
             <Show when={totalItems() > 0}>
               <div>
@@ -90,7 +92,9 @@ export function PackingListBagView(props: PackingListBagViewProps) {
                     />
                   </Show>
                   <h2 class="text-lg md:text-base font-semibold text-gray-900">{bag.name}</h2>
-                  <span class="text-sm md:text-xs text-gray-500">({totalItems()})</span>
+                  <span class="text-sm md:text-xs text-gray-500">
+                    {packedItems()} / {totalItems()}
+                  </span>
                 </div>
                 <For each={Array.from(bagCategories().entries())}>
                   {([category, categoryItems]) => (
