@@ -22,7 +22,8 @@
       "Bash(wc:*)",
       "Bash(bunx tsc:*)",
       "Bash(bun x tsc:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(NODE_ENV=development node:*)"
     ]
   }
 }

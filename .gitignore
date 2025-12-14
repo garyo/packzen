@@ -26,3 +26,4 @@ pnpm-debug.log*
 # jetbrains setting folder
 .idea/
 .env.production.local
+src/lib/version.ts

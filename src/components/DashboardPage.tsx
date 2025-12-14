@@ -5,18 +5,20 @@
  * Delegates to focused sub-components for each concern
  */
 
-import { createResource, onMount, Show } from 'solid-js';
+import { createResource, createSignal, onMount, Show } from 'solid-js';
 import { authStore } from '../stores/auth';
 import { api, endpoints } from '../lib/api';
 import type { Trip, MasterItem, Category } from '../lib/types';
 import { LoadingSpinner } from './ui/LoadingSpinner';
 import { Toast } from './ui/Toast';
 import { fetchWithErrorHandling } from '../lib/resource-helpers';
-import { BackupManager } from './dashboard/BackupManager';
 import { DashboardStats } from './dashboard/DashboardStats';
 import { UpcomingTripsList } from './dashboard/UpcomingTripsList';
+import { AboutModal } from './dashboard/AboutModal';
+import { UserMenu } from './dashboard/UserMenu';
 
 export function DashboardPage() {
+  const [showAbout, setShowAbout] = createSignal(false);
   // Data fetching
   const [masterItems, { refetch: refetchItems }] = createResource<MasterItem[]>(async () => {
     return fetchWithErrorHandling(
@@ -40,10 +42,6 @@ export function DashboardPage() {
     await authStore.initAuth();
   });
 
-  const handleSignOut = async () => {
-    await authStore.signOut();
-  };
-
   const handleBackupRestored = () => {
     refetchCategories();
     refetchItems();
@@ -59,18 +57,26 @@ export function DashboardPage() {
           <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div class="flex h-16 items-center justify-between">
               <h1 class="text-2xl font-bold text-gray-900">Dashboard</h1>
-              <div class="flex items-center gap-2">
-                <BackupManager
+              <div class="flex items-center gap-3">
+                <button
+                  onClick={() => setShowAbout(true)}
+                  class="rounded-lg border border-gray-300 bg-white p-2 text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                  title="About PackZen"
+                >
+                  <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                </button>
+                <UserMenu
                   categories={categories}
                   masterItems={masterItems}
                   onBackupRestored={handleBackupRestored}
                 />
-                <button
-                  onClick={handleSignOut}
-                  class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                >
-                  Sign Out
-                </button>
               </div>
             </div>
           </div>
@@ -105,6 +111,10 @@ export function DashboardPage() {
           </Show>
         </main>
       </div>
+
+      <Show when={showAbout()}>
+        <AboutModal onClose={() => setShowAbout(false)} />
+      </Show>
     </>
   );
 }
