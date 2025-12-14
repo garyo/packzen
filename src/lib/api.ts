@@ -22,12 +22,18 @@ async function getCsrfToken(): Promise<string> {
   }
 
   try {
+    const sessionToken = await getSessionToken();
+
     const response = await fetch('/api/csrf-token', {
       credentials: 'same-origin',
+      headers: {
+        Authorization: `Bearer ${sessionToken}`,
+      },
     });
 
     if (!response.ok) {
-      throw new Error('Failed to fetch CSRF token');
+      const errorText = await response.text().catch(() => 'Unknown error');
+      throw new Error(`Failed to fetch CSRF token (${response.status}): ${errorText}`);
     }
 
     const data = await response.json();
