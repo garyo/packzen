@@ -17,8 +17,9 @@ function getGitInfo() {
     // Get git commit hash (short form)
     let commitHash = execSync('git rev-parse --short HEAD', { encoding: 'utf8' }).trim();
 
-    // Check for uncommitted changes
-    const hasChanges = execSync('git status --porcelain', { encoding: 'utf8' }).trim().length > 0;
+    // Check for uncommitted changes (excluding untracked files)
+    const gitStatus = execSync('git status --porcelain', { encoding: 'utf8' }).trim();
+    const hasChanges = gitStatus.split('\n').some(line => line && !line.startsWith('??'));
     if (hasChanges) {
       commitHash += '+';
     }
