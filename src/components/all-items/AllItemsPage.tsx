@@ -104,22 +104,34 @@ export function AllItemsPage() {
       <main class="container mx-auto px-4 py-6 md:px-3 md:py-3">
         <Show when={!items.loading} fallback={<LoadingSpinner text="Loading items..." />}>
           <Show
-            when={(items()?.length || 0) > 0}
+            when={!items.error}
             fallback={
               <EmptyState
-                icon="📝"
-                title="No items yet"
-                description="Start building your packing list by adding your first item"
-                action={<Button onClick={handleAddItem}>Add Your First Item</Button>}
+                icon="⚠️"
+                title="Unable to connect"
+                description="Cannot reach the server. Please check your connection and try again."
+                action={<Button onClick={() => refetchItems()}>Retry</Button>}
               />
             }
           >
-            <ItemsList
-              items={items}
-              categories={categories}
-              onEditItem={handleEditItem}
-              onDeleteItem={handleDeleteItem}
-            />
+            <Show
+              when={(items()?.length || 0) > 0}
+              fallback={
+                <EmptyState
+                  icon="📝"
+                  title="No items yet"
+                  description="Start building your packing list by adding your first item"
+                  action={<Button onClick={handleAddItem}>Add Your First Item</Button>}
+                />
+              }
+            >
+              <ItemsList
+                items={items}
+                categories={categories}
+                onEditItem={handleEditItem}
+                onDeleteItem={handleDeleteItem}
+              />
+            </Show>
           </Show>
         </Show>
       </main>

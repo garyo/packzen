@@ -120,74 +120,86 @@ export function TripsPage() {
       <main class="container mx-auto px-4 py-6">
         <Show when={!trips.loading} fallback={<LoadingSpinner text="Loading trips..." />}>
           <Show
-            when={(trips()?.length || 0) > 0}
+            when={!trips.error}
             fallback={
               <EmptyState
-                icon="🧳"
-                title="No trips yet"
-                description="Create your first trip and start planning your packing list"
-                action={<Button onClick={() => setShowForm(true)}>Create Your First Trip</Button>}
+                icon="⚠️"
+                title="Unable to connect"
+                description="Cannot reach the server. Please check your connection and try again."
+                action={<Button onClick={() => refetch()}>Retry</Button>}
               />
             }
           >
-            <div class="space-y-8">
-              {/* Active Trips */}
-              <Show when={activeTrips().length > 0}>
-                <div>
-                  <h2 class="mb-3 text-lg font-semibold text-gray-900">Active Trips</h2>
-                  <div class="grid gap-4 md:grid-cols-2">
-                    <For each={activeTrips()}>
-                      {(trip) => (
-                        <TripCard
-                          trip={trip}
-                          onEdit={() => handleEdit(trip)}
-                          onCopy={() => handleCopy(trip)}
-                          onDelete={() => handleDelete(trip)}
-                        />
-                      )}
-                    </For>
+            <Show
+              when={(trips()?.length || 0) > 0}
+              fallback={
+                <EmptyState
+                  icon="🧳"
+                  title="No trips yet"
+                  description="Create your first trip and start planning your packing list"
+                  action={<Button onClick={() => setShowForm(true)}>Create Your First Trip</Button>}
+                />
+              }
+            >
+              <div class="space-y-8">
+                {/* Active Trips */}
+                <Show when={activeTrips().length > 0}>
+                  <div>
+                    <h2 class="mb-3 text-lg font-semibold text-gray-900">Active Trips</h2>
+                    <div class="grid gap-4 md:grid-cols-2">
+                      <For each={activeTrips()}>
+                        {(trip) => (
+                          <TripCard
+                            trip={trip}
+                            onEdit={() => handleEdit(trip)}
+                            onCopy={() => handleCopy(trip)}
+                            onDelete={() => handleDelete(trip)}
+                          />
+                        )}
+                      </For>
+                    </div>
                   </div>
-                </div>
-              </Show>
+                </Show>
 
-              {/* Upcoming Trips */}
-              <Show when={upcomingTrips().length > 0}>
-                <div>
-                  <h2 class="mb-3 text-lg font-semibold text-gray-900">Upcoming Trips</h2>
-                  <div class="grid gap-4 md:grid-cols-2">
-                    <For each={upcomingTrips()}>
-                      {(trip) => (
-                        <TripCard
-                          trip={trip}
-                          onEdit={() => handleEdit(trip)}
-                          onCopy={() => handleCopy(trip)}
-                          onDelete={() => handleDelete(trip)}
-                        />
-                      )}
-                    </For>
+                {/* Upcoming Trips */}
+                <Show when={upcomingTrips().length > 0}>
+                  <div>
+                    <h2 class="mb-3 text-lg font-semibold text-gray-900">Upcoming Trips</h2>
+                    <div class="grid gap-4 md:grid-cols-2">
+                      <For each={upcomingTrips()}>
+                        {(trip) => (
+                          <TripCard
+                            trip={trip}
+                            onEdit={() => handleEdit(trip)}
+                            onCopy={() => handleCopy(trip)}
+                            onDelete={() => handleDelete(trip)}
+                          />
+                        )}
+                      </For>
+                    </div>
                   </div>
-                </div>
-              </Show>
+                </Show>
 
-              {/* Past Trips */}
-              <Show when={pastTrips().length > 0}>
-                <div>
-                  <h2 class="mb-3 text-lg font-semibold text-gray-900">Past Trips</h2>
-                  <div class="grid gap-4 md:grid-cols-2">
-                    <For each={pastTrips()}>
-                      {(trip) => (
-                        <TripCard
-                          trip={trip}
-                          onEdit={() => handleEdit(trip)}
-                          onCopy={() => handleCopy(trip)}
-                          onDelete={() => handleDelete(trip)}
-                        />
-                      )}
-                    </For>
+                {/* Past Trips */}
+                <Show when={pastTrips().length > 0}>
+                  <div>
+                    <h2 class="mb-3 text-lg font-semibold text-gray-900">Past Trips</h2>
+                    <div class="grid gap-4 md:grid-cols-2">
+                      <For each={pastTrips()}>
+                        {(trip) => (
+                          <TripCard
+                            trip={trip}
+                            onEdit={() => handleEdit(trip)}
+                            onCopy={() => handleCopy(trip)}
+                            onDelete={() => handleDelete(trip)}
+                          />
+                        )}
+                      </For>
+                    </div>
                   </div>
-                </div>
-              </Show>
-            </div>
+                </Show>
+              </div>
+            </Show>
           </Show>
         </Show>
       </main>

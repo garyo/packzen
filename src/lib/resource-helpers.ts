@@ -3,7 +3,7 @@ import { showToast } from '../components/ui/Toast';
 
 /**
  * Helper for createResource that handles API errors gracefully
- * Shows toast notifications for errors and returns empty array on failure
+ * Shows toast notifications for errors and throws to set resource error state
  */
 export async function fetchWithErrorHandling<T>(
   fetchFn: () => Promise<ApiResponse<T[]>>,
@@ -16,7 +16,8 @@ export async function fetchWithErrorHandling<T>(
     if (response.statusCode !== 401) {
       showToast('error', response.error || errorMessage);
     }
-    return [];
+    // Throw error so resource.error is set
+    throw new Error(response.error || errorMessage);
   }
 
   return response.data || [];
@@ -24,7 +25,7 @@ export async function fetchWithErrorHandling<T>(
 
 /**
  * Helper for createResource that handles API errors for single items
- * Shows toast notifications for errors and returns null on failure
+ * Shows toast notifications for errors and throws to set resource error state
  */
 export async function fetchSingleWithErrorHandling<T>(
   fetchFn: () => Promise<ApiResponse<T>>,
@@ -37,7 +38,8 @@ export async function fetchSingleWithErrorHandling<T>(
     if (response.statusCode !== 401) {
       showToast('error', response.error || errorMessage);
     }
-    return null;
+    // Throw error so resource.error is set
+    throw new Error(response.error || errorMessage);
   }
 
   return response.data || null;

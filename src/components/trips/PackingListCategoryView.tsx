@@ -59,12 +59,25 @@ export function PackingListCategoryView(props: PackingListCategoryViewProps) {
     return { grouped, allBags: bagsWithWearing };
   };
 
+  // Sort categories alphabetically
+  const sortedCategories = () => {
+    return Array.from(itemsByCategory().grouped.entries()).sort(([a], [b]) => a.localeCompare(b));
+  };
+
   return (
     <div class="space-y-6 md:space-y-3">
-      <For each={Array.from(itemsByCategory().grouped.entries())}>
+      <For each={sortedCategories()}>
         {([category, categoryBags]) => {
           const totalItems = () =>
             Array.from(categoryBags.values()).reduce((sum, items) => sum + items.length, 0);
+          // Sort bags alphabetically within category
+          const sortedBags = () => {
+            return Array.from(categoryBags.entries()).sort(([bagIdA], [bagIdB]) => {
+              const bagA = itemsByCategory().allBags.find((b) => b.id === bagIdA);
+              const bagB = itemsByCategory().allBags.find((b) => b.id === bagIdB);
+              return (bagA?.name || '').localeCompare(bagB?.name || '');
+            });
+          };
           return (
             <Show when={totalItems() > 0}>
               <div>
@@ -72,9 +85,11 @@ export function PackingListCategoryView(props: PackingListCategoryViewProps) {
                   <h2 class="text-lg font-semibold text-gray-900 md:text-base">📁 {category}</h2>
                   <span class="text-sm text-gray-500 md:text-xs">({totalItems()})</span>
                 </div>
-                <For each={Array.from(categoryBags.entries())}>
+                <For each={sortedBags()}>
                   {([bagId, bagItems]) => {
                     const bag = () => itemsByCategory().allBags.find((b) => b.id === bagId);
+                    // Sort items alphabetically by name
+                    const sortedItems = [...bagItems].sort((a, b) => a.name.localeCompare(b.name));
                     return (
                       <div class="mb-4 md:mb-2">
                         <h3 class="mb-2 px-1 text-sm font-medium text-gray-600 md:mb-1 md:text-xs">
@@ -84,7 +99,7 @@ export function PackingListCategoryView(props: PackingListCategoryViewProps) {
                           class="grid gap-2 md:gap-1.5"
                           style="grid-template-columns: repeat(auto-fill, minmax(320px, 400px))"
                         >
-                          <For each={bagItems}>
+                          <For each={sortedItems}>
                             {(item) => (
                               <PackingItemCard
                                 item={item}

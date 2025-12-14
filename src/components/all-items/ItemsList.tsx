@@ -17,15 +17,23 @@ interface ItemsListProps {
 
 export function ItemsList(props: ItemsListProps) {
   const getItemsByCategory = (categoryId: string | null) => {
-    return props.items()?.filter((item) => item.category_id === categoryId) || [];
+    const items = props.items()?.filter((item) => item.category_id === categoryId) || [];
+    // Sort items alphabetically by name
+    return items.sort((a, b) => a.name.localeCompare(b.name));
   };
 
   const uncategorizedItems = () => getItemsByCategory(null);
 
+  // Sort categories alphabetically by name
+  const sortedCategories = () => {
+    const cats = props.categories() || [];
+    return [...cats].sort((a, b) => a.name.localeCompare(b.name));
+  };
+
   return (
     <div class="space-y-6 md:space-y-3">
       {/* Categories */}
-      <For each={props.categories()}>
+      <For each={sortedCategories()}>
         {(category) => {
           const categoryItems = () => getItemsByCategory(category.id);
           return (

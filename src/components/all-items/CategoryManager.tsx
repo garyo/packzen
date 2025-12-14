@@ -100,6 +100,11 @@ export function CategoryManager(props: CategoryManagerProps) {
     }
   };
 
+  // Sort categories alphabetically by name
+  const sortedCategories = () => {
+    return [...props.categories].sort((a, b) => a.name.localeCompare(b.name));
+  };
+
   return (
     <Modal isOpen={true} onClose={props.onClose} title="Manage Categories">
       <div class="space-y-4">
@@ -132,7 +137,7 @@ export function CategoryManager(props: CategoryManagerProps) {
           <h3 class="mb-3 text-sm font-medium text-gray-700">Your Categories</h3>
           <div class="space-y-2">
             <For
-              each={props.categories}
+              each={sortedCategories()}
               fallback={<p class="py-4 text-center text-sm text-gray-500">No categories yet</p>}
             >
               {(category) => (

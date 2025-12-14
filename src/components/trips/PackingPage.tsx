@@ -207,27 +207,49 @@ export function PackingPage(props: PackingPageProps) {
       <main class="container mx-auto px-4 py-6 pb-20 md:px-3 md:py-3 md:pb-16">
         <Show when={!items.loading} fallback={<LoadingSpinner text="Loading items..." />}>
           <Show
-            when={totalCount() > 0}
+            when={!items.error}
             fallback={
               <EmptyState
-                icon="📦"
-                title="No items yet"
-                description="Add items to your packing list to get started"
-                action={
-                  <div class="flex gap-2">
-                    <Button onClick={() => setShowAddFromMaster(true)}>Add from All Items</Button>
-                    <Button variant="secondary" onClick={handleAddItem}>
-                      Add Manually
-                    </Button>
-                  </div>
-                }
+                icon="⚠️"
+                title="Unable to connect"
+                description="Cannot reach the server. Please check your connection and try again."
+                action={<Button onClick={() => refetch()}>Retry</Button>}
               />
             }
           >
             <Show
-              when={sortBy() === 'bag'}
+              when={totalCount() > 0}
               fallback={
-                <PackingListCategoryView
+                <EmptyState
+                  icon="📦"
+                  title="No items yet"
+                  description="Add items to your packing list to get started"
+                  action={
+                    <div class="flex gap-2">
+                      <Button onClick={() => setShowAddFromMaster(true)}>Add from All Items</Button>
+                      <Button variant="secondary" onClick={handleAddItem}>
+                        Add Manually
+                      </Button>
+                    </div>
+                  }
+                />
+              }
+            >
+              <Show
+                when={sortBy() === 'bag'}
+                fallback={
+                  <PackingListCategoryView
+                    items={items}
+                    bags={bags}
+                    selectMode={selectMode}
+                    selectedItems={selectedItems}
+                    onTogglePacked={handleTogglePacked}
+                    onEditItem={setEditingItem}
+                    onToggleItemSelection={toggleItemSelection}
+                  />
+                }
+              >
+                <PackingListBagView
                   items={items}
                   bags={bags}
                   selectMode={selectMode}
@@ -236,23 +258,13 @@ export function PackingPage(props: PackingPageProps) {
                   onEditItem={setEditingItem}
                   onToggleItemSelection={toggleItemSelection}
                 />
-              }
-            >
-              <PackingListBagView
-                items={items}
-                bags={bags}
-                selectMode={selectMode}
-                selectedItems={selectedItems}
-                onTogglePacked={handleTogglePacked}
-                onEditItem={setEditingItem}
-                onToggleItemSelection={toggleItemSelection}
-              />
-            </Show>
+              </Show>
 
-            {/* Add More Items Button */}
-            <div class="mt-6 flex justify-center">
-              <Button onClick={() => setShowAddFromMaster(true)}>Add More from All Items</Button>
-            </div>
+              {/* Add More Items Button */}
+              <div class="mt-6 flex justify-center">
+                <Button onClick={() => setShowAddFromMaster(true)}>Add More from All Items</Button>
+              </div>
+            </Show>
           </Show>
         </Show>
       </main>

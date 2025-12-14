@@ -88,25 +88,50 @@ export function DashboardPage() {
             when={!trips.loading && !masterItems.loading && !categories.loading}
             fallback={<LoadingSpinner />}
           >
-            <div class="space-y-8">
-              {/* Statistics */}
-              <DashboardStats trips={trips} masterItems={masterItems} categories={categories} />
+            <Show
+              when={!trips.error && !masterItems.error && !categories.error}
+              fallback={
+                <div class="flex flex-col items-center justify-center py-12">
+                  <div class="rounded-lg bg-white p-8 text-center shadow-sm">
+                    <div class="mb-4 text-6xl">⚠️</div>
+                    <h2 class="mb-2 text-xl font-semibold text-gray-900">Unable to connect</h2>
+                    <p class="mb-6 text-gray-600">
+                      Cannot reach the server. Please check your connection and try again.
+                    </p>
+                    <button
+                      onClick={() => {
+                        refetchTrips();
+                        refetchItems();
+                        refetchCategories();
+                      }}
+                      class="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+                    >
+                      Retry
+                    </button>
+                  </div>
+                </div>
+              }
+            >
+              <div class="space-y-8">
+                {/* Statistics */}
+                <DashboardStats trips={trips} masterItems={masterItems} categories={categories} />
 
-              {/* Upcoming Trips */}
-              <UpcomingTripsList trips={trips} />
+                {/* Upcoming Trips */}
+                <UpcomingTripsList trips={trips} />
 
-              {/* Quick Links */}
-              <div class="flex justify-center">
-                <div class="w-full max-w-md">
-                  <QuickLink
-                    href="/trips?new=true"
-                    icon="➕"
-                    title="Plan New Trip"
-                    description="Start planning your next adventure"
-                  />
+                {/* Quick Links */}
+                <div class="flex justify-center">
+                  <div class="w-full max-w-md">
+                    <QuickLink
+                      href="/trips?new=true"
+                      icon="➕"
+                      title="Plan New Trip"
+                      description="Start planning your next adventure"
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
+            </Show>
           </Show>
         </main>
       </div>

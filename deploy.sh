@@ -16,6 +16,9 @@ source .env.production.local
 # Build with production key
 PUBLIC_CLERK_PUBLISHABLE_KEY=$PUBLIC_CLERK_PUBLISHABLE_KEY bun run build
 
+echo "🗄️  Running database migrations..."
+npx wrangler d1 migrations apply packzen-db --remote
+
 echo "🚀 Deploying to Cloudflare Workers..."
 npx wrangler deploy
 

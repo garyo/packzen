@@ -59,14 +59,23 @@ export function PackingListBagView(props: PackingListBagViewProps) {
     return { grouped, allBags: bagsWithWearing };
   };
 
+  // Sort bags alphabetically
+  const sortedBags = () => {
+    return [...itemsByBag().allBags].sort((a, b) => a.name.localeCompare(b.name));
+  };
+
   return (
     <div class="space-y-6 md:space-y-3">
-      <For each={itemsByBag().allBags}>
+      <For each={sortedBags()}>
         {(bag) => {
           const bagCategories = () => itemsByBag().grouped.get(bag.id) || new Map();
           const allBagItems = () => Array.from(bagCategories().values()).flat();
           const totalItems = () => allBagItems().length;
           const packedItems = () => allBagItems().filter((item) => item.is_packed).length;
+          // Sort categories alphabetically within bag
+          const sortedCategories = () => {
+            return Array.from(bagCategories().entries()).sort(([a], [b]) => a.localeCompare(b));
+          };
           return (
             <Show when={totalItems() > 0}>
               <div>
@@ -98,32 +107,38 @@ export function PackingListBagView(props: PackingListBagViewProps) {
                     {packedItems()} / {totalItems()}
                   </span>
                 </div>
-                <For each={Array.from(bagCategories().entries())}>
-                  {([category, categoryItems]) => (
-                    <div class="mb-4 md:mb-2">
-                      <h3 class="mb-2 px-1 text-sm font-medium text-gray-600 md:mb-1 md:text-xs">
-                        {category}
-                      </h3>
-                      <div
-                        class="grid gap-2 md:gap-1.5"
-                        style="grid-template-columns: repeat(auto-fill, minmax(320px, 400px))"
-                      >
-                        <For each={categoryItems}>
-                          {(item) => (
-                            <PackingItemCard
-                              item={item}
-                              selectMode={props.selectMode()}
-                              isSelected={props.selectedItems().has(item.id)}
-                              showCategoryInfo={true}
-                              onTogglePacked={() => props.onTogglePacked(item)}
-                              onEdit={() => props.onEditItem(item)}
-                              onToggleSelection={() => props.onToggleItemSelection(item.id)}
-                            />
-                          )}
-                        </For>
+                <For each={sortedCategories()}>
+                  {([category, categoryItems]) => {
+                    // Sort items alphabetically by name
+                    const sortedItems = [...categoryItems].sort((a, b) =>
+                      a.name.localeCompare(b.name)
+                    );
+                    return (
+                      <div class="mb-4 md:mb-2">
+                        <h3 class="mb-2 px-1 text-sm font-medium text-gray-600 md:mb-1 md:text-xs">
+                          {category}
+                        </h3>
+                        <div
+                          class="grid gap-2 md:gap-1.5"
+                          style="grid-template-columns: repeat(auto-fill, minmax(320px, 400px))"
+                        >
+                          <For each={sortedItems}>
+                            {(item) => (
+                              <PackingItemCard
+                                item={item}
+                                selectMode={props.selectMode()}
+                                isSelected={props.selectedItems().has(item.id)}
+                                showCategoryInfo={true}
+                                onTogglePacked={() => props.onTogglePacked(item)}
+                                onEdit={() => props.onEditItem(item)}
+                                onToggleSelection={() => props.onToggleItemSelection(item.id)}
+                              />
+                            )}
+                          </For>
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    );
+                  }}
                 </For>
               </div>
             </Show>
