@@ -81,8 +81,10 @@ export function AboutModal(props: AboutModalProps) {
           <p class="text-xs text-gray-500">
             {VERSION_INFO.isDev ? (
               <>Dev Build &middot; {VERSION_INFO.commitHash}</>
-            ) : (
+            ) : VERSION_INFO.version !== VERSION_INFO.commitHash ? (
               <>Version {VERSION_INFO.version} &middot; {VERSION_INFO.commitHash}</>
+            ) : (
+              <>Version {VERSION_INFO.commitHash}</>
             )}
           </p>
           <p class="text-xs text-gray-500 mt-1">
