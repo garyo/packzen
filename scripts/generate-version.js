@@ -19,8 +19,12 @@ function getGitInfo() {
 
     // Check for uncommitted changes (excluding untracked files)
     const gitStatus = execSync('git status --porcelain', { encoding: 'utf8' }).trim();
-    const hasChanges = gitStatus.split('\n').some((line) => line && !line.startsWith('??'));
+    console.log('Git status output:', gitStatus || '(empty)');
+    const modifiedFiles = gitStatus.split('\n').filter((line) => line && !line.startsWith('??'));
+    console.log('Modified files (excluding untracked):', modifiedFiles);
+    const hasChanges = modifiedFiles.length > 0;
     if (hasChanges) {
+      console.warn('⚠️  Uncommitted changes detected - adding "+" to version');
       commitHash += '+';
     }
 
