@@ -22,6 +22,7 @@ interface PackingPageHeaderProps {
   onAddItem: () => void;
   onManageBags: () => void;
   onAddFromMaster: () => void;
+  onBrowseTemplates: () => void;
   onExport: () => void;
   onImport: () => void;
   onClearAll: () => void;
@@ -30,7 +31,9 @@ interface PackingPageHeaderProps {
 
 export function PackingPageHeader(props: PackingPageHeaderProps) {
   const [showMenu, setShowMenu] = createSignal(false);
+  const [showAddMenu, setShowAddMenu] = createSignal(false);
   let menuRef: HTMLDivElement | undefined;
+  let addMenuRef: HTMLDivElement | undefined;
 
   // Handle clicks outside menu and ESC key
   onMount(() => {
@@ -38,11 +41,15 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
       if (showMenu() && menuRef && !menuRef.contains(e.target as Node)) {
         setShowMenu(false);
       }
+      if (showAddMenu() && addMenuRef && !addMenuRef.contains(e.target as Node)) {
+        setShowAddMenu(false);
+      }
     };
 
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && showMenu()) {
-        setShowMenu(false);
+      if (e.key === 'Escape') {
+        if (showMenu()) setShowMenu(false);
+        if (showAddMenu()) setShowAddMenu(false);
       }
     };
 
@@ -58,11 +65,11 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
   return (
     <header class="sticky top-0 z-10 border-b border-gray-200 bg-white">
       <div class="container mx-auto px-4 py-4 md:py-2">
-        <div class="mb-3 flex items-center justify-between md:mb-2">
-          <div class="flex items-center gap-2">
+        <div class="mb-3 flex items-center justify-between gap-2 md:mb-2">
+          <div class="flex min-w-0 flex-1 items-center gap-2">
             <a
               href="/dashboard"
-              class="flex items-center text-gray-600 hover:text-gray-900"
+              class="flex flex-shrink-0 items-center text-gray-600 hover:text-gray-900"
               title="Home"
             >
               <svg
@@ -81,7 +88,7 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
             </a>
             <a
               href="/trips"
-              class="flex items-center text-gray-600 hover:text-gray-900"
+              class="flex flex-shrink-0 items-center text-gray-600 hover:text-gray-900"
               title="Back to Trips"
             >
               <svg
@@ -98,8 +105,8 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
                 />
               </svg>
             </a>
-            <div>
-              <h1 class="text-2xl font-bold text-gray-900 md:text-lg">
+            <div class="min-w-0 flex-1">
+              <h1 class="truncate text-2xl font-bold text-gray-900 md:text-lg">
                 {props.trip()?.name || 'Packing'}
               </h1>
               <p class="text-sm text-gray-600 md:text-xs">
@@ -107,7 +114,7 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
               </p>
             </div>
           </div>
-          <div class="flex gap-2">
+          <div class="flex flex-shrink-0 gap-2">
             <Show
               when={props.selectMode()}
               fallback={
@@ -115,9 +122,42 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
                   <Button variant="secondary" size="sm" onClick={props.onManageBags}>
                     Bags
                   </Button>
-                  <Button size="sm" onClick={props.onAddFromMaster}>
-                    Add from All Items
-                  </Button>
+                  <div class="relative" ref={addMenuRef}>
+                    <Button size="sm" onClick={() => setShowAddMenu(!showAddMenu())}>
+                      Add Items...
+                    </Button>
+                    <Show when={showAddMenu()}>
+                      <div class="absolute top-full left-0 z-20 mt-1 w-56 rounded-lg border border-gray-200 bg-white shadow-lg">
+                        <button
+                          onClick={() => {
+                            props.onAddFromMaster();
+                            setShowAddMenu(false);
+                          }}
+                          class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
+                        >
+                          📋 Add from My Items
+                        </button>
+                        <button
+                          onClick={() => {
+                            props.onBrowseTemplates();
+                            setShowAddMenu(false);
+                          }}
+                          class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
+                        >
+                          📚 Browse Templates
+                        </button>
+                        <button
+                          onClick={() => {
+                            props.onAddItem();
+                            setShowAddMenu(false);
+                          }}
+                          class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
+                        >
+                          ✏️ Add New Item
+                        </button>
+                      </div>
+                    </Show>
+                  </div>
                   <Button variant="secondary" size="sm" onClick={props.onToggleSelectMode}>
                     Select
                   </Button>
@@ -129,12 +169,13 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
                   >
                     {props.sortBy() === 'bag' ? '👜→📁' : '📁→👜'}
                   </Button>
-                  <Button variant="secondary" size="sm" onClick={props.onAddItem}>
-                    Add New
-                  </Button>
                   <div class="relative" ref={menuRef}>
                     <Button variant="secondary" size="sm" onClick={() => setShowMenu(!showMenu())}>
-                      ⋮
+                      <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
+                        <circle cx="12" cy="5" r="2" />
+                        <circle cx="12" cy="12" r="2" />
+                        <circle cx="12" cy="19" r="2" />
+                      </svg>
                     </Button>
                     <Show when={showMenu()}>
                       <div class="absolute top-full right-0 z-20 mt-1 w-48 rounded-lg border border-gray-200 bg-white shadow-lg">

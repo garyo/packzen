@@ -1,7 +1,12 @@
 import { createSignal, createResource, Show, onMount } from 'solid-js';
 import { authStore } from '../../stores/auth';
 import { api, endpoints } from '../../lib/api';
-import type { Category, MasterItemWithCategory, BagTemplate } from '../../lib/types';
+import type {
+  Category,
+  MasterItemWithCategory,
+  BagTemplate,
+  SelectedBuiltInItem,
+} from '../../lib/types';
 import { Button } from '../ui/Button';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
 import { EmptyState } from '../ui/EmptyState';
@@ -11,12 +16,15 @@ import { CategoryManager } from './CategoryManager';
 import { BagTemplateManager } from '../bag-templates/BagTemplateManager';
 import { AllItemsPageHeader } from './AllItemsPageHeader';
 import { ItemsList } from './ItemsList';
+import { BuiltInItemsBrowser } from '../built-in-items/BuiltInItemsBrowser';
 import { fetchWithErrorHandling } from '../../lib/resource-helpers';
+import { getCategoryIcon } from '../../lib/built-in-items';
 
 export function AllItemsPage() {
   const [showItemForm, setShowItemForm] = createSignal(false);
   const [showCategoryManager, setShowCategoryManager] = createSignal(false);
   const [showBagTemplateManager, setShowBagTemplateManager] = createSignal(false);
+  const [showBuiltInItems, setShowBuiltInItems] = createSignal(false);
   const [editingItem, setEditingItem] = createSignal<MasterItemWithCategory | null>(null);
 
   // Fetch categories
@@ -87,6 +95,70 @@ export function AllItemsPage() {
     refetchBagTemplates();
   };
 
+  const handleImportBuiltInItems = async (itemsToImport: SelectedBuiltInItem[]) => {
+    let created = 0;
+    let updated = 0;
+
+    for (const item of itemsToImport) {
+      // 1. Check if category exists, create if needed
+      let categoryId: string | null = null;
+      const existingCategory = categories()?.find(
+        (c) => c.name.toLowerCase() === item.category.toLowerCase()
+      );
+
+      if (existingCategory) {
+        categoryId = existingCategory.id;
+      } else {
+        // Create new category
+        const response = await api.post(endpoints.categories, {
+          name: item.category,
+          icon: getCategoryIcon(item.category),
+          sort_order: categories()?.length || 0,
+        });
+        if (response.success) {
+          categoryId = response.data.id;
+          await refetchCategories();
+        }
+      }
+
+      // 2. Check if item exists (case-insensitive name match)
+      const existingItem = items()?.find(
+        (i) => i.name.toLowerCase().trim() === item.name.toLowerCase().trim()
+      );
+
+      if (existingItem) {
+        // Update existing item
+        const response = await api.patch(endpoints.masterItem(existingItem.id), {
+          description: item.description,
+          category_id: categoryId,
+          default_quantity: item.quantity,
+        });
+        if (response.success) {
+          updated++;
+        }
+      } else {
+        // Create new item
+        const response = await api.post(endpoints.masterItems, {
+          name: item.name,
+          description: item.description,
+          category_id: categoryId,
+          default_quantity: item.quantity,
+        });
+        if (response.success) {
+          created++;
+        }
+      }
+    }
+
+    const messages = [];
+    if (created > 0) messages.push(`${created} created`);
+    if (updated > 0) messages.push(`${updated} updated`);
+
+    showToast('success', `Imported ${itemsToImport.length} items (${messages.join(', ')})`);
+    refetchItems();
+    refetchCategories();
+  };
+
   return (
     <div class="min-h-screen bg-gray-50">
       <Toast />
@@ -97,6 +169,7 @@ export function AllItemsPage() {
         onAddItem={handleAddItem}
         onManageCategories={() => setShowCategoryManager(true)}
         onManageBagTemplates={() => setShowBagTemplateManager(true)}
+        onBrowseTemplates={() => setShowBuiltInItems(true)}
         onDataChanged={handleDataChanged}
       />
 
@@ -162,6 +235,13 @@ export function AllItemsPage() {
           templates={bagTemplates() || []}
           onClose={() => setShowBagTemplateManager(false)}
           onSaved={handleBagTemplatesChanged}
+        />
+      </Show>
+
+      <Show when={showBuiltInItems()}>
+        <BuiltInItemsBrowser
+          onClose={() => setShowBuiltInItems(false)}
+          onImportToMaster={handleImportBuiltInItems}
         />
       </Show>
     </div>

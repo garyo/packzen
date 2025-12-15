@@ -5,9 +5,22 @@ interface ModalProps {
   onClose: () => void;
   title: string;
   children: JSX.Element;
+  size?: 'small' | 'medium' | 'large';
 }
 
 export function Modal(props: ModalProps) {
+  const maxWidthClass = () => {
+    switch (props.size) {
+      case 'small':
+        return 'max-w-sm';
+      case 'large':
+        return 'max-w-4xl';
+      case 'medium':
+      default:
+        return 'max-w-md';
+    }
+  };
+
   return (
     <Portal>
       <div class="fixed inset-0 z-50 overflow-y-auto">
@@ -20,7 +33,7 @@ export function Modal(props: ModalProps) {
         {/* Modal */}
         <div class="flex min-h-screen items-center justify-center p-4">
           <div
-            class="relative z-10 w-full max-w-md rounded-lg bg-white p-6 shadow-xl"
+            class={`relative z-10 w-full ${maxWidthClass()} rounded-lg bg-white p-6 shadow-xl`}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}

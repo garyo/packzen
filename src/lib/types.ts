@@ -54,3 +54,38 @@ export const BAG_TYPES: BagTypeOption[] = [
   { type: 'personal', label: 'Personal Item', description: 'Small bag under the seat' },
   { type: 'custom', label: 'Custom', description: 'Your own custom bag type' },
 ];
+
+// Built-in items types
+export interface BuiltInCategory {
+  name: string;
+  icon: string;
+  sort_order: number;
+}
+
+export interface TripType {
+  id: string;
+  name: string;
+  description: string;
+}
+
+export interface BuiltInItem {
+  name: string;
+  description: string | null;
+  category: string;
+  default_quantity: number;
+  trip_types: string[]; // Array of trip_type IDs
+}
+
+export interface BuiltInItemsData {
+  categories: BuiltInCategory[];
+  trip_types: TripType[];
+  items: BuiltInItem[];
+}
+
+// Selected item for import/add to trip
+export interface SelectedBuiltInItem {
+  name: string;
+  description: string | null;
+  category: string;
+  quantity: number; // User-adjusted quantity
+}

@@ -1,7 +1,7 @@
 import { createSignal, createResource, Show, onMount } from 'solid-js';
 import { authStore } from '../../stores/auth';
 import { api, endpoints } from '../../lib/api';
-import type { Trip, TripItem, Bag } from '../../lib/types';
+import type { Trip, TripItem, Bag, Category, SelectedBuiltInItem } from '../../lib/types';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
 import { EmptyState } from '../ui/EmptyState';
 import { Button } from '../ui/Button';
@@ -16,6 +16,7 @@ import { PackingPageHeader } from './PackingPageHeader';
 import { PackingListBagView } from './PackingListBagView';
 import { PackingListCategoryView } from './PackingListCategoryView';
 import { SelectModeActionBar } from './SelectModeActionBar';
+import { BuiltInItemsBrowser } from '../built-in-items/BuiltInItemsBrowser';
 import { fetchWithErrorHandling, fetchSingleWithErrorHandling } from '../../lib/resource-helpers';
 import { tripToYAML, downloadYAML } from '../../lib/yaml';
 import { deleteTripWithConfirm } from '../../lib/trip-actions';
@@ -32,6 +33,7 @@ export function PackingPage(props: PackingPageProps) {
   const [selectMode, setSelectMode] = createSignal(false);
   const [selectedItems, setSelectedItems] = createSignal<Set<string>>(new Set());
   const [showImport, setShowImport] = createSignal(false);
+  const [showBuiltInItems, setShowBuiltInItems] = createSignal(false);
   const [sortBy, setSortBy] = createSignal<'bag' | 'category'>('bag');
 
   const [items, { mutate, refetch }] = createResource<TripItem[]>(async () => {
@@ -52,6 +54,13 @@ export function PackingPage(props: PackingPageProps) {
     return fetchWithErrorHandling(
       () => api.get<Bag[]>(endpoints.tripBags(props.tripId)),
       'Failed to load bags'
+    );
+  });
+
+  const [categories] = createResource<Category[]>(async () => {
+    return fetchWithErrorHandling(
+      () => api.get<Category[]>(endpoints.categories),
+      'Failed to load categories'
     );
   });
 
@@ -177,6 +186,22 @@ export function PackingPage(props: PackingPageProps) {
     });
   };
 
+  const handleAddBuiltInItemsToTrip = async (itemsToAdd: SelectedBuiltInItem[]) => {
+    for (const item of itemsToAdd) {
+      await api.post(endpoints.tripItems(props.tripId), {
+        name: item.name,
+        category_name: item.category,
+        quantity: item.quantity,
+        notes: item.description,
+        bag_id: null, // User can assign bags later
+        master_item_id: null, // Not linked to master list
+      });
+    }
+
+    showToast('success', `Added ${itemsToAdd.length} items to trip`);
+    refetch();
+  };
+
   const packedCount = () => items()?.filter((i) => i.is_packed).length || 0;
   const totalCount = () => items()?.length || 0;
   const progress = () => getPackingProgress(packedCount(), totalCount());
@@ -197,6 +222,7 @@ export function PackingPage(props: PackingPageProps) {
         onAddItem={handleAddItem}
         onManageBags={() => setShowBagManager(true)}
         onAddFromMaster={() => setShowAddFromMaster(true)}
+        onBrowseTemplates={() => setShowBuiltInItems(true)}
         onExport={handleExport}
         onImport={() => setShowImport(true)}
         onClearAll={handleClearAll}
@@ -241,6 +267,7 @@ export function PackingPage(props: PackingPageProps) {
                   <PackingListCategoryView
                     items={items}
                     bags={bags}
+                    categories={categories}
                     selectMode={selectMode}
                     selectedItems={selectedItems}
                     onTogglePacked={handleTogglePacked}
@@ -252,6 +279,7 @@ export function PackingPage(props: PackingPageProps) {
                 <PackingListBagView
                   items={items}
                   bags={bags}
+                  categories={categories}
                   selectMode={selectMode}
                   selectedItems={selectedItems}
                   onTogglePacked={handleTogglePacked}
@@ -321,6 +349,15 @@ export function PackingPage(props: PackingPageProps) {
             refetch();
             refetchBags();
           }}
+        />
+      </Show>
+
+      {/* Built-in Items Browser Modal */}
+      <Show when={showBuiltInItems()}>
+        <BuiltInItemsBrowser
+          tripId={props.tripId}
+          onClose={() => setShowBuiltInItems(false)}
+          onAddToTrip={handleAddBuiltInItemsToTrip}
         />
       </Show>
 

@@ -6,12 +6,14 @@
  */
 
 import { For, Show, type Accessor } from 'solid-js';
-import type { TripItem, Bag } from '../../lib/types';
+import type { TripItem, Bag, Category } from '../../lib/types';
 import { PackingItemCard } from './PackingItemCard';
+import { getBagColorClass, getBagColorStyle } from '../../lib/color-utils';
 
 interface PackingListCategoryViewProps {
   items: Accessor<TripItem[] | undefined>;
   bags: Accessor<Bag[] | undefined>;
+  categories: Accessor<Category[] | undefined>;
   selectMode: Accessor<boolean>;
   selectedItems: Accessor<Set<string>>;
   onTogglePacked: (item: TripItem) => void;
@@ -59,6 +61,13 @@ export function PackingListCategoryView(props: PackingListCategoryViewProps) {
     return { grouped, allBags: bagsWithWearing };
   };
 
+  // Get category icon by name
+  const getCategoryIcon = (categoryName: string) => {
+    const allCategories = props.categories() || [];
+    const category = allCategories.find((c) => c.name === categoryName);
+    return category?.icon || '📦';
+  };
+
   // Sort categories alphabetically
   const sortedCategories = () => {
     return Array.from(itemsByCategory().grouped.entries()).sort(([a], [b]) => a.localeCompare(b));
@@ -78,11 +87,13 @@ export function PackingListCategoryView(props: PackingListCategoryViewProps) {
               return (bagA?.name || '').localeCompare(bagB?.name || '');
             });
           };
+          const categoryIcon = getCategoryIcon(category);
           return (
             <Show when={totalItems() > 0}>
               <div>
                 <div class="mb-3 flex items-center gap-2 md:mb-1.5">
-                  <h2 class="text-lg font-semibold text-gray-900 md:text-base">📁 {category}</h2>
+                  <span class="text-xl md:text-lg">{categoryIcon}</span>
+                  <h2 class="text-lg font-semibold text-gray-900 md:text-base">{category}</h2>
                   <span class="text-sm text-gray-500 md:text-xs">({totalItems()})</span>
                 </div>
                 <For each={sortedBags()}>
@@ -92,7 +103,16 @@ export function PackingListCategoryView(props: PackingListCategoryViewProps) {
                     const sortedItems = [...bagItems].sort((a, b) => a.name.localeCompare(b.name));
                     return (
                       <div class="mb-4 md:mb-2">
-                        <h3 class="mb-2 px-1 text-sm font-medium text-gray-600 md:mb-1 md:text-xs">
+                        <h3 class="mb-2 flex items-center gap-1.5 px-1 text-sm font-medium text-gray-600 md:mb-1 md:text-xs">
+                          <Show
+                            when={bag()?.id !== null}
+                            fallback={<span class="text-base md:text-sm">👕</span>}
+                          >
+                            <div
+                              class={`h-2.5 w-2.5 rounded-full md:h-2 md:w-2 ${getBagColorClass(bag()?.color)}`}
+                              style={getBagColorStyle(bag()?.color)}
+                            />
+                          </Show>
                           {bag()?.name || 'No bag'}
                         </h3>
                         <div

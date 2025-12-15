@@ -1,0 +1,1255 @@
+# Built-in packing items organized by category with trip type metadata
+# This file contains curated items that users can browse and import
+
+categories:
+  - name: 'Clothing'
+    icon: '👕'
+    sort_order: 1
+  - name: 'Toiletries'
+    icon: '🧴'
+    sort_order: 2
+  - name: 'Electronics'
+    icon: '🔌'
+    sort_order: 3
+  - name: 'Entertainment'
+    icon: '🎮'
+    sort_order: 4
+  - name: 'Documents'
+    icon: '📄'
+    sort_order: 5
+  - name: 'Health'
+    icon: '💊'
+    sort_order: 6
+  - name: 'Beach/Pool'
+    icon: '🏖️'
+    sort_order: 7
+  - name: 'Outdoor'
+    icon: '⛰️'
+    sort_order: 8
+  - name: 'Baby'
+    icon: '👶'
+    sort_order: 9
+  - name: 'Children'
+    icon: '🧒'
+    sort_order: 10
+  - name: 'Miscellaneous'
+    icon: '📦'
+    sort_order: 11
+
+trip_types:
+  - id: 'overnight'
+    name: 'Overnight'
+    description: '1-2 nights'
+  - id: 'weekend'
+    name: 'Weekend'
+    description: '3-4 nights'
+  - id: 'week'
+    name: 'Week-Long'
+    description: '5-7 nights'
+  - id: 'beach'
+    name: 'Beach Day'
+    description: 'Beach or pool'
+  - id: 'business'
+    name: 'Business'
+    description: 'Work travel'
+  - id: 'hiking'
+    name: 'Hiking/Camping'
+    description: 'Outdoor adventure'
+  - id: 'ski'
+    name: 'Ski Trip'
+    description: 'Winter sports'
+
+items:
+  # Clothing
+  - name: 'T-shirts'
+    description: 'Casual cotton t-shirts'
+    category: 'Clothing'
+    default_quantity: 5
+    trip_types: ['overnight', 'weekend', 'week', 'beach']
+
+  - name: 'Short sleeve shirts'
+    description: 'Casual button-up or polo shirts'
+    category: 'Clothing'
+    default_quantity: 3
+    trip_types: ['weekend', 'week', 'business', 'beach']
+
+  - name: 'Underwear'
+    description: 'Undergarments'
+    category: 'Clothing'
+    default_quantity: 7
+    trip_types: ['overnight', 'weekend', 'week', 'business', 'beach', 'hiking']
+
+  - name: 'Socks'
+    description: 'Pairs of socks'
+    category: 'Clothing'
+    default_quantity: 7
+    trip_types: ['overnight', 'weekend', 'week', 'business', 'hiking']
+
+  - name: 'Pants/Jeans'
+    description: 'Casual pants or jeans'
+    category: 'Clothing'
+    default_quantity: 2
+    trip_types: ['overnight', 'weekend', 'week', 'business']
+
+  - name: 'Shorts'
+    description: 'Casual shorts'
+    category: 'Clothing'
+    default_quantity: 2
+    trip_types: ['weekend', 'week', 'beach', 'hiking']
+
+  - name: 'Jacket/Sweater'
+    description: 'Light jacket or sweater for cool weather'
+    category: 'Clothing'
+    default_quantity: 1
+    trip_types: ['weekend', 'week', 'business', 'hiking']
+
+  - name: 'Sweatshirt/Hoodie'
+    description: 'Casual pullover sweatshirt'
+    category: 'Clothing'
+    default_quantity: 1
+    trip_types: ['weekend', 'week', 'hiking']
+
+  - name: 'Dress/Skirt'
+    description: 'Dress or skirt'
+    category: 'Clothing'
+    default_quantity: 2
+    trip_types: ['weekend', 'week', 'business']
+
+  - name: 'Bra'
+    description: 'Undergarment bra'
+    category: 'Clothing'
+    default_quantity: 3
+    trip_types: ['overnight', 'weekend', 'week', 'business', 'beach', 'hiking']
+
+  - name: 'Scarf'
+    description: 'Fashion or warm scarf'
+    category: 'Clothing'
+    default_quantity: 1
+    trip_types: ['week', 'business', 'ski', 'hiking']
+
+  - name: 'Gloves'
+    description: 'Cold weather gloves'
+    category: 'Clothing'
+    default_quantity: 1
+    trip_types: ['week', 'ski', 'hiking']
+
+  - name: 'Tie'
+    description: 'Necktie for formal occasions'
+    category: 'Clothing'
+    default_quantity: 1
+    trip_types: ['business']
+
+  - name: 'Sneakers'
+    description: 'Athletic or casual sneakers'
+    category: 'Clothing'
+    default_quantity: 1
+    trip_types: ['weekend', 'week', 'hiking']
+
+  - name: 'Swimsuit cover-up'
+    description: 'Beach cover-up or sarong'
+    category: 'Clothing'
+    default_quantity: 1
+    trip_types: ['beach']
+
+  - name: 'Pajamas'
+    description: 'Sleepwear'
+    category: 'Clothing'
+    default_quantity: 2
+    trip_types: ['overnight', 'weekend', 'week', 'business']
+
+  - name: 'Dress shirt'
+    description: 'Button-up dress shirt'
+    category: 'Clothing'
+    default_quantity: 2
+    trip_types: ['business', 'week']
+
+  - name: 'Dress pants'
+    description: 'Formal or business pants'
+    category: 'Clothing'
+    default_quantity: 2
+    trip_types: ['business']
+
+  - name: 'Belt'
+    description: 'Leather belt'
+    category: 'Clothing'
+    default_quantity: 1
+    trip_types: ['business', 'week']
+
+  - name: 'Shoes (casual)'
+    description: 'Comfortable walking shoes'
+    category: 'Clothing'
+    default_quantity: 1
+    trip_types: ['overnight', 'weekend', 'week', 'business']
+
+  - name: 'Dress shoes'
+    description: 'Formal shoes'
+    category: 'Clothing'
+    default_quantity: 1
+    trip_types: ['business']
+
+  - name: 'Sandals/Flip-flops'
+    description: 'Casual footwear'
+    category: 'Clothing'
+    default_quantity: 1
+    trip_types: ['beach', 'weekend', 'week']
+
+  - name: 'Hat/Cap'
+    description: 'Sun protection hat'
+    category: 'Clothing'
+    default_quantity: 1
+    trip_types: ['beach', 'hiking', 'week']
+
+  - name: 'Sunglasses'
+    description: 'UV protection sunglasses'
+    category: 'Clothing'
+    default_quantity: 1
+    trip_types: ['beach', 'hiking', 'week', 'weekend']
+
+  - name: 'Raincoat'
+    description: 'Waterproof jacket'
+    category: 'Clothing'
+    default_quantity: 1
+    trip_types: ['hiking', 'week']
+
+  # Toiletries
+  - name: 'Toothbrush'
+    description: 'Travel toothbrush'
+    category: 'Toiletries'
+    default_quantity: 1
+    trip_types: ['overnight', 'weekend', 'week', 'business', 'beach', 'hiking']
+
+  - name: 'Toothpaste'
+    description: 'Travel-size toothpaste'
+    category: 'Toiletries'
+    default_quantity: 1
+    trip_types: ['overnight', 'weekend', 'week', 'business', 'beach', 'hiking']
+
+  - name: 'Dental floss'
+    description: 'Dental floss for oral hygiene'
+    category: 'Toiletries'
+    default_quantity: 1
+    trip_types: ['overnight', 'weekend', 'week', 'business', 'beach', 'hiking']
+
+  - name: 'Shampoo'
+    description: 'Travel-size shampoo'
+    category: 'Toiletries'
+    default_quantity: 1
+    trip_types: ['overnight', 'weekend', 'week', 'business', 'hiking']
+
+  - name: 'Conditioner'
+    description: 'Travel-size conditioner'
+    category: 'Toiletries'
+    default_quantity: 1
+    trip_types: ['overnight', 'weekend', 'week', 'business']
+
+  - name: 'Body wash/Soap'
+    description: 'Travel-size body wash or soap bar'
+    category: 'Toiletries'
+    default_quantity: 1
+    trip_types: ['overnight', 'weekend', 'week', 'business', 'beach', 'hiking']
+
+  - name: 'Deodorant'
+    description: 'Antiperspirant deodorant'
+    category: 'Toiletries'
+    default_quantity: 1
+    trip_types: ['overnight', 'weekend', 'week', 'business', 'beach', 'hiking']
+
+  - name: 'Face wash'
+    description: 'Facial cleanser'
+    category: 'Toiletries'
+    default_quantity: 1
+    trip_types: ['overnight', 'weekend', 'week', 'business']
+
+  - name: 'Moisturizer'
+    description: 'Face and body moisturizer'
+    category: 'Toiletries'
+    default_quantity: 1
+    trip_types: ['overnight', 'weekend', 'week', 'business', 'beach']
+
+  - name: 'Sunscreen'
+    description: 'SPF 30+ sunscreen'
+    category: 'Toiletries'
+    default_quantity: 1
+    trip_types: ['beach', 'hiking', 'week']
+
+  - name: 'Razor'
+    description: 'Shaving razor'
+    category: 'Toiletries'
+    default_quantity: 1
+    trip_types: ['overnight', 'weekend', 'week', 'business']
+
+  - name: 'Shaving cream'
+    description: 'Shaving gel or cream'
+    category: 'Toiletries'
+    default_quantity: 1
+    trip_types: ['overnight', 'weekend', 'week', 'business']
+
+  - name: 'Hair brush/Comb'
+    description: 'Hair styling tool'
+    category: 'Toiletries'
+    default_quantity: 1
+    trip_types: ['overnight', 'weekend', 'week', 'business']
+
+  - name: 'Hair dryer'
+    description: 'Travel hair dryer'
+    category: 'Toiletries'
+    default_quantity: 1
+    trip_types: ['week', 'business']
+
+  - name: 'Makeup'
+    description: 'Makeup kit'
+    category: 'Toiletries'
+    default_quantity: 1
+    trip_types: ['overnight', 'weekend', 'week', 'business']
+
+  - name: 'Makeup remover'
+    description: 'Makeup remover wipes or solution'
+    category: 'Toiletries'
+    default_quantity: 1
+    trip_types: ['overnight', 'weekend', 'week', 'business']
+
+  - name: 'Perfume/Cologne'
+    description: 'Fragrance'
+    category: 'Toiletries'
+    default_quantity: 1
+    trip_types: ['weekend', 'week', 'business']
+
+  - name: 'Nail clippers'
+    description: 'Fingernail and toenail clippers'
+    category: 'Toiletries'
+    default_quantity: 1
+    trip_types: ['week', 'hiking']
+
+  - name: 'Tweezers'
+    description: 'Grooming tweezers'
+    category: 'Toiletries'
+    default_quantity: 1
+    trip_types: ['week', 'business']
+
+  - name: 'Cotton swabs'
+    description: 'Q-tips'
+    category: 'Toiletries'
+    default_quantity: 1
+    trip_types: ['week', 'business']
+
+  - name: 'Tissues'
+    description: 'Travel tissue pack'
+    category: 'Toiletries'
+    default_quantity: 2
+    trip_types: ['overnight', 'weekend', 'week', 'business', 'hiking']
+
+  - name: 'Feminine hygiene products'
+    description: 'Pads or tampons'
+    category: 'Toiletries'
+    default_quantity: 10
+    trip_types: ['overnight', 'weekend', 'week', 'business', 'beach', 'hiking']
+
+  - name: 'Hand sanitizer'
+    description: 'Antibacterial hand gel'
+    category: 'Toiletries'
+    default_quantity: 1
+    trip_types: ['overnight', 'weekend', 'week', 'business', 'beach', 'hiking']
+
+  - name: 'Lip balm'
+    description: 'Moisturizing lip balm'
+    category: 'Toiletries'
+    default_quantity: 1
+    trip_types: ['overnight', 'weekend', 'week', 'business', 'beach', 'hiking']
+
+  - name: 'Contact lenses'
+    description: 'Contact lenses (bring extras)'
+    category: 'Toiletries'
+    default_quantity: 7
+    trip_types: ['overnight', 'weekend', 'week', 'business', 'beach', 'hiking']
+
+  - name: 'Contact lens solution'
+    description: 'Contact lens cleaning solution'
+    category: 'Toiletries'
+    default_quantity: 1
+    trip_types: ['overnight', 'weekend', 'week', 'business', 'beach', 'hiking']
+
+  - name: 'Eyeglasses'
+    description: 'Prescription eyeglasses'
+    category: 'Toiletries'
+    default_quantity: 1
+    trip_types: ['overnight', 'weekend', 'week', 'business', 'beach', 'hiking']
+
+  - name: 'Glasses case'
+    description: 'Protective case for glasses'
+    category: 'Toiletries'
+    default_quantity: 1
+    trip_types: ['overnight', 'weekend', 'week', 'business', 'beach', 'hiking']
+
+  - name: 'Hair straightener/Curling iron'
+    description: 'Hair styling tools'
+    category: 'Toiletries'
+    default_quantity: 1
+    trip_types: ['week', 'business']
+
+  - name: 'Towel'
+    description: 'Quick-dry travel towel'
+    category: 'Toiletries'
+    default_quantity: 1
+    trip_types: ['beach', 'hiking', 'week']
+
+  # Electronics
+  - name: 'Phone charger'
+    description: 'Smartphone charging cable and adapter'
+    category: 'Electronics'
+    default_quantity: 1
+    trip_types: ['overnight', 'weekend', 'week', 'business', 'beach', 'hiking']
+
+  - name: 'Laptop'
+    description: 'Work or personal laptop'
+    category: 'Electronics'
+    default_quantity: 1
+    trip_types: ['business', 'week']
+
+  - name: 'Laptop charger'
+    description: 'Laptop power adapter'
+    category: 'Electronics'
+    default_quantity: 1
+    trip_types: ['business', 'week']
+
+  - name: 'Headphones'
+    description: 'Earbuds or over-ear headphones'
+    category: 'Electronics'
+    default_quantity: 1
+    trip_types: ['overnight', 'weekend', 'week', 'business']
+
+  - name: 'Power bank'
+    description: 'Portable battery charger'
+    category: 'Electronics'
+    default_quantity: 1
+    trip_types: ['overnight', 'weekend', 'week', 'beach', 'hiking']
+
+  - name: 'Camera'
+    description: 'Digital camera'
+    category: 'Electronics'
+    default_quantity: 1
+    trip_types: ['weekend', 'week', 'beach', 'hiking']
+
+  - name: 'Camera charger'
+    description: 'Camera battery charger'
+    category: 'Electronics'
+    default_quantity: 1
+    trip_types: ['weekend', 'week', 'beach', 'hiking']
+
+  - name: 'Travel adapter'
+    description: 'Universal power adapter for international travel'
+    category: 'Electronics'
+    default_quantity: 1
+    trip_types: ['week', 'business']
+
+  - name: 'E-reader'
+    description: 'Kindle or similar e-reader'
+    category: 'Electronics'
+    default_quantity: 1
+    trip_types: ['weekend', 'week', 'beach']
+
+  - name: 'Tablet'
+    description: 'iPad or Android tablet'
+    category: 'Electronics'
+    default_quantity: 1
+    trip_types: ['weekend', 'week', 'business']
+
+  - name: 'Watch'
+    description: 'Wristwatch or smartwatch'
+    category: 'Electronics'
+    default_quantity: 1
+    trip_types: ['overnight', 'weekend', 'week', 'business']
+
+  - name: 'Watch charger'
+    description: 'Smartwatch charging cable'
+    category: 'Electronics'
+    default_quantity: 1
+    trip_types: ['overnight', 'weekend', 'week', 'business']
+
+  - name: 'USB cables'
+    description: 'Extra USB charging cables'
+    category: 'Electronics'
+    default_quantity: 2
+    trip_types: ['week', 'business']
+
+  - name: 'Waterproof phone case'
+    description: 'Waterproof pouch for phone'
+    category: 'Electronics'
+    default_quantity: 1
+    trip_types: ['beach', 'hiking']
+
+  - name: 'Portable speaker'
+    description: 'Bluetooth portable speaker'
+    category: 'Electronics'
+    default_quantity: 1
+    trip_types: ['beach', 'weekend', 'week']
+
+  - name: 'Memory card reader'
+    description: 'SD card reader for transferring photos'
+    category: 'Electronics'
+    default_quantity: 1
+    trip_types: ['week', 'hiking']
+
+  # Documents
+  - name: 'Passport'
+    description: 'Valid passport for international travel'
+    category: 'Documents'
+    default_quantity: 1
+    trip_types: ['week', 'business']
+
+  - name: "Driver's license/ID"
+    description: 'Government-issued identification'
+    category: 'Documents'
+    default_quantity: 1
+    trip_types: ['overnight', 'weekend', 'week', 'business']
+
+  - name: 'Travel tickets'
+    description: 'Flight, train, or bus tickets'
+    category: 'Documents'
+    default_quantity: 1
+    trip_types: ['weekend', 'week', 'business']
+
+  - name: 'Hotel confirmation'
+    description: 'Printed or digital hotel reservation'
+    category: 'Documents'
+    default_quantity: 1
+    trip_types: ['overnight', 'weekend', 'week', 'business']
+
+  - name: 'Insurance card'
+    description: 'Health or travel insurance card'
+    category: 'Documents'
+    default_quantity: 1
+    trip_types: ['overnight', 'weekend', 'week', 'business', 'hiking']
+
+  - name: 'Credit cards'
+    description: 'Payment cards'
+    category: 'Documents'
+    default_quantity: 2
+    trip_types: ['overnight', 'weekend', 'week', 'business', 'beach']
+
+  - name: 'Cash'
+    description: 'Local currency'
+    category: 'Documents'
+    default_quantity: 1
+    trip_types: ['overnight', 'weekend', 'week', 'business', 'beach']
+
+  - name: 'Emergency contacts'
+    description: 'List of emergency phone numbers'
+    category: 'Documents'
+    default_quantity: 1
+    trip_types: ['overnight', 'weekend', 'week', 'business', 'hiking']
+
+  - name: 'Travel itinerary'
+    description: 'Printed trip schedule and plans'
+    category: 'Documents'
+    default_quantity: 1
+    trip_types: ['week', 'business']
+
+  # Health
+  - name: 'Prescription medications'
+    description: 'Daily prescription medicines'
+    category: 'Health'
+    default_quantity: 7
+    trip_types: ['overnight', 'weekend', 'week', 'business', 'beach', 'hiking']
+
+  - name: 'Pain reliever'
+    description: 'Ibuprofen or acetaminophen'
+    category: 'Health'
+    default_quantity: 10
+    trip_types: ['overnight', 'weekend', 'week', 'business', 'hiking']
+
+  - name: 'Allergy medication'
+    description: 'Antihistamines'
+    category: 'Health'
+    default_quantity: 7
+    trip_types: ['overnight', 'weekend', 'week', 'business', 'beach', 'hiking']
+
+  - name: 'Band-aids'
+    description: 'Adhesive bandages'
+    category: 'Health'
+    default_quantity: 10
+    trip_types: ['overnight', 'weekend', 'week', 'business', 'beach', 'hiking']
+
+  - name: 'First aid kit'
+    description: 'Basic first aid supplies'
+    category: 'Health'
+    default_quantity: 1
+    trip_types: ['hiking', 'week']
+
+  - name: 'Vitamins'
+    description: 'Daily vitamin supplements'
+    category: 'Health'
+    default_quantity: 7
+    trip_types: ['week', 'business']
+
+  - name: 'Antacid'
+    description: 'Stomach medication'
+    category: 'Health'
+    default_quantity: 5
+    trip_types: ['overnight', 'weekend', 'week', 'business']
+
+  - name: 'Motion sickness medication'
+    description: 'Dramamine or similar'
+    category: 'Health'
+    default_quantity: 5
+    trip_types: ['week', 'beach']
+
+  - name: 'Hand lotion'
+    description: 'Moisturizing hand cream'
+    category: 'Health'
+    default_quantity: 1
+    trip_types: ['week', 'business', 'hiking']
+
+  - name: 'Insect repellent'
+    description: 'Bug spray with DEET'
+    category: 'Health'
+    default_quantity: 1
+    trip_types: ['hiking', 'beach']
+
+  - name: 'After-sun lotion'
+    description: 'Aloe vera gel for sunburn'
+    category: 'Health'
+    default_quantity: 1
+    trip_types: ['beach']
+
+  - name: 'Cold/Flu medication'
+    description: 'Decongestant or cold medicine'
+    category: 'Health'
+    default_quantity: 10
+    trip_types: ['overnight', 'weekend', 'week', 'business', 'hiking']
+
+  - name: 'Anti-diarrhea medication'
+    description: 'Imodium or similar'
+    category: 'Health'
+    default_quantity: 5
+    trip_types: ['overnight', 'weekend', 'week', 'business', 'beach', 'hiking']
+
+  - name: 'Sleep aid'
+    description: 'Melatonin or sleep medication'
+    category: 'Health'
+    default_quantity: 5
+    trip_types: ['week', 'business']
+
+  - name: 'Antibiotic ointment'
+    description: 'Triple antibiotic cream'
+    category: 'Health'
+    default_quantity: 1
+    trip_types: ['overnight', 'weekend', 'week', 'hiking']
+
+  # Beach/Pool
+  - name: 'Swimsuit'
+    description: 'Swimming trunks or bathing suit'
+    category: 'Beach/Pool'
+    default_quantity: 2
+    trip_types: ['beach', 'week']
+
+  - name: 'Beach towel'
+    description: 'Large towel for beach or pool'
+    category: 'Beach/Pool'
+    default_quantity: 1
+    trip_types: ['beach', 'week']
+
+  - name: 'Goggles'
+    description: 'Swimming goggles'
+    category: 'Beach/Pool'
+    default_quantity: 1
+    trip_types: ['beach']
+
+  - name: 'Snorkel'
+    description: 'Snorkeling equipment'
+    category: 'Beach/Pool'
+    default_quantity: 1
+    trip_types: ['beach']
+
+  - name: 'Water shoes'
+    description: 'Aqua socks for rocky beaches'
+    category: 'Beach/Pool'
+    default_quantity: 1
+    trip_types: ['beach']
+
+  - name: 'Beach bag'
+    description: 'Waterproof beach bag'
+    category: 'Beach/Pool'
+    default_quantity: 1
+    trip_types: ['beach']
+
+  - name: 'Cooler'
+    description: 'Small cooler for drinks and snacks'
+    category: 'Beach/Pool'
+    default_quantity: 1
+    trip_types: ['beach']
+
+  # Outdoor/Camping
+  - name: 'Hiking boots'
+    description: 'Sturdy hiking footwear'
+    category: 'Outdoor'
+    default_quantity: 1
+    trip_types: ['hiking']
+
+  - name: 'Backpack'
+    description: 'Day hiking backpack'
+    category: 'Outdoor'
+    default_quantity: 1
+    trip_types: ['hiking']
+
+  - name: 'Tent'
+    description: 'Camping tent'
+    category: 'Outdoor'
+    default_quantity: 1
+    trip_types: ['hiking']
+
+  - name: 'Sleeping bag'
+    description: 'Camping sleeping bag'
+    category: 'Outdoor'
+    default_quantity: 1
+    trip_types: ['hiking']
+
+  - name: 'Sleeping pad'
+    description: 'Camping mattress pad'
+    category: 'Outdoor'
+    default_quantity: 1
+    trip_types: ['hiking']
+
+  - name: 'Flashlight'
+    description: 'LED flashlight or headlamp'
+    category: 'Outdoor'
+    default_quantity: 1
+    trip_types: ['hiking']
+
+  - name: 'Extra batteries'
+    description: 'AA/AAA batteries'
+    category: 'Outdoor'
+    default_quantity: 4
+    trip_types: ['hiking']
+
+  - name: 'Water bottle'
+    description: 'Reusable water bottle'
+    category: 'Outdoor'
+    default_quantity: 2
+    trip_types: ['hiking', 'beach', 'week']
+
+  - name: 'Hydration pack'
+    description: 'CamelBak or similar hydration system'
+    category: 'Outdoor'
+    default_quantity: 1
+    trip_types: ['hiking']
+
+  - name: 'Trail maps'
+    description: 'Hiking trail maps'
+    category: 'Outdoor'
+    default_quantity: 1
+    trip_types: ['hiking']
+
+  - name: 'Compass'
+    description: 'Navigation compass'
+    category: 'Outdoor'
+    default_quantity: 1
+    trip_types: ['hiking']
+
+  - name: 'Whistle'
+    description: 'Emergency whistle'
+    category: 'Outdoor'
+    default_quantity: 1
+    trip_types: ['hiking']
+
+  - name: 'Multi-tool'
+    description: 'Swiss Army knife or Leatherman'
+    category: 'Outdoor'
+    default_quantity: 1
+    trip_types: ['hiking']
+
+  - name: 'Matches/Lighter'
+    description: 'Waterproof matches or lighter'
+    category: 'Outdoor'
+    default_quantity: 1
+    trip_types: ['hiking']
+
+  - name: 'Camping stove'
+    description: 'Portable camping stove'
+    category: 'Outdoor'
+    default_quantity: 1
+    trip_types: ['hiking']
+
+  - name: 'Cooking pot'
+    description: 'Camping cookware'
+    category: 'Outdoor'
+    default_quantity: 1
+    trip_types: ['hiking']
+
+  - name: 'Camping utensils'
+    description: 'Fork, spoon, knife set'
+    category: 'Outdoor'
+    default_quantity: 1
+    trip_types: ['hiking']
+
+  - name: 'Trash bags'
+    description: 'For packing out waste'
+    category: 'Outdoor'
+    default_quantity: 5
+    trip_types: ['hiking']
+
+  # Entertainment
+  - name: 'Book'
+    description: 'Physical book for reading'
+    category: 'Entertainment'
+    default_quantity: 2
+    trip_types: ['weekend', 'week', 'beach', 'business']
+
+  - name: 'Playing cards'
+    description: 'Deck of cards'
+    category: 'Entertainment'
+    default_quantity: 1
+    trip_types: ['weekend', 'week', 'beach']
+
+  - name: 'Travel games'
+    description: 'Portable board games'
+    category: 'Entertainment'
+    default_quantity: 1
+    trip_types: ['weekend', 'week']
+
+  - name: 'Journal'
+    description: 'Travel journal/diary for writing'
+    category: 'Entertainment'
+    default_quantity: 1
+    trip_types: ['week', 'hiking']
+
+  - name: 'Pens/Pencils'
+    description: 'Writing instruments'
+    category: 'Entertainment'
+    default_quantity: 2
+    trip_types: ['week', 'business', 'hiking']
+
+  - name: 'Binoculars'
+    description: 'Compact binoculars for sightseeing'
+    category: 'Entertainment'
+    default_quantity: 1
+    trip_types: ['week', 'hiking', 'beach']
+
+  # Miscellaneous
+  - name: 'Reusable shopping bag'
+    description: 'Foldable tote bag'
+    category: 'Miscellaneous'
+    default_quantity: 2
+    trip_types: ['weekend', 'week', 'beach']
+
+  - name: 'Laundry bag'
+    description: 'Bag for dirty clothes'
+    category: 'Miscellaneous'
+    default_quantity: 1
+    trip_types: ['weekend', 'week', 'business', 'hiking']
+
+  - name: 'Snacks'
+    description: 'Non-perishable snacks'
+    category: 'Miscellaneous'
+    default_quantity: 5
+    trip_types: ['overnight', 'weekend', 'week', 'business', 'hiking']
+
+  - name: 'Umbrella'
+    description: 'Compact travel umbrella'
+    category: 'Miscellaneous'
+    default_quantity: 1
+    trip_types: ['week', 'business']
+
+  - name: 'Zip-lock bags'
+    description: 'Various sizes for organization'
+    category: 'Miscellaneous'
+    default_quantity: 10
+    trip_types: ['week', 'beach', 'hiking']
+
+  - name: 'Duct tape'
+    description: 'Small roll for repairs'
+    category: 'Miscellaneous'
+    default_quantity: 1
+    trip_types: ['hiking', 'week']
+
+  - name: 'Safety pins'
+    description: 'Assorted safety pins'
+    category: 'Miscellaneous'
+    default_quantity: 5
+    trip_types: ['week', 'business']
+
+  - name: 'Sewing kit'
+    description: 'Travel sewing kit'
+    category: 'Miscellaneous'
+    default_quantity: 1
+    trip_types: ['week', 'business']
+
+  - name: 'Clothesline'
+    description: 'Travel clothesline'
+    category: 'Miscellaneous'
+    default_quantity: 1
+    trip_types: ['week', 'hiking']
+
+  - name: 'Pillow'
+    description: 'Travel neck pillow'
+    category: 'Miscellaneous'
+    default_quantity: 1
+    trip_types: ['week', 'business']
+
+  - name: 'Eye mask'
+    description: 'Sleep mask'
+    category: 'Miscellaneous'
+    default_quantity: 1
+    trip_types: ['week', 'business']
+
+  - name: 'Ear plugs'
+    description: 'Noise-canceling ear plugs'
+    category: 'Miscellaneous'
+    default_quantity: 2
+    trip_types: ['week', 'business']
+
+  - name: 'Padlock'
+    description: 'TSA-approved lock'
+    category: 'Miscellaneous'
+    default_quantity: 1
+    trip_types: ['week', 'business']
+
+  - name: 'Luggage tags'
+    description: 'Identification tags for bags'
+    category: 'Miscellaneous'
+    default_quantity: 2
+    trip_types: ['week', 'business']
+
+  - name: 'Travel blanket'
+    description: 'Compact travel blanket or throw'
+    category: 'Miscellaneous'
+    default_quantity: 1
+    trip_types: ['week', 'business']
+
+  - name: 'Disinfecting wipes'
+    description: 'Antibacterial cleaning wipes'
+    category: 'Miscellaneous'
+    default_quantity: 1
+    trip_types: ['overnight', 'weekend', 'week', 'business']
+
+  - name: 'Chewing gum'
+    description: 'Gum for freshness and ear pressure'
+    category: 'Miscellaneous'
+    default_quantity: 1
+    trip_types: ['overnight', 'weekend', 'week', 'business']
+
+  - name: 'Face masks'
+    description: 'Disposable or cloth face masks'
+    category: 'Miscellaneous'
+    default_quantity: 5
+    trip_types: ['overnight', 'weekend', 'week', 'business', 'beach', 'hiking']
+
+  - name: 'Reusable utensils'
+    description: 'Fork, spoon, knife for eco-friendly eating'
+    category: 'Miscellaneous'
+    default_quantity: 1
+    trip_types: ['overnight', 'weekend', 'week', 'business']
+
+  - name: 'Stain remover pen'
+    description: 'Portable stain remover stick'
+    category: 'Miscellaneous'
+    default_quantity: 1
+    trip_types: ['week', 'business']
+
+  - name: 'Packing cubes'
+    description: 'Organizational packing cubes for clothes'
+    category: 'Miscellaneous'
+    default_quantity: 3
+    trip_types: ['week', 'business']
+
+  - name: 'Compression bags'
+    description: 'Space-saving compression bags'
+    category: 'Miscellaneous'
+    default_quantity: 2
+    trip_types: ['week', 'hiking']
+
+  - name: 'Luggage scale'
+    description: 'Portable digital luggage scale'
+    category: 'Miscellaneous'
+    default_quantity: 1
+    trip_types: ['week', 'business']
+
+  - name: 'Money belt'
+    description: 'Hidden travel wallet or money belt'
+    category: 'Miscellaneous'
+    default_quantity: 1
+    trip_types: ['week', 'business']
+
+  - name: 'Shoe bags'
+    description: 'Bags to keep shoes separate from clothes'
+    category: 'Miscellaneous'
+    default_quantity: 2
+    trip_types: ['week', 'business', 'hiking']
+
+  - name: 'Travel laundry detergent'
+    description: 'Packets or travel-size detergent'
+    category: 'Miscellaneous'
+    default_quantity: 5
+    trip_types: ['week', 'hiking']
+
+  - name: 'Clothespins'
+    description: 'Travel clothespins for drying'
+    category: 'Miscellaneous'
+    default_quantity: 6
+    trip_types: ['week', 'hiking']
+
+  # Baby Items
+  - name: 'Diapers'
+    description: 'Disposable or cloth diapers'
+    category: 'Baby'
+    default_quantity: 20
+    trip_types: ['overnight', 'weekend', 'week']
+
+  - name: 'Wipes'
+    description: 'Baby wipes for changing'
+    category: 'Baby'
+    default_quantity: 2
+    trip_types: ['overnight', 'weekend', 'week']
+
+  - name: 'Baby bottles'
+    description: 'Feeding bottles'
+    category: 'Baby'
+    default_quantity: 3
+    trip_types: ['overnight', 'weekend', 'week']
+
+  - name: 'Baby formula/food'
+    description: 'Formula powder or baby food jars'
+    category: 'Baby'
+    default_quantity: 10
+    trip_types: ['overnight', 'weekend', 'week']
+
+  - name: 'Pacifiers'
+    description: 'Baby pacifiers'
+    category: 'Baby'
+    default_quantity: 2
+    trip_types: ['overnight', 'weekend', 'week']
+
+  - name: 'Baby blanket'
+    description: 'Soft receiving blanket'
+    category: 'Baby'
+    default_quantity: 2
+    trip_types: ['overnight', 'weekend', 'week']
+
+  - name: 'Changing pad'
+    description: 'Portable changing pad'
+    category: 'Baby'
+    default_quantity: 1
+    trip_types: ['overnight', 'weekend', 'week']
+
+  - name: 'Diaper bag'
+    description: 'Bag for baby supplies'
+    category: 'Baby'
+    default_quantity: 1
+    trip_types: ['overnight', 'weekend', 'week']
+
+  - name: 'Burp cloths'
+    description: 'Cloth for burping baby'
+    category: 'Baby'
+    default_quantity: 5
+    trip_types: ['overnight', 'weekend', 'week']
+
+  - name: 'Baby carrier'
+    description: 'Front or back baby carrier'
+    category: 'Baby'
+    default_quantity: 1
+    trip_types: ['overnight', 'weekend', 'week']
+
+  - name: 'Stroller'
+    description: 'Baby stroller'
+    category: 'Baby'
+    default_quantity: 1
+    trip_types: ['weekend', 'week']
+
+  - name: 'Car seat'
+    description: 'Infant or child car seat'
+    category: 'Baby'
+    default_quantity: 1
+    trip_types: ['weekend', 'week']
+
+  - name: 'Baby monitor'
+    description: 'Audio or video baby monitor'
+    category: 'Baby'
+    default_quantity: 1
+    trip_types: ['overnight', 'weekend', 'week']
+
+  - name: 'Baby shampoo'
+    description: 'Tear-free baby shampoo'
+    category: 'Baby'
+    default_quantity: 1
+    trip_types: ['weekend', 'week']
+
+  - name: 'Baby lotion'
+    description: 'Moisturizing baby lotion'
+    category: 'Baby'
+    default_quantity: 1
+    trip_types: ['weekend', 'week']
+
+  - name: 'Diaper rash cream'
+    description: 'Cream for diaper rash'
+    category: 'Baby'
+    default_quantity: 1
+    trip_types: ['overnight', 'weekend', 'week']
+
+  - name: 'Baby thermometer'
+    description: 'Digital baby thermometer'
+    category: 'Baby'
+    default_quantity: 1
+    trip_types: ['weekend', 'week']
+
+  # Children Items
+  - name: 'Favorite toy'
+    description: "Child's favorite toy or stuffed animal"
+    category: 'Children'
+    default_quantity: 1
+    trip_types: ['overnight', 'weekend', 'week']
+
+  - name: 'Coloring books'
+    description: 'Activity coloring books'
+    category: 'Children'
+    default_quantity: 2
+    trip_types: ['overnight', 'weekend', 'week', 'business']
+
+  - name: 'Crayons/Markers'
+    description: 'Coloring supplies'
+    category: 'Children'
+    default_quantity: 1
+    trip_types: ['overnight', 'weekend', 'week', 'business']
+
+  - name: 'Sippy cup'
+    description: 'Spill-proof drinking cup'
+    category: 'Children'
+    default_quantity: 2
+    trip_types: ['overnight', 'weekend', 'week']
+
+  - name: 'Snacks (kid-friendly)'
+    description: 'Crackers, fruit pouches, granola bars'
+    category: 'Children'
+    default_quantity: 10
+    trip_types: ['overnight', 'weekend', 'week']
+
+  - name: 'Night light'
+    description: 'Portable night light'
+    category: 'Children'
+    default_quantity: 1
+    trip_types: ['overnight', 'weekend', 'week']
+
+  - name: 'Comfort item'
+    description: 'Blanket or special item for bedtime'
+    category: 'Children'
+    default_quantity: 1
+    trip_types: ['overnight', 'weekend', 'week']
+
+  - name: "Kids' tablets/games"
+    description: 'Electronic entertainment for kids'
+    category: 'Children'
+    default_quantity: 1
+    trip_types: ['overnight', 'weekend', 'week', 'business']
+
+  - name: "Kids' headphones"
+    description: 'Volume-limited headphones for children'
+    category: 'Children'
+    default_quantity: 1
+    trip_types: ['overnight', 'weekend', 'week', 'business']
+
+  - name: 'Booster seat'
+    description: 'Portable booster seat for dining'
+    category: 'Children'
+    default_quantity: 1
+    trip_types: ['weekend', 'week']
+
+  - name: 'Swim floaties'
+    description: 'Arm floaties or swim vest'
+    category: 'Children'
+    default_quantity: 1
+    trip_types: ['beach', 'week']
+
+  - name: "Kids' sunglasses"
+    description: 'UV protection sunglasses'
+    category: 'Children'
+    default_quantity: 1
+    trip_types: ['beach', 'weekend', 'week']
+
+  # Ski/Winter Items
+  - name: 'Ski jacket'
+    description: 'Insulated waterproof ski jacket'
+    category: 'Clothing'
+    default_quantity: 1
+    trip_types: ['ski', 'week']
+
+  - name: 'Ski pants'
+    description: 'Waterproof ski pants'
+    category: 'Clothing'
+    default_quantity: 1
+    trip_types: ['ski', 'week']
+
+  - name: 'Thermal underwear'
+    description: 'Base layer thermal clothing'
+    category: 'Clothing'
+    default_quantity: 2
+    trip_types: ['ski', 'hiking']
+
+  - name: 'Ski gloves'
+    description: 'Insulated waterproof gloves'
+    category: 'Clothing'
+    default_quantity: 2
+    trip_types: ['ski']
+
+  - name: 'Ski goggles'
+    description: 'Snow goggles with UV protection'
+    category: 'Clothing'
+    default_quantity: 1
+    trip_types: ['ski']
+
+  - name: 'Neck warmer/Balaclava'
+    description: 'Face and neck protection'
+    category: 'Clothing'
+    default_quantity: 1
+    trip_types: ['ski', 'hiking']
+
+  - name: 'Wool socks'
+    description: 'Thick wool or ski socks'
+    category: 'Clothing'
+    default_quantity: 5
+    trip_types: ['ski', 'hiking']
+
+  - name: 'Winter boots'
+    description: 'Insulated waterproof boots'
+    category: 'Clothing'
+    default_quantity: 1
+    trip_types: ['ski', 'hiking']
+
+  - name: 'Ski helmet'
+    description: 'Safety helmet for skiing'
+    category: 'Outdoor'
+    default_quantity: 1
+    trip_types: ['ski']
+
+  - name: 'Skis'
+    description: 'Downhill or cross-country skis'
+    category: 'Outdoor'
+    default_quantity: 1
+    trip_types: ['ski']
+
+  - name: 'Ski poles'
+    description: 'Adjustable ski poles'
+    category: 'Outdoor'
+    default_quantity: 2
+    trip_types: ['ski']
+
+  - name: 'Snowboard'
+    description: 'Snowboard with bindings'
+    category: 'Outdoor'
+    default_quantity: 1
+    trip_types: ['ski']
+
+  - name: 'Hand warmers'
+    description: 'Disposable hand warmer packets'
+    category: 'Miscellaneous'
+    default_quantity: 10
+    trip_types: ['ski', 'hiking']
+
+  - name: 'Lip balm (SPF)'
+    description: 'Moisturizing lip balm with sun protection'
+    category: 'Health'
+    default_quantity: 1
+    trip_types: ['ski', 'hiking', 'beach']
+
+  - name: 'Ski wax'
+    description: 'Wax for ski maintenance'
+    category: 'Outdoor'
+    default_quantity: 1
+    trip_types: ['ski']

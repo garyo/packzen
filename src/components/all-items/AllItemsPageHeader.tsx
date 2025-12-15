@@ -16,6 +16,7 @@ interface AllItemsPageHeaderProps {
   onAddItem: () => void;
   onManageCategories: () => void;
   onManageBagTemplates: () => void;
+  onBrowseTemplates: () => void;
   onDataChanged: () => void;
 }
 
@@ -61,6 +62,9 @@ export function AllItemsPageHeader(props: AllItemsPageHeaderProps) {
               categories={props.categories}
               onDataChanged={props.onDataChanged}
             />
+            <Button variant="secondary" size="sm" onClick={props.onBrowseTemplates}>
+              Browse Templates
+            </Button>
             <Button size="sm" onClick={props.onAddItem}>
               + Add Item
             </Button>
