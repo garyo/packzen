@@ -65,7 +65,9 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
   return (
     <header class="sticky top-0 z-10 border-b border-gray-200 bg-white">
       <div class="container mx-auto px-4 py-4 md:py-2">
-        <div class="mb-3 flex items-center justify-between gap-2 md:mb-2">
+        {/* Two-row layout on mobile, single row on desktop */}
+        <div class="mb-3 flex flex-col gap-2 md:mb-2 md:flex-row md:items-center md:justify-between">
+          {/* Title row */}
           <div class="flex min-w-0 flex-1 items-center gap-2">
             <a
               href="/dashboard"
@@ -106,14 +108,16 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
               </svg>
             </a>
             <div class="min-w-0 flex-1">
-              <h1 class="truncate text-2xl font-bold text-gray-900 md:text-lg">
+              <h1 class="truncate text-xl font-bold text-gray-900 md:text-lg">
                 {props.trip()?.name || 'Packing'}
               </h1>
-              <p class="text-sm text-gray-600 md:text-xs">
+              <p class="text-xs text-gray-600">
                 {props.packedCount()} of {props.totalCount()} packed
               </p>
             </div>
           </div>
+
+          {/* Buttons row */}
           <div class="flex flex-shrink-0 gap-2">
             <Show
               when={props.selectMode()}
