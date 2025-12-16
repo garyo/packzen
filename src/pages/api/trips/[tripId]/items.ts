@@ -1,3 +1,5 @@
+export const prerender = false;
+
 import type { APIRoute } from 'astro';
 import { eq, and, asc } from 'drizzle-orm';
 import { z } from 'zod';

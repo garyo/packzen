@@ -38,9 +38,11 @@ const CACHE_NAME = \`packzen-\${CACHE_VERSION}\`;
 // Files to cache immediately on install
 const PRECACHE_URLS = [
   '/',
-  '/dashboard',
-  '/trips',
-  '/all-items',
+  '/dashboard/',
+  '/trips/',
+  '/all-items/',
+  '/sign-in/',
+  '/sign-up/',
   '/manifest.json',
   '/favicon.png',
   '/logo.png',
@@ -110,12 +112,12 @@ self.addEventListener('fetch', (event) => {
       })
     );
   } else {
-    // Network-first with timeout for HTML/API requests
+    // Network-first with fast timeout for HTML/API requests
     event.respondWith(
       Promise.race([
         fetch(event.request).then((response) => {
-          // Clone and cache successful responses
-          if (response.status === 200) {
+          // Clone and cache successful responses (but not API responses)
+          if (response.status === 200 && !url.pathname.startsWith('/api/')) {
             const responseToCache = response.clone();
             caches.open(CACHE_NAME).then((cache) => {
               cache.put(event.request, responseToCache);
@@ -123,24 +125,32 @@ self.addEventListener('fetch', (event) => {
           }
           return response;
         }),
-        // Timeout after 3 seconds
+        // Fast timeout of 2 seconds for HTML/navigation
         new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Network timeout')), 3000)
+          setTimeout(() => reject(new Error('Network timeout')), 2000)
         )
       ]).catch(() => {
-        // Network failed or timed out, try cache
+        // Network failed or timed out, try cache first
         return caches.match(event.request).then((cachedResponse) => {
           if (cachedResponse) {
             return cachedResponse;
           }
 
-          // For navigation requests, return cached homepage as fallback
+          // For navigation requests, try to match with trailing slash or without
           if (event.request.mode === 'navigate') {
-            return caches.match('/').then(response => {
-              return response || new Response(
-                '<!DOCTYPE html><html><head><title>Offline</title></head><body><h1>App is offline</h1><p>Please check your connection and try again.</p></body></html>',
-                { headers: { 'Content-Type': 'text/html' } }
-              );
+            const urlPath = url.pathname;
+            const alternateUrl = urlPath.endsWith('/') ? urlPath.slice(0, -1) : urlPath + '/';
+
+            return caches.match(alternateUrl).then(altResponse => {
+              if (altResponse) return altResponse;
+
+              // Final fallback to homepage
+              return caches.match('/').then(response => {
+                return response || new Response(
+                  '<!DOCTYPE html><html><head><title>Offline</title></head><body><h1>App is offline</h1><p>Please check your connection and try again.</p></body></html>',
+                  { headers: { 'Content-Type': 'text/html' } }
+                );
+              });
             });
           }
 

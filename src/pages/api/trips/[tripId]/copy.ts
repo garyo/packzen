@@ -1,3 +1,5 @@
+export const prerender = false;
+
 import type { APIRoute } from 'astro';
 import { eq, and } from 'drizzle-orm';
 import { trips, bags, tripItems } from '../../../../../db/schema';
