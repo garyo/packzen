@@ -79,7 +79,7 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Fetch event - network first, fallback to cache
+// Fetch event - stale-while-revalidate strategy with timeout
 self.addEventListener('fetch', (event) => {
   // Skip non-GET requests
   if (event.request.method !== 'GET') {
@@ -91,23 +91,44 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  event.respondWith(
-    fetch(event.request)
-      .then((response) => {
-        // Clone the response before caching
-        const responseToCache = response.clone();
+  const url = new URL(event.request.url);
 
-        // Cache successful responses
-        if (response.status === 200) {
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseToCache);
-          });
+  // Use cache-first for static assets (CSS, JS, images, fonts)
+  const isStaticAsset = /\\.(css|js|png|jpg|jpeg|gif|svg|woff|woff2|ttf|eot)$/i.test(url.pathname);
+
+  if (isStaticAsset) {
+    // Cache-first strategy for static assets
+    event.respondWith(
+      caches.match(event.request).then((cachedResponse) => {
+        if (cachedResponse) {
+          // Return cached version immediately, update in background
+          fetchAndCache(event.request);
+          return cachedResponse;
         }
-
-        return response;
+        // Not in cache, fetch from network
+        return fetchAndCache(event.request);
       })
-      .catch(() => {
-        // Network failed, try cache
+    );
+  } else {
+    // Network-first with timeout for HTML/API requests
+    event.respondWith(
+      Promise.race([
+        fetch(event.request).then((response) => {
+          // Clone and cache successful responses
+          if (response.status === 200) {
+            const responseToCache = response.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(event.request, responseToCache);
+            });
+          }
+          return response;
+        }),
+        // Timeout after 3 seconds
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Network timeout')), 3000)
+        )
+      ]).catch(() => {
+        // Network failed or timed out, try cache
         return caches.match(event.request).then((cachedResponse) => {
           if (cachedResponse) {
             return cachedResponse;
@@ -115,7 +136,12 @@ self.addEventListener('fetch', (event) => {
 
           // For navigation requests, return cached homepage as fallback
           if (event.request.mode === 'navigate') {
-            return caches.match('/');
+            return caches.match('/').then(response => {
+              return response || new Response(
+                '<!DOCTYPE html><html><head><title>Offline</title></head><body><h1>App is offline</h1><p>Please check your connection and try again.</p></body></html>',
+                { headers: { 'Content-Type': 'text/html' } }
+              );
+            });
           }
 
           // Return a basic offline response for other requests
@@ -128,8 +154,27 @@ self.addEventListener('fetch', (event) => {
           });
         });
       })
-  );
+    );
+  }
 });
+
+// Helper function to fetch and cache
+async function fetchAndCache(request) {
+  try {
+    const response = await fetch(request);
+    if (response.status === 200) {
+      const cache = await caches.open(CACHE_NAME);
+      cache.put(request, response.clone());
+    }
+    return response;
+  } catch (error) {
+    const cachedResponse = await caches.match(request);
+    if (cachedResponse) {
+      return cachedResponse;
+    }
+    throw error;
+  }
+}
 `;
 
 // Write the generated service worker
