@@ -31,6 +31,8 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     const pricingDiv = document.getElementById('pricing-table');
     if (pricingDiv) {
       clerk.mountPricingTable(pricingDiv, {
+        // Redirect to dashboard after successful checkout (use full URL for Account Portal)
+        afterCheckoutUrl: 'https://packzen.org/dashboard',
         // Optional: customize appearance
         // appearance: { ... }
       });
