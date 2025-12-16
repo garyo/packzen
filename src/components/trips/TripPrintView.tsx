@@ -205,7 +205,22 @@ export function TripPrintView(props: TripPrintViewProps) {
           min-width: 16px;
           border: 2px solid #333;
           border-radius: 3px;
-          display: inline-block;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          position: relative;
+        }
+
+        .checkbox.checked {
+          background: #333;
+        }
+
+        .checkbox.checked::after {
+          content: '✓';
+          color: white;
+          font-size: 12px;
+          font-weight: bold;
+          line-height: 1;
         }
 
         .item-name {
@@ -355,7 +370,7 @@ export function TripPrintView(props: TripPrintViewProps) {
                     {(item) => (
                       <div>
                         <div class="item-row">
-                          <span class="checkbox"></span>
+                          <span class={item.is_packed ? 'checkbox checked' : 'checkbox'}></span>
                           <span class="item-name">{item.name}</span>
                           {item.quantity > 1 && <span class="item-quantity">×{item.quantity}</span>}
                           {props.sortBy === 'bag' && item.category_name && (
