@@ -313,8 +313,6 @@ export function UserMenu(props: UserMenuProps) {
     await authStore.signOut();
   };
 
-  const user = authStore.user();
-
   return (
     <div class="relative" ref={menuRef}>
       <button
@@ -323,7 +321,7 @@ export function UserMenu(props: UserMenuProps) {
         title="Account menu"
       >
         <Show
-          when={user?.imageUrl}
+          when={authStore.user()?.imageUrl}
           fallback={
             <div class="flex h-full w-full items-center justify-center rounded-full bg-gray-300 text-gray-600">
               <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -337,20 +335,32 @@ export function UserMenu(props: UserMenuProps) {
             </div>
           }
         >
-          <img src={user!.imageUrl} alt="User avatar" class="h-full w-full rounded-full" />
+          <img
+            src={authStore.user()!.imageUrl}
+            alt="User avatar"
+            class="h-full w-full rounded-full"
+          />
         </Show>
       </button>
 
       <Show when={showMenu()}>
         <div class="absolute top-full right-0 z-20 mt-2 w-56 rounded-lg border border-gray-200 bg-white shadow-lg">
-          <Show when={user}>
-            <div class="border-b border-gray-200 px-4 py-3">
-              <p class="text-sm font-medium text-gray-900">{user!.firstName || user!.email}</p>
-              <p class="text-xs text-gray-500">{user!.email}</p>
-            </div>
+          <Show when={authStore.user()}>
+            {(user) => (
+              <div class="border-b border-gray-200 px-4 py-3">
+                <p class="text-sm font-medium text-gray-900">{user().firstName || user().email}</p>
+                <p class="text-xs text-gray-500">{user().email}</p>
+              </div>
+            )}
           </Show>
 
           <div class="py-1">
+            <a
+              href="/profile"
+              class="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100"
+            >
+              Account Settings
+            </a>
             <button
               onClick={handleExport}
               class="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100"

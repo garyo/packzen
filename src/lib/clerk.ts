@@ -47,6 +47,12 @@ export async function isSignedIn(): Promise<boolean> {
 // Helper to get current user
 export async function getCurrentUser() {
   const clerk = await getClerk();
+
+  // Ensure Clerk is fully loaded
+  if (!clerk.loaded) {
+    await clerk.load();
+  }
+
   return clerk.user;
 }
 

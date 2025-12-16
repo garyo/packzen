@@ -26,7 +26,8 @@
       "Bash(NODE_ENV=development node:*)",
       "Bash(node scripts/setup-git-hooks.js:*)",
       "Bash(git add:*)",
-      "Bash(bun pm:*)"
+      "Bash(bun pm:*)",
+      "WebFetch(domain:clerk.com)"
     ]
   }
 }
