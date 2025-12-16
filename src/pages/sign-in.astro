@@ -21,9 +21,21 @@ import BaseLayout from '../layouts/BaseLayout.astro';
   async function initSignIn() {
     const clerk = await getClerk();
 
+    // If user is already signed in, redirect to dashboard
+    if (clerk.user) {
+      window.location.href = '/dashboard';
+      return;
+    }
+
+    // Read redirect_url from query string
+    const params = new URLSearchParams(window.location.search);
+    const redirectUrl = params.get('redirect_url');
+
     clerk.mountSignIn(document.getElementById('clerk-sign-in')!, {
-      afterSignInUrl: '/dashboard',
-      signUpUrl: '/sign-up',
+      signUpUrl: redirectUrl
+        ? `/sign-up?redirect_url=${encodeURIComponent(redirectUrl)}`
+        : '/sign-up',
+      fallbackRedirectUrl: redirectUrl || '/dashboard',
     });
   }
 

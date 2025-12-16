@@ -280,35 +280,6 @@ export function UserMenu(props: UserMenuProps) {
     }
   };
 
-  const handleDeleteAccount = async () => {
-    // Double confirmation for safety
-    if (
-      !confirm(
-        '⚠️ WARNING: This will permanently delete ALL your data (trips, items, categories, etc.). This CANNOT be undone!\n\nAre you absolutely sure?'
-      )
-    ) {
-      return;
-    }
-
-    if (!confirm('Final confirmation: Delete everything and close your account?')) {
-      return;
-    }
-
-    try {
-      const response = await api.delete(endpoints.deleteAccount);
-      if (response.success) {
-        showToast('success', 'Account deleted successfully');
-        // Sign out and redirect
-        await authStore.signOut();
-      } else {
-        showToast('error', 'Failed to delete account');
-      }
-    } catch (error) {
-      showToast('error', 'Failed to delete account');
-      console.error(error);
-    }
-  };
-
   const handleSignOut = async () => {
     await authStore.signOut();
   };
@@ -391,12 +362,6 @@ export function UserMenu(props: UserMenuProps) {
               class="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100"
             >
               Sign Out
-            </button>
-            <button
-              onClick={handleDeleteAccount}
-              class="block w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50"
-            >
-              Delete Account
             </button>
           </div>
         </div>

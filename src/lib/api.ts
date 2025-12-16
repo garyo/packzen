@@ -87,7 +87,7 @@ async function makeRequest<T>(
         const currentPath = window.location.pathname;
         if (!currentPath.includes('/sign-in') && !currentPath.includes('/sign-up')) {
           setTimeout(() => {
-            window.location.href = '/sign-in';
+            window.location.href = `/sign-in?redirect_url=${encodeURIComponent(currentPath)}`;
           }, 1000);
         }
       }

@@ -8,6 +8,11 @@ export const onRequest = clerkMiddleware(async (auth, context, next) => {
     return next();
   }
 
+  // Skip auth/CSRF checks for webhook endpoints (they use signature verification)
+  if (context.url.pathname.startsWith('/api/webhooks/')) {
+    return next();
+  }
+
   // Get auth state from Clerk
   const authObject = await auth();
 

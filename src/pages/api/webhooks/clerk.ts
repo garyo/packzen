@@ -13,12 +13,6 @@ import { drizzle } from 'drizzle-orm/d1';
 import type { D1Database } from '@cloudflare/workers-types';
 import { deleteAllUserData } from '../../../lib/user-data-cleanup';
 
-const WEBHOOK_SECRET = import.meta.env.CLERK_WEBHOOK_SECRET;
-
-if (!WEBHOOK_SECRET) {
-  throw new Error('Missing CLERK_WEBHOOK_SECRET environment variable');
-}
-
 interface ClerkWebhookEvent {
   data: {
     id: string; // User ID
@@ -29,8 +23,26 @@ interface ClerkWebhookEvent {
   timestamp: number;
 }
 
-export const POST: APIRoute = async ({ request, locals }) => {
+export const POST: APIRoute = async (context) => {
+  const { request, locals } = context;
+
   try {
+    // Get webhook secret from runtime environment
+    const runtime = locals.runtime as
+      | { env: { CLERK_WEBHOOK_SECRET?: string; DB: D1Database } }
+      | undefined;
+
+    if (!runtime?.env) {
+      console.error('Runtime environment not available');
+      return new Response('Server configuration error', { status: 500 });
+    }
+
+    const WEBHOOK_SECRET = runtime.env.CLERK_WEBHOOK_SECRET;
+
+    if (!WEBHOOK_SECRET) {
+      console.error('Missing CLERK_WEBHOOK_SECRET environment variable');
+      return new Response('Server configuration error', { status: 500 });
+    }
     // Get the webhook signature headers
     const svixId = request.headers.get('svix-id');
     const svixTimestamp = request.headers.get('svix-timestamp');
@@ -66,7 +78,6 @@ export const POST: APIRoute = async ({ request, locals }) => {
 
     // Handle user.deleted event
     if (type === 'user.deleted') {
-      const runtime = locals.runtime as { env: { DB: D1Database } };
       const db = drizzle(runtime.env.DB);
 
       try {
