@@ -1,0 +1,41 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="Pricing - PackZen">
+  <div class="min-h-screen bg-gray-50 px-4 py-12">
+    <div class="mx-auto max-w-7xl">
+      <div class="mb-12 text-center">
+        <h1 class="mb-4 text-4xl font-bold text-gray-900">Choose Your Plan</h1>
+        <p class="text-lg text-gray-600">Start with a free trial, upgrade anytime</p>
+      </div>
+
+      {/* Clerk's PricingTable component will be mounted here */}
+      <div id="pricing-table"></div>
+    </div>
+  </div>
+</BaseLayout>
+
+<script>
+  import { getClerk } from '../lib/clerk';
+
+  async function initPricingTable() {
+    const clerk = await getClerk();
+
+    // Wait for Clerk to be fully loaded
+    if (!clerk.loaded) {
+      await clerk.load();
+    }
+
+    // Mount the PricingTable component
+    const pricingDiv = document.getElementById('pricing-table');
+    if (pricingDiv) {
+      clerk.mountPricingTable(pricingDiv, {
+        // Optional: customize appearance
+        // appearance: { ... }
+      });
+    }
+  }
+
+  initPricingTable();
+</script>

@@ -361,6 +361,12 @@ export function UserMenu(props: UserMenuProps) {
             >
               Account Settings
             </a>
+            <a
+              href="/pricing"
+              class="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100"
+            >
+              Subscription & Pricing
+            </a>
             <button
               onClick={handleExport}
               class="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100"
