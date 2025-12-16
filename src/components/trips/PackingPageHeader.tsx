@@ -183,6 +183,13 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
                     </Button>
                     <Show when={showMenu()}>
                       <div class="absolute top-full right-0 z-20 mt-1 w-48 rounded-lg border border-gray-200 bg-white shadow-lg">
+                        <a
+                          href={`/trips/${props.trip()?.id}/print?sortBy=${props.sortBy()}`}
+                          target="_blank"
+                          class="block w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
+                        >
+                          🖨️ Print Checklist
+                        </a>
                         <button
                           onClick={() => {
                             props.onExport();

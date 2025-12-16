@@ -1,0 +1,25 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+
+const { id } = Astro.params;
+const sortBy = Astro.url.searchParams.get('sortBy') || 'bag';
+const columns = Astro.url.searchParams.get('columns') === '2' ? '2' : '1';
+---
+
+<BaseLayout title="Print Checklist - PackZen">
+  <div id="app-root" data-trip-id={id} data-sort-by={sortBy} data-columns={columns}></div>
+</BaseLayout>
+
+<script>
+  import { render } from 'solid-js/web';
+  import { TripPrintView } from '../../../components/trips/TripPrintView';
+
+  const root = document.getElementById('app-root');
+  const tripId = root?.dataset.tripId;
+  const sortBy = (root?.dataset.sortBy as 'bag' | 'category') || 'bag';
+  const columns = root?.dataset.columns === '2' ? 2 : 1;
+
+  if (root && tripId) {
+    render(() => TripPrintView({ tripId, sortBy, initialColumns: columns }), root);
+  }
+</script>

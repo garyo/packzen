@@ -187,19 +187,81 @@ export function PackingPage(props: PackingPageProps) {
   };
 
   const handleAddBuiltInItemsToTrip = async (itemsToAdd: SelectedBuiltInItem[]) => {
-    for (const item of itemsToAdd) {
-      await api.post(endpoints.tripItems(props.tripId), {
-        name: item.name,
-        category_name: item.category,
-        quantity: item.quantity,
-        notes: item.description,
-        bag_id: null, // User can assign bags later
-        master_item_id: null, // Not linked to master list
-      });
-    }
+    try {
+      // Fetch current master items and categories
+      const [masterItemsResponse, categoriesResponse] = await Promise.all([
+        api.get(endpoints.masterItems),
+        api.get(endpoints.categories),
+      ]);
 
-    showToast('success', `Added ${itemsToAdd.length} items to trip`);
-    refetch();
+      if (!masterItemsResponse.success || !categoriesResponse.success) {
+        throw new Error('Failed to fetch master items or categories');
+      }
+
+      const masterItems = masterItemsResponse.data as any[];
+      const existingCategories = categoriesResponse.data as any[];
+
+      // Helper to get or create category
+      const getCategoryId = async (categoryName: string): Promise<string | null> => {
+        let category = existingCategories.find(
+          (c: any) => c.name.toLowerCase() === categoryName.toLowerCase()
+        );
+
+        if (!category) {
+          const response = await api.post(endpoints.categories, { name: categoryName });
+          if (response.success && response.data) {
+            category = response.data;
+            existingCategories.push(category);
+          }
+        }
+
+        return category?.id || null;
+      };
+
+      // Helper to get or create master item
+      const getMasterItemId = async (item: SelectedBuiltInItem): Promise<string | null> => {
+        let masterItem = masterItems.find(
+          (m: any) => m.name.toLowerCase() === item.name.toLowerCase()
+        );
+
+        if (!masterItem) {
+          const categoryId = await getCategoryId(item.category);
+          const response = await api.post(endpoints.masterItems, {
+            name: item.name,
+            description: item.description,
+            category_id: categoryId,
+            default_quantity: item.quantity,
+          });
+
+          if (response.success && response.data) {
+            masterItem = response.data;
+            masterItems.push(masterItem);
+          }
+        }
+
+        return masterItem?.id || null;
+      };
+
+      // Add items to trip with master_item_id
+      for (const item of itemsToAdd) {
+        const masterItemId = await getMasterItemId(item);
+
+        await api.post(endpoints.tripItems(props.tripId), {
+          name: item.name,
+          category_name: item.category,
+          quantity: item.quantity,
+          notes: item.description,
+          bag_id: null,
+          master_item_id: masterItemId,
+        });
+      }
+
+      showToast('success', `Added ${itemsToAdd.length} items to trip and master list`);
+      refetch();
+    } catch (error) {
+      showToast('error', 'Failed to add items');
+      console.error('Error adding built-in items to trip:', error);
+    }
   };
 
   const packedCount = () => items()?.filter((i) => i.is_packed).length || 0;
