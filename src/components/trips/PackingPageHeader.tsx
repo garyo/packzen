@@ -186,6 +186,7 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
                         <a
                           href={`/trips/${props.trip()?.id}/print?sortBy=${props.sortBy()}`}
                           target="_blank"
+                          onClick={() => setShowMenu(false)}
                           class="block w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
                         >
                           🖨️ Print Checklist

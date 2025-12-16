@@ -225,7 +225,8 @@ export function TripPrintView(props: TripPrintViewProps) {
 
         .item-name {
           flex: 1;
-          font-size: 14px;
+          font-size: 13px;
+          font-weight: normal;
         }
 
         .item-quantity {

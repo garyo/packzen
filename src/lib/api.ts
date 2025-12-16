@@ -172,4 +172,7 @@ export const endpoints = {
   tripBags: (tripId: string) => `${API_BASE_URL}/trips/${tripId}/bags`,
   tripItems: (tripId: string) => `${API_BASE_URL}/trips/${tripId}/items`,
   tripCopyFromMaster: (tripId: string) => `${API_BASE_URL}/trips/${tripId}/copy-from-master`,
+
+  // User
+  deleteAccount: `${API_BASE_URL}/user/delete-account`,
 };
