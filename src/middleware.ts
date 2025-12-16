@@ -1,5 +1,6 @@
 import { clerkMiddleware, clerkClient } from '@clerk/astro/server';
 import { validateCsrfToken } from './lib/csrf';
+import { checkBillingStatus, logBillingStatus } from './lib/billing';
 
 export const onRequest = clerkMiddleware(async (auth, context, next) => {
   // Only apply auth to API routes
@@ -19,6 +20,13 @@ export const onRequest = clerkMiddleware(async (auth, context, next) => {
 
   // Add user ID to locals for API routes to use
   context.locals.userId = authObject.userId;
+
+  // Check and log billing status
+  const billingStatus = checkBillingStatus(authObject);
+  logBillingStatus(authObject.userId, billingStatus);
+
+  // Store billing status in locals for API routes to use
+  context.locals.billingStatus = billingStatus;
 
   // CSRF protection for state-changing requests
   const method = context.request.method.toUpperCase();

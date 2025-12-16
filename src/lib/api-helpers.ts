@@ -268,3 +268,81 @@ export function createDeleteHandler(
     }
   };
 }
+
+/**
+ * Billing helpers
+ */
+import type { BillingPlan, BillingStatus } from './billing';
+import { hasStandardPlan } from './billing';
+
+/**
+ * Get billing status from locals
+ */
+export function getBillingStatus(locals: APIContext['locals']): BillingStatus | null {
+  return locals.billingStatus || null;
+}
+
+/**
+ * Check if user has required plan (returns error response if not)
+ *
+ * @example
+ * // In an API route:
+ * export const GET: APIRoute = async ({ locals }) => {
+ *   const billingCheck = requirePlan(locals, 'standard');
+ *   if (billingCheck) return billingCheck; // Returns 403 error if plan not met
+ *
+ *   // User has required plan, continue...
+ * };
+ */
+export function requirePlan(
+  locals: APIContext['locals'],
+  requiredPlan: BillingPlan
+): Response | null {
+  const billingStatus = getBillingStatus(locals);
+
+  if (!billingStatus) {
+    console.error('Billing status not available in locals');
+    return errorResponse('Billing information unavailable', 500);
+  }
+
+  // Check if user has the required plan
+  if (billingStatus.activePlan !== requiredPlan) {
+    console.log(
+      `[Billing] User ${locals.userId} attempted to access ${requiredPlan} feature but has ${billingStatus.activePlan} plan`
+    );
+    return errorResponse(
+      `This feature requires the ${requiredPlan} plan. Your current plan is ${billingStatus.activePlan}.`,
+      403
+    );
+  }
+
+  // User has required plan
+  return null;
+}
+
+/**
+ * Check if user has standard (paid) plan
+ *
+ * @example
+ * export const GET: APIRoute = async ({ locals }) => {
+ *   const billingCheck = requireStandardPlan(locals);
+ *   if (billingCheck) return billingCheck;
+ *   // User has standard plan...
+ * };
+ */
+export function requireStandardPlan(locals: APIContext['locals']): Response | null {
+  const billingStatus = getBillingStatus(locals);
+
+  if (!billingStatus) {
+    return errorResponse('Billing information unavailable', 500);
+  }
+
+  if (!hasStandardPlan(billingStatus)) {
+    console.log(
+      `[Billing] User ${locals.userId} needs standard plan but has ${billingStatus.activePlan}`
+    );
+    return errorResponse('This feature requires a standard plan subscription.', 403);
+  }
+
+  return null;
+}
