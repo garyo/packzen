@@ -450,17 +450,6 @@ export function PackingPage(props: PackingPageProps) {
                   icon="📦"
                   title="No items yet"
                   description="Add items to your packing list to get started"
-                  action={
-                    <div class="flex flex-wrap gap-2">
-                      <Button onClick={() => openAddFromMaster()}>Add from All Items</Button>
-                      <Button variant="secondary" onClick={() => openBrowseTemplates()}>
-                        Add from Templates
-                      </Button>
-                      <Button variant="secondary" onClick={() => openAddForm()}>
-                        Add New Item
-                      </Button>
-                    </div>
-                  }
                 />
               }
             >
@@ -500,9 +489,12 @@ export function PackingPage(props: PackingPageProps) {
                   }
                 />
               </Show>
+            </Show>
 
-              {/* Add More Items Buttons */}
-              <div class="mt-6 flex flex-wrap justify-center gap-2">
+            {/* Add Items Buttons - shown for both empty and non-empty states */}
+            <div class="mt-6 flex flex-col items-center gap-3">
+              <Button onClick={() => setShowBagManager(true)}>Add Bags</Button>
+              <div class="flex flex-wrap justify-center gap-2">
                 <Button onClick={() => openAddFromMaster()}>Add from All Items</Button>
                 <Button variant="secondary" onClick={() => openBrowseTemplates()}>
                   Add from Templates
@@ -511,7 +503,7 @@ export function PackingPage(props: PackingPageProps) {
                   Add New Item
                 </Button>
               </div>
-            </Show>
+            </div>
           </Show>
         </Show>
       </main>
