@@ -17,6 +17,7 @@ import { PackingListBagView } from './PackingListBagView';
 import { PackingListCategoryView } from './PackingListCategoryView';
 import { SelectModeActionBar } from './SelectModeActionBar';
 import { BuiltInItemsBrowser } from '../built-in-items/BuiltInItemsBrowser';
+import { builtInItems } from '../../lib/built-in-items';
 import { fetchWithErrorHandling, fetchSingleWithErrorHandling } from '../../lib/resource-helpers';
 import { tripToYAML, downloadYAML } from '../../lib/yaml';
 import { deleteTripWithConfirm } from '../../lib/trip-actions';
@@ -344,7 +345,14 @@ export function PackingPage(props: PackingPageProps) {
         );
 
         if (!category) {
-          const response = await api.post(endpoints.categories, { name: categoryName });
+          // Get icon from built-in categories
+          const builtInCategory = builtInItems.categories.find(
+            (c) => c.name.toLowerCase() === categoryName.toLowerCase()
+          );
+          const response = await api.post(endpoints.categories, {
+            name: categoryName,
+            icon: builtInCategory?.icon || null,
+          });
           if (response.success && response.data) {
             category = response.data;
             existingCategories.push(category);
