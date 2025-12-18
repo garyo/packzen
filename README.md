@@ -1,5 +1,7 @@
 # PackZen
 
+[![Build](https://github.com/garyo/packzen/actions/workflows/build.yml/badge.svg)](https://github.com/garyo/packzen/actions/workflows/build.yml)
+
 A mobile-first packing list web app for travel with all-items management, trip planning, and bag organization. Built with Astro, Solid.js, Tailwind CSS, Cloudflare D1, and Clerk Auth.
 
 ## Tech Stack

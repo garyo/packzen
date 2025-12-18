@@ -27,7 +27,8 @@
       "Bash(node scripts/setup-git-hooks.js:*)",
       "Bash(git add:*)",
       "Bash(bun pm:*)",
-      "WebFetch(domain:clerk.com)"
+      "WebFetch(domain:clerk.com)",
+      "Bash(git remote:*)"
     ]
   }
 }
