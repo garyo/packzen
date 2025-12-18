@@ -318,7 +318,11 @@ export function PackingPage(props: PackingPageProps) {
     });
   };
 
-  const handleAddBuiltInItemsToTrip = async (itemsToAdd: SelectedBuiltInItem[]) => {
+  const handleAddBuiltInItemsToTrip = async (
+    itemsToAdd: SelectedBuiltInItem[],
+    bagId?: string | null,
+    containerId?: string | null
+  ) => {
     try {
       // Fetch current master items and categories
       const [masterItemsResponse, categoriesResponse] = await Promise.all([
@@ -383,7 +387,8 @@ export function PackingPage(props: PackingPageProps) {
           category_name: item.category,
           quantity: item.quantity,
           notes: item.description,
-          bag_id: null,
+          bag_id: containerId ? null : bagId || null, // Clear bag if using container
+          container_item_id: containerId || null,
           master_item_id: masterItemId,
         });
       }

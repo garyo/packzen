@@ -6,22 +6,27 @@
  * Users can select items and import them to master list or add to a trip
  */
 
-import { createSignal, For, Show, createMemo } from 'solid-js';
+import { createSignal, For, Show, createMemo, createResource } from 'solid-js';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
-import type { SelectedBuiltInItem } from '../../lib/types';
+import type { SelectedBuiltInItem, Bag, TripItem } from '../../lib/types';
 import {
   builtInItems,
   getCategoryIcon,
   getItemsByTripTypes,
   getCategoriesForTripTypes,
 } from '../../lib/built-in-items';
+import { api, endpoints } from '../../lib/api';
 
 interface BuiltInItemsBrowserProps {
   onClose: () => void;
   onImportToMaster?: (items: SelectedBuiltInItem[]) => Promise<void>;
   tripId?: string; // Optional: for "Add to Trip" workflow
-  onAddToTrip?: (items: SelectedBuiltInItem[]) => Promise<void>;
+  onAddToTrip?: (
+    items: SelectedBuiltInItem[],
+    bagId?: string | null,
+    containerId?: string | null
+  ) => Promise<void>;
 }
 
 export function BuiltInItemsBrowser(props: BuiltInItemsBrowserProps) {
@@ -31,6 +36,33 @@ export function BuiltInItemsBrowser(props: BuiltInItemsBrowserProps) {
   const [selectedItems, setSelectedItems] = createSignal<Map<string, number>>(new Map());
   const [isImporting, setIsImporting] = createSignal(false);
   const [expandedCategories, setExpandedCategories] = createSignal<Set<string>>(new Set());
+  const [selectedBag, setSelectedBag] = createSignal<string | null>(null);
+  const [selectedContainer, setSelectedContainer] = createSignal<string | null>(null);
+  const [keepOpen, setKeepOpen] = createSignal(false);
+
+  // Load bags if adding to trip
+  const [bags] = createResource<Bag[]>(
+    () => props.tripId,
+    async (tripId) => {
+      const response = await api.get<Bag[]>(endpoints.tripBags(tripId));
+      return response.success && response.data ? response.data : [];
+    }
+  );
+
+  // Load trip items to get containers
+  const [tripItems] = createResource<TripItem[]>(
+    () => props.tripId,
+    async (tripId) => {
+      const response = await api.get<TripItem[]>(endpoints.tripItems(tripId));
+      return response.success && response.data ? response.data : [];
+    }
+  );
+
+  // Get available containers
+  const availableContainers = () => {
+    const items = tripItems() || [];
+    return items.filter((item) => item.is_container);
+  };
 
   // Filter items based on search, trip types, and category
   const filteredItems = createMemo(() => {
@@ -175,9 +207,16 @@ export function BuiltInItemsBrowser(props: BuiltInItemsBrowserProps) {
       if (props.onImportToMaster) {
         await props.onImportToMaster(items);
       } else if (props.onAddToTrip) {
-        await props.onAddToTrip(items);
+        await props.onAddToTrip(items, selectedBag(), selectedContainer());
       }
-      props.onClose();
+
+      if (keepOpen()) {
+        // Keep dialog open but reset selections for next batch
+        setSelectedItems(new Map());
+        setKeepOpen(false);
+      } else {
+        props.onClose();
+      }
     } catch (error) {
       console.error('Failed to import items:', error);
     } finally {
@@ -189,15 +228,29 @@ export function BuiltInItemsBrowser(props: BuiltInItemsBrowserProps) {
 
   return (
     <Modal title="Browse Item Templates" onClose={props.onClose} size="large">
-      {/* Search */}
-      <div class="mb-4">
-        <input
-          type="text"
-          placeholder="Search items..."
-          value={searchQuery()}
-          onInput={(e) => setSearchQuery(e.target.value)}
-          class="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
-        />
+      {/* Search & Category - side by side on larger screens */}
+      <div class="mb-4 grid gap-4 md:grid-cols-2">
+        <div>
+          <input
+            type="text"
+            placeholder="Search items..."
+            value={searchQuery()}
+            onInput={(e) => setSearchQuery(e.target.value)}
+            class="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        <div>
+          <select
+            value={selectedCategory() || ''}
+            onChange={(e) => setSelectedCategory(e.target.value || null)}
+            class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">All Categories</option>
+            <For each={availableCategories()}>
+              {(category) => <option value={category}>{category}</option>}
+            </For>
+          </select>
+        </div>
       </div>
 
       {/* Trip Type Filter */}
@@ -225,20 +278,47 @@ export function BuiltInItemsBrowser(props: BuiltInItemsBrowserProps) {
         </div>
       </div>
 
-      {/* Category Filter */}
-      <div class="mb-4">
-        <label class="mb-2 block text-sm font-medium text-gray-700">Category:</label>
-        <select
-          value={selectedCategory() || ''}
-          onChange={(e) => setSelectedCategory(e.target.value || null)}
-          class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="">All Categories</option>
-          <For each={availableCategories()}>
-            {(category) => <option value={category}>{category}</option>}
-          </For>
-        </select>
-      </div>
+      {/* Container & Bag Selectors - side by side on larger screens (only show for trip workflow) */}
+      <Show when={props.onAddToTrip}>
+        <div class="mb-4 grid gap-4 md:grid-cols-2">
+          {/* Container Selector */}
+          <Show when={availableContainers().length > 0}>
+            <div>
+              <label class="mb-1 block text-sm font-medium text-gray-700">Container:</label>
+              <select
+                value={selectedContainer() || ''}
+                onChange={(e) => {
+                  setSelectedContainer(e.target.value || null);
+                  if (e.target.value) {
+                    setSelectedBag(null); // Clear bag if selecting container
+                  }
+                }}
+                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">No container</option>
+                <For each={availableContainers()}>
+                  {(container) => <option value={container.id}>📦 {container.name}</option>}
+                </For>
+              </select>
+            </div>
+          </Show>
+
+          {/* Bag Selector (only show if not using container) */}
+          <Show when={!selectedContainer()}>
+            <div>
+              <label class="mb-1 block text-sm font-medium text-gray-700">Bag:</label>
+              <select
+                value={selectedBag() || ''}
+                onChange={(e) => setSelectedBag(e.target.value || null)}
+                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">No bag</option>
+                <For each={bags()}>{(bag) => <option value={bag.id}>{bag.name}</option>}</For>
+              </select>
+            </div>
+          </Show>
+        </div>
+      </Show>
 
       {/* Selected Count */}
       <div class="mb-4 text-sm font-medium text-gray-700">Selected: {selectedCount()} items</div>
@@ -350,7 +430,7 @@ export function BuiltInItemsBrowser(props: BuiltInItemsBrowserProps) {
       </div>
 
       {/* Actions */}
-      <div class="mt-6 flex justify-end gap-2">
+      <div class="mt-6 flex flex-wrap justify-end gap-2">
         <Button variant="secondary" onClick={props.onClose} disabled={isImporting()}>
           Cancel
         </Button>
@@ -360,6 +440,16 @@ export function BuiltInItemsBrowser(props: BuiltInItemsBrowserProps) {
           </Button>
         </Show>
         <Show when={props.onAddToTrip}>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setKeepOpen(true);
+              handleImport();
+            }}
+            disabled={selectedCount() === 0 || isImporting()}
+          >
+            Add & Continue
+          </Button>
           <Button onClick={handleImport} disabled={selectedCount() === 0 || isImporting()}>
             {isImporting() ? 'Adding...' : `Add to Trip (${selectedCount()})`}
           </Button>

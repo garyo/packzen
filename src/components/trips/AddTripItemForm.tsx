@@ -289,23 +289,20 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
           </div>
         </Show>
 
-        {/* Bag selector - always visible so user can see and change */}
-        <div>
-          <label class="mb-1 block text-sm font-medium text-gray-700">Bag</label>
-          <select
-            value={bagId() || ''}
-            onChange={(e) => setBagId(e.target.value || null)}
-            class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">No bag</option>
-            <For each={bags()}>{(bag) => <option value={bag.id}>{bag.name}</option>}</For>
-          </select>
-          <Show when={containerItemId()}>
-            <p class="mt-1 text-xs text-gray-500">
-              Items in containers inherit the container's bag
-            </p>
-          </Show>
-        </div>
+        {/* Bag selector - hidden when item is in a container (bag is inherited) */}
+        <Show when={!containerItemId()}>
+          <div>
+            <label class="mb-1 block text-sm font-medium text-gray-700">Bag</label>
+            <select
+              value={bagId() || ''}
+              onChange={(e) => setBagId(e.target.value || null)}
+              class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">No bag</option>
+              <For each={bags()}>{(bag) => <option value={bag.id}>{bag.name}</option>}</For>
+            </select>
+          </div>
+        </Show>
 
         {/* Container checkbox */}
         <div class="flex items-center gap-3">
