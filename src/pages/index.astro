@@ -3,6 +3,30 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 ---
 
 <BaseLayout title="PackZen - Travel Packing Made Easy">
+  <!-- Redirect logged-in users to dashboard -->
+  <script>
+    import { isSignedIn } from '../lib/clerk';
+
+    // Hide content during auth check to prevent flash
+    document.body.style.visibility = 'hidden';
+
+    (async () => {
+      try {
+        if (await isSignedIn()) {
+          // Use replace to avoid back button returning to landing page
+          window.location.replace('/dashboard');
+          return;
+        }
+      } catch (error) {
+        console.error('Auth check failed:', error);
+        // Fail open - show landing page
+      }
+
+      // Not signed in, show landing page
+      document.body.style.visibility = 'visible';
+    })();
+  </script>
+
   <div class="min-h-screen bg-gradient-to-b from-blue-50 to-white">
     <!-- Hero Section -->
     <div class="container mx-auto px-4 py-16">
@@ -47,8 +71,8 @@ import BaseLayout from '../layouts/BaseLayout.astro';
           <div class="mb-4 text-4xl">🧳</div>
           <h3 class="mb-2 text-xl font-semibold text-gray-900">Bag Organization</h3>
           <p class="text-gray-600">
-            Assign items to specific bags (carry-on, checked, personal). Know exactly what goes
-            where.
+            Assign items to specific bags (carry-on, checked, personal). Containers within bags keep
+            things organized. Know exactly what goes where.
           </p>
         </div>
 
@@ -82,6 +106,30 @@ import BaseLayout from '../layouts/BaseLayout.astro';
           <h3 class="mb-2 text-xl font-semibold text-gray-900">Lightning Fast</h3>
           <p class="text-gray-600">
             Built on Cloudflare's edge network. Blazing fast from anywhere in the world.
+          </p>
+        </div>
+
+        <div class="rounded-lg bg-white p-6 shadow-md">
+          <div class="mb-4 text-4xl">🔓</div>
+          <h3 class="mb-2 text-xl font-semibold text-gray-900">You Own Your Data</h3>
+          <p class="text-gray-600">
+            Export full backups anytime. Move to a new service whenever you want. Zero lock-in.
+          </p>
+        </div>
+
+        <div class="rounded-lg bg-white p-6 shadow-md">
+          <div class="mb-4 text-4xl">📚</div>
+          <h3 class="mb-2 text-xl font-semibold text-gray-900">Built-in Templates</h3>
+          <p class="text-gray-600">
+            Start with curated packing lists for different trip types. Customize to fit your needs.
+          </p>
+        </div>
+
+        <div class="rounded-lg bg-white p-6 shadow-md">
+          <div class="mb-4 text-4xl">🖨️</div>
+          <h3 class="mb-2 text-xl font-semibold text-gray-900">Print & Share</h3>
+          <p class="text-gray-600">
+            Print your packing list or export as YAML. Share with travel companions.
           </p>
         </div>
       </div>
