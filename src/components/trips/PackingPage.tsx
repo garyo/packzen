@@ -151,6 +151,9 @@ export function PackingPage(props: PackingPageProps) {
     const itemsToUpdate = Array.from(selectedItems());
     if (itemsToUpdate.length === 0) return;
 
+    // Capture scroll position before update
+    const scrollY = window.scrollY;
+
     try {
       await Promise.all(
         itemsToUpdate.map((itemId) =>
@@ -166,6 +169,11 @@ export function PackingPage(props: PackingPageProps) {
       await refetch();
       setSelectMode(false);
       setSelectedItems(new Set<string>());
+
+      // Restore scroll position after refetch and re-render
+      requestAnimationFrame(() => {
+        window.scrollTo({ top: scrollY, behavior: 'instant' });
+      });
     } catch (error) {
       showToast('error', 'Failed to assign items');
     }
@@ -185,6 +193,9 @@ export function PackingPage(props: PackingPageProps) {
       return;
     }
 
+    // Capture scroll position before update
+    const scrollY = window.scrollY;
+
     try {
       await Promise.all(
         itemsToUpdate.map((itemId) =>
@@ -203,6 +214,11 @@ export function PackingPage(props: PackingPageProps) {
       await refetch();
       setSelectMode(false);
       setSelectedItems(new Set<string>());
+
+      // Restore scroll position after refetch and re-render
+      requestAnimationFrame(() => {
+        window.scrollTo({ top: scrollY, behavior: 'instant' });
+      });
     } catch (error) {
       showToast('error', 'Failed to assign items to container');
     }
@@ -215,6 +231,9 @@ export function PackingPage(props: PackingPageProps) {
     const categoryName = categoryId
       ? categories()?.find((cat) => cat.id === categoryId)?.name || null
       : null;
+
+    // Capture scroll position before update
+    const scrollY = window.scrollY;
 
     try {
       await Promise.all(
@@ -233,6 +252,11 @@ export function PackingPage(props: PackingPageProps) {
       await refetch();
       setSelectMode(false);
       setSelectedItems(new Set<string>());
+
+      // Restore scroll position after refetch and re-render
+      requestAnimationFrame(() => {
+        window.scrollTo({ top: scrollY, behavior: 'instant' });
+      });
     } catch (error) {
       showToast('error', 'Failed to assign items to category');
     }
@@ -241,6 +265,9 @@ export function PackingPage(props: PackingPageProps) {
   const handleBatchDelete = async () => {
     const itemsToDelete = Array.from(selectedItems());
     if (itemsToDelete.length === 0) return;
+
+    // Capture scroll position before update
+    const scrollY = window.scrollY;
 
     try {
       await Promise.all(
@@ -255,6 +282,11 @@ export function PackingPage(props: PackingPageProps) {
       await refetch();
       setSelectMode(false);
       setSelectedItems(new Set<string>());
+
+      // Restore scroll position after refetch and re-render
+      requestAnimationFrame(() => {
+        window.scrollTo({ top: scrollY, behavior: 'instant' });
+      });
     } catch (error) {
       showToast('error', 'Failed to delete items');
     }

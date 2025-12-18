@@ -1,9 +1,9 @@
 export const prerender = false;
 
 import type { APIRoute } from 'astro';
-import { eq, desc, count } from 'drizzle-orm';
+import { eq, desc, count, sql } from 'drizzle-orm';
 import { z } from 'zod';
-import { trips } from '../../../../db/schema';
+import { trips, bags, tripItems } from '../../../../db/schema';
 import { tripCreateSchema, validateRequestSafe } from '../../../lib/validation';
 import {
   createGetHandler,
@@ -18,12 +18,28 @@ import {
 import { checkTripLimit } from '../../../lib/resource-limits';
 
 export const GET: APIRoute = createGetHandler(async ({ db, userId }) => {
-  return await db
-    .select()
+  // Get all trips with bag and item statistics
+  const tripsWithStats = await db
+    .select({
+      id: trips.id,
+      clerk_user_id: trips.clerk_user_id,
+      name: trips.name,
+      destination: trips.destination,
+      start_date: trips.start_date,
+      end_date: trips.end_date,
+      notes: trips.notes,
+      created_at: trips.created_at,
+      updated_at: trips.updated_at,
+      bag_count: sql<number>`COALESCE((SELECT COUNT(*) FROM bags WHERE bags.trip_id = trips.id), 0)`,
+      items_total: sql<number>`CAST(COALESCE((SELECT COUNT(*) FROM trip_items WHERE trip_items.trip_id = trips.id), 0) AS INTEGER)`,
+      items_packed: sql<number>`CAST(COALESCE((SELECT COUNT(*) FROM trip_items WHERE trip_items.trip_id = trips.id AND trip_items.is_packed = 1), 0) AS INTEGER)`,
+    })
     .from(trips)
     .where(eq(trips.clerk_user_id, userId))
     .orderBy(desc(trips.start_date))
     .all();
+
+  return tripsWithStats;
 }, 'fetch trips');
 
 export const POST: APIRoute = async (context) => {

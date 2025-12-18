@@ -15,11 +15,18 @@ export type {
 } from '../../db/schema';
 
 // Import for extending
-import type { MasterItem } from '../../db/schema';
+import type { MasterItem, Trip } from '../../db/schema';
 
 // Extended type for master items with joined category name (returned by API)
 export type MasterItemWithCategory = MasterItem & {
   category_name: string | null;
+};
+
+// Extended type for trips with statistics (returned by API)
+export type TripWithStats = Trip & {
+  bag_count: number;
+  items_total: number;
+  items_packed: number;
 };
 
 // Auth types

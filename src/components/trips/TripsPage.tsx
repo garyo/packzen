@@ -1,7 +1,7 @@
 import { createSignal, createResource, For, Show, onMount } from 'solid-js';
 import { authStore } from '../../stores/auth';
 import { api, endpoints } from '../../lib/api';
-import type { Trip } from '../../lib/types';
+import type { Trip, TripWithStats } from '../../lib/types';
 import { Button } from '../ui/Button';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
 import { EmptyState } from '../ui/EmptyState';
@@ -18,8 +18,11 @@ export function TripsPage() {
   const [editingTrip, setEditingTrip] = createSignal<Trip | null>(null);
   const [showImport, setShowImport] = createSignal(false);
 
-  const [trips, { refetch }] = createResource<Trip[]>(async () => {
-    return fetchWithErrorHandling(() => api.get<Trip[]>(endpoints.trips), 'Failed to load trips');
+  const [trips, { refetch }] = createResource<TripWithStats[]>(async () => {
+    return fetchWithErrorHandling(
+      () => api.get<TripWithStats[]>(endpoints.trips),
+      'Failed to load trips'
+    );
   });
 
   onMount(async () => {
@@ -252,7 +255,7 @@ export function TripsPage() {
 }
 
 function TripCard(props: {
-  trip: Trip;
+  trip: TripWithStats;
   onEdit: () => void;
   onCopy: () => void;
   onDelete: () => void;
@@ -282,7 +285,7 @@ function TripCard(props: {
         </span>
       </div>
 
-      <p class="mb-4 text-sm text-gray-600">
+      <p class="mb-2 text-sm text-gray-600">
         {props.trip.start_date ? (
           <>
             {formatDate(props.trip.start_date)}
@@ -292,6 +295,22 @@ function TripCard(props: {
           <span class="text-gray-400">No date set</span>
         )}
       </p>
+
+      {/* Statistics */}
+      <div class="mb-4 flex gap-4 text-sm text-gray-600">
+        <div class="flex items-center gap-1">
+          <span>🧳</span>
+          <span>
+            {props.trip.bag_count} {props.trip.bag_count === 1 ? 'bag' : 'bags'}
+          </span>
+        </div>
+        <div class="flex items-center gap-1">
+          <span>✓</span>
+          <span>
+            {props.trip.items_packed}/{props.trip.items_total} items
+          </span>
+        </div>
+      </div>
 
       <div class="flex gap-2">
         <a
