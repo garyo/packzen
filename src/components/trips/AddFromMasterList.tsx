@@ -1,6 +1,6 @@
-import { createResource, For, Show, createSignal } from 'solid-js';
+import { createResource, createEffect, For, Show, createSignal } from 'solid-js';
 import { api, endpoints } from '../../lib/api';
-import type { MasterItemWithCategory, Bag } from '../../lib/types';
+import type { MasterItemWithCategory, Bag, TripItem } from '../../lib/types';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
@@ -17,10 +17,19 @@ interface AddFromMasterListProps {
 
 export function AddFromMasterList(props: AddFromMasterListProps) {
   const [addingItems, setAddingItems] = createSignal<Set<string>>(new Set());
-  const [selectedBag, setSelectedBag] = createSignal<string | null>(props.preSelectedBagId || null);
-  const [selectedContainer, setSelectedContainer] = createSignal<string | null>(
-    props.preSelectedContainerId || null
-  );
+  const [selectedBag, setSelectedBag] = createSignal<string | null>(null);
+  const [selectedContainer, setSelectedContainer] = createSignal<string | null>(null);
+
+  // Set pre-selected values from props using createEffect for proper reactivity
+  // Wait for resources to load before setting to ensure dropdown options exist
+  createEffect(() => {
+    if (bags() && props.preSelectedBagId) {
+      setSelectedBag(props.preSelectedBagId);
+    }
+    if (tripItems() && props.preSelectedContainerId) {
+      setSelectedContainer(props.preSelectedContainerId);
+    }
+  });
 
   const [masterItems] = createResource<MasterItemWithCategory[]>(async () => {
     return fetchWithErrorHandling(

@@ -69,6 +69,14 @@ export function PackingListBagView(props: PackingListBagViewProps) {
     }
   };
 
+  // Scroll to a bag section
+  const scrollToBag = (bagId: string) => {
+    const element = document.getElementById(`bag-section-${bagId}`);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
   const itemsByBag = () => {
     const allItems = props.items() || [];
     const allBags = props.bags() || [];
@@ -149,7 +157,7 @@ export function PackingListBagView(props: PackingListBagViewProps) {
           };
           return (
             <Show when={totalItems() > 0}>
-              <div>
+              <div id={bag.id ? `bag-section-${bag.id}` : undefined}>
                 <div class="mb-3 flex items-center gap-2 md:mb-1.5">
                   <Show
                     when={bag.id !== null}
@@ -313,9 +321,13 @@ export function PackingListBagView(props: PackingListBagViewProps) {
                       </span>
                     </Show>
                     <Show when={containerBag()}>
-                      <span class="text-sm text-gray-500 md:text-xs">
+                      <button
+                        onClick={() => scrollToBag(containerBag()!.id)}
+                        class="text-sm text-blue-600 hover:text-blue-800 hover:underline md:text-xs"
+                        title="Scroll to bag"
+                      >
                         in {containerBag()!.name}
-                      </span>
+                      </button>
                     </Show>
                     {/* Add items button */}
                     <div class="relative">

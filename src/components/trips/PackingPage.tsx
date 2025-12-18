@@ -156,6 +156,7 @@ export function PackingPage(props: PackingPageProps) {
           api.patch(endpoints.tripItems(props.tripId), {
             id: itemId,
             bag_id: bagId,
+            container_item_id: null, // Clear container when assigning to bag
           })
         )
       );
@@ -166,6 +167,95 @@ export function PackingPage(props: PackingPageProps) {
       setSelectedItems(new Set<string>());
     } catch (error) {
       showToast('error', 'Failed to assign items');
+    }
+  };
+
+  const handleBatchAssignToContainer = async (containerId: string | null) => {
+    const itemsToUpdate = Array.from(selectedItems());
+    if (itemsToUpdate.length === 0) return;
+
+    // Validate: can't assign containers to other containers
+    const currentItems = items() || [];
+    const selectedItemsData = currentItems.filter((item) => selectedItems().has(item.id));
+    const hasContainers = selectedItemsData.some((item) => item.is_container);
+
+    if (hasContainers && containerId) {
+      showToast('error', 'Containers cannot be placed inside other containers');
+      return;
+    }
+
+    try {
+      await Promise.all(
+        itemsToUpdate.map((itemId) =>
+          api.patch(endpoints.tripItems(props.tripId), {
+            id: itemId,
+            container_item_id: containerId,
+            bag_id: null, // Clear bag when assigning to container
+          })
+        )
+      );
+
+      const containerName = containerId
+        ? currentItems.find((item) => item.id === containerId)?.name || 'container'
+        : 'no container';
+      showToast('success', `Assigned ${itemsToUpdate.length} items to ${containerName}`);
+      await refetch();
+      setSelectMode(false);
+      setSelectedItems(new Set<string>());
+    } catch (error) {
+      showToast('error', 'Failed to assign items to container');
+    }
+  };
+
+  const handleBatchAssignToCategory = async (categoryId: string | null) => {
+    const itemsToUpdate = Array.from(selectedItems());
+    if (itemsToUpdate.length === 0) return;
+
+    const categoryName = categoryId
+      ? categories()?.find((cat) => cat.id === categoryId)?.name || null
+      : null;
+
+    try {
+      await Promise.all(
+        itemsToUpdate.map((itemId) =>
+          api.patch(endpoints.tripItems(props.tripId), {
+            id: itemId,
+            category_name: categoryName,
+          })
+        )
+      );
+
+      showToast(
+        'success',
+        `Assigned ${itemsToUpdate.length} items to ${categoryName || 'no category'}`
+      );
+      await refetch();
+      setSelectMode(false);
+      setSelectedItems(new Set<string>());
+    } catch (error) {
+      showToast('error', 'Failed to assign items to category');
+    }
+  };
+
+  const handleBatchDelete = async () => {
+    const itemsToDelete = Array.from(selectedItems());
+    if (itemsToDelete.length === 0) return;
+
+    try {
+      await Promise.all(
+        itemsToDelete.map((itemId) =>
+          api.delete(endpoints.tripItems(props.tripId), {
+            body: JSON.stringify({ id: itemId }),
+          })
+        )
+      );
+
+      showToast('success', `Deleted ${itemsToDelete.length} items`);
+      await refetch();
+      setSelectMode(false);
+      setSelectedItems(new Set<string>());
+    } catch (error) {
+      showToast('error', 'Failed to delete items');
     }
   };
 
@@ -309,6 +399,12 @@ export function PackingPage(props: PackingPageProps) {
   const packedCount = () => items()?.filter((i) => i.is_packed).length || 0;
   const totalCount = () => items()?.length || 0;
   const progress = () => getPackingProgress(packedCount(), totalCount());
+
+  // Get available containers for select mode
+  const getContainers = () => {
+    const currentItems = items() || [];
+    return currentItems.filter((item) => item.is_container);
+  };
 
   return (
     <div class="min-h-screen bg-gray-50">
@@ -494,7 +590,12 @@ export function PackingPage(props: PackingPageProps) {
         <SelectModeActionBar
           selectedCount={() => selectedItems().size}
           bags={bags}
+          categories={categories}
+          containers={getContainers}
           onAssignToBag={handleBatchAssignToBag}
+          onAssignToContainer={handleBatchAssignToContainer}
+          onAssignToCategory={handleBatchAssignToCategory}
+          onDeleteAll={handleBatchDelete}
         />
       </Show>
 

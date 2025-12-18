@@ -25,6 +25,8 @@ export function EditTripItem(props: EditTripItemProps) {
   const [containerItemId, setContainerItemId] = createSignal<string | null>(
     props.item.container_item_id || null
   );
+  const [showDeleteConfirm, setShowDeleteConfirm] = createSignal(false);
+  const [containedItemsCount, setContainedItemsCount] = createSignal(0);
 
   const [bags] = createResource<Bag[]>(async () => {
     const response = await api.get<Bag[]>(endpoints.tripBags(props.tripId));
@@ -84,7 +86,7 @@ export function EditTripItem(props: EditTripItemProps) {
         name: newCatName,
       });
       if (createCategoryResponse.success && createCategoryResponse.data) {
-        finalCategoryId = createCategoryResponse.data.id;
+        finalCategoryId = (createCategoryResponse.data as { id: string }).id;
         finalCategoryName = newCatName;
         setCategoryId(finalCategoryId);
         await refetchCategories();
@@ -127,14 +129,60 @@ export function EditTripItem(props: EditTripItemProps) {
   };
 
   const handleDelete = async () => {
-    if (!confirm('Delete this item?')) return;
+    // If this is a container, check for contained items
+    if (props.item.is_container && props.allItems) {
+      const contained = props.allItems.filter((item) => item.container_item_id === props.item.id);
 
+      if (contained.length > 0) {
+        // Show custom confirmation dialog
+        setContainedItemsCount(contained.length);
+        setShowDeleteConfirm(true);
+        return;
+      }
+    }
+
+    // Simple delete for non-containers or empty containers
+    if (!confirm('Delete this item?')) return;
+    await performDelete(false);
+  };
+
+  const getContainerDestination = () => {
+    if (props.item.bag_id) {
+      const bag = bags()?.find((b) => b.id === props.item.bag_id);
+      return bag ? `to ${bag.name}` : 'to trip';
+    }
+    return 'to trip';
+  };
+
+  const performDelete = async (keepItems: boolean) => {
+    if (keepItems) {
+      // First, move all contained items - they inherit the container's bag
+      const contained =
+        props.allItems?.filter((item) => item.container_item_id === props.item.id) || [];
+
+      for (const item of contained) {
+        await api.patch(endpoints.tripItems(props.tripId), {
+          id: item.id,
+          container_item_id: null,
+          bag_id: props.item.bag_id || null, // Inherit bag from container
+        });
+      }
+    }
+
+    // Then delete the container
     const response = await api.delete(endpoints.tripItems(props.tripId), {
       body: JSON.stringify({ id: props.item.id }),
     });
 
     if (response.success) {
-      showToast('success', 'Item deleted');
+      const destination = getContainerDestination();
+      showToast(
+        'success',
+        keepItems
+          ? `Container deleted. ${containedItemsCount()} items moved ${destination}.`
+          : 'Item deleted'
+      );
+      setShowDeleteConfirm(false);
       props.onSaved();
       props.onClose();
     } else {
@@ -292,6 +340,42 @@ export function EditTripItem(props: EditTripItemProps) {
           </button>
         </div>
       </div>
+
+      {/* Delete confirmation dialog for containers with items */}
+      <Show when={showDeleteConfirm()}>
+        <div class="bg-opacity-50 fixed inset-0 z-50 flex items-center justify-center bg-black p-4">
+          <div class="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
+            <h3 class="mb-4 text-lg font-semibold text-gray-900">Delete Container?</h3>
+            <p class="mb-6 text-sm text-gray-600">
+              This container has {containedItemsCount()} item
+              {containedItemsCount() !== 1 ? 's' : ''} inside. What would you like to do?
+            </p>
+            <div class="flex flex-col gap-3">
+              <Button
+                onClick={() => performDelete(true)}
+                variant="primary"
+                class="w-full justify-center"
+              >
+                Keep Items (move {getContainerDestination()})
+              </Button>
+              <Button
+                onClick={() => performDelete(false)}
+                variant="secondary"
+                class="w-full justify-center bg-red-50 text-red-600 hover:bg-red-100"
+              >
+                Delete All ({containedItemsCount() + 1} items)
+              </Button>
+              <Button
+                onClick={() => setShowDeleteConfirm(false)}
+                variant="secondary"
+                class="w-full justify-center"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      </Show>
     </Modal>
   );
 }

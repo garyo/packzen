@@ -1,4 +1,4 @@
-import { createSignal, createResource, For, Show } from 'solid-js';
+import { createSignal, createResource, createEffect, For, Show } from 'solid-js';
 import { api, endpoints } from '../../lib/api';
 import type { Bag, Category, MasterItemWithCategory, TripItem } from '../../lib/types';
 import { Modal } from '../ui/Modal';
@@ -18,14 +18,23 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
   const [name, setName] = createSignal('');
   const [quantity, setQuantity] = createSignal(1);
   const [categoryId, setCategoryId] = createSignal<string | null>(null);
-  const [bagId, setBagId] = createSignal<string | null>(props.preSelectedBagId || null);
-  const [containerItemId, setContainerItemId] = createSignal<string | null>(
-    props.preSelectedContainerId || null
-  );
+  const [bagId, setBagId] = createSignal<string | null>(null);
+  const [containerItemId, setContainerItemId] = createSignal<string | null>(null);
   const [keepOpen, setKeepOpen] = createSignal(false);
   const [isNewCategory, setIsNewCategory] = createSignal(false);
   const [newCategoryName, setNewCategoryName] = createSignal('');
   const [isContainer, setIsContainer] = createSignal(false);
+
+  // Set pre-selected values from props using createEffect for proper reactivity
+  // Wait for resources to load before setting to ensure dropdown options exist
+  createEffect(() => {
+    if (bags() && props.preSelectedBagId) {
+      setBagId(props.preSelectedBagId);
+    }
+    if (tripItems() && props.preSelectedContainerId) {
+      setContainerItemId(props.preSelectedContainerId);
+    }
+  });
 
   const [bags] = createResource<Bag[]>(async () => {
     const response = await api.get<Bag[]>(endpoints.tripBags(props.tripId));
@@ -43,7 +52,7 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
     return [];
   });
 
-  const [tripItems] = createResource<TripItem[]>(async () => {
+  const [tripItems, { refetch: refetchTripItems }] = createResource<TripItem[]>(async () => {
     const response = await api.get<TripItem[]>(endpoints.tripItems(props.tripId));
     if (response.success && response.data) {
       return response.data;
@@ -78,7 +87,7 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
         name: newCatName,
       });
       if (createCategoryResponse.success && createCategoryResponse.data) {
-        finalCategoryId = createCategoryResponse.data.id;
+        finalCategoryId = (createCategoryResponse.data as { id: string }).id;
         setCategoryId(finalCategoryId);
         await refetchCategories();
         showToast('success', `Created category "${newCatName}"`);
@@ -95,7 +104,7 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
     );
 
     let masterItemId = existingMasterItem?.id;
-    let categoryName: string | undefined;
+    let categoryName: string | null | undefined;
 
     // If not in master list, add it
     if (!existingMasterItem) {
@@ -125,7 +134,7 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
       name: itemName,
       category_name: categoryName,
       quantity: quantity(),
-      bag_id: containerItemId() ? null : bagId(), // Clear bag if assigning to container
+      bag_id: bagId(), // Always use the selected bag
       master_item_id: masterItemId,
       is_container: isContainer(),
       container_item_id: containerItemId(),
@@ -133,24 +142,45 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
 
     if (response.success) {
       showToast('success', 'Item added to trip');
-      props.onSaved();
 
       if (keepOpen()) {
-        // Keep form open, reset only name field and new category fields
+        // Smart reuse logic for Add Another
+        const wasContainer = isContainer();
+        const lastBagId = bagId();
+        const lastCategoryId = categoryId();
+
+        // Reset name and new category fields (but NOT category/bag/container)
         setName('');
         setIsNewCategory(false);
         setNewCategoryName('');
-        setIsContainer(false);
-        setContainerItemId(null);
         setKeepOpen(false);
-        // Refetch categories to ensure new categories show up
-        await refetchCategories();
+        setIsContainer(false); // Always uncheck container for next item
+
+        // Call onSaved to trigger refetch (important for containers to appear in list)
+        props.onSaved();
+
+        if (wasContainer && response.data) {
+          // If we just created a container, pre-select it as the container for the next item
+          // Refetch trip items so the new container appears in the dropdown
+          await refetchTripItems();
+
+          // Wait for the UI to update with new container
+          const newContainerId = (response.data as { id: string }).id;
+          setTimeout(() => {
+            setContainerItemId(newContainerId);
+            // Category and bag should already be set from before, but restore them explicitly
+            // to ensure they're not lost during refetch
+            setCategoryId(lastCategoryId);
+            setBagId(lastBagId);
+          }, 250);
+        }
         // Focus back on name input
         setTimeout(() => {
           document.querySelector<HTMLInputElement>('input[type="text"]')?.focus();
         }, 0);
       } else {
         props.onClose();
+        props.onSaved();
       }
     } else {
       showToast('error', response.error || 'Failed to add item');
@@ -259,20 +289,23 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
           </div>
         </Show>
 
-        {/* Bag selector (only show if not inside a container) */}
-        <Show when={!containerItemId()}>
-          <div>
-            <label class="mb-1 block text-sm font-medium text-gray-700">Bag</label>
-            <select
-              value={bagId() || ''}
-              onChange={(e) => setBagId(e.target.value || null)}
-              class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">No bag</option>
-              <For each={bags()}>{(bag) => <option value={bag.id}>{bag.name}</option>}</For>
-            </select>
-          </div>
-        </Show>
+        {/* Bag selector - always visible so user can see and change */}
+        <div>
+          <label class="mb-1 block text-sm font-medium text-gray-700">Bag</label>
+          <select
+            value={bagId() || ''}
+            onChange={(e) => setBagId(e.target.value || null)}
+            class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">No bag</option>
+            <For each={bags()}>{(bag) => <option value={bag.id}>{bag.name}</option>}</For>
+          </select>
+          <Show when={containerItemId()}>
+            <p class="mt-1 text-xs text-gray-500">
+              Items in containers inherit the container's bag
+            </p>
+          </Show>
+        </div>
 
         {/* Container checkbox */}
         <div class="flex items-center gap-3">
