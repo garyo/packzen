@@ -1,11 +1,20 @@
 export const prerender = false;
 
 import type { APIRoute } from 'astro';
-import { eq } from 'drizzle-orm';
+import { eq, and, count } from 'drizzle-orm';
 import { z } from 'zod';
 import { masterItems, categories } from '../../../../db/schema';
 import { masterItemCreateSchema, validateRequestSafe } from '../../../lib/validation';
-import { createGetHandler, createPostHandler } from '../../../lib/api-helpers';
+import {
+  createGetHandler,
+  getDatabaseConnection,
+  getUserId,
+  getBillingStatus,
+  errorResponse,
+  successResponse,
+  handleApiError,
+} from '../../../lib/api-helpers';
+import { checkMasterItemLimit } from '../../../lib/resource-limits';
 
 export const GET: APIRoute = createGetHandler(async ({ db, userId }) => {
   return await db
@@ -40,12 +49,44 @@ type MasterItemWithCategory = {
   category_name: string | null;
 };
 
-export const POST: APIRoute = createPostHandler<
-  z.infer<typeof masterItemCreateSchema>,
-  MasterItemWithCategory
->(
-  async ({ db, userId, validatedData }) => {
-    const { name, description, category_id, default_quantity, is_container } = validatedData;
+export const POST: APIRoute = async (context) => {
+  try {
+    const db = getDatabaseConnection(context.locals);
+    const userId = getUserId(context.locals);
+    const billingStatus = getBillingStatus(context.locals);
+
+    // Validate request body
+    const body = await context.request.json();
+    const validation = validateRequestSafe(masterItemCreateSchema, body);
+    if (!validation.success) {
+      return errorResponse(validation.error, 400);
+    }
+
+    // Check resource limit
+    const [{ itemCount }] = await db
+      .select({ itemCount: count() })
+      .from(masterItems)
+      .where(eq(masterItems.clerk_user_id, userId));
+
+    const limitCheck = checkMasterItemLimit(itemCount, billingStatus);
+    if (!limitCheck.allowed) {
+      return errorResponse(limitCheck.message!, 403);
+    }
+
+    const { name, description, category_id, default_quantity, is_container } = validation.data;
+
+    // Verify category ownership if category_id is provided
+    if (category_id) {
+      const category = await db
+        .select()
+        .from(categories)
+        .where(and(eq(categories.id, category_id), eq(categories.clerk_user_id, userId)))
+        .get();
+
+      if (!category) {
+        return errorResponse('Category not found or does not belong to you', 400);
+      }
+    }
 
     const newItem = await db
       .insert(masterItems)
@@ -80,11 +121,11 @@ export const POST: APIRoute = createPostHandler<
       .get();
 
     if (!result) {
-      throw new Error('Failed to fetch created item');
+      return errorResponse('Failed to fetch created item', 500);
     }
 
-    return result;
-  },
-  'create master item',
-  (data) => validateRequestSafe(masterItemCreateSchema, data)
-);
+    return successResponse(result, 201);
+  } catch (error) {
+    return handleApiError(error, 'create master item');
+  }
+};

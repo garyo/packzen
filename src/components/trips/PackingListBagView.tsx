@@ -251,6 +251,11 @@ export function PackingListBagView(props: PackingListBagViewProps) {
                                 selectMode={props.selectMode()}
                                 isSelected={props.selectedItems().has(item.id)}
                                 showCategoryInfo={true}
+                                categoryIcon={
+                                  item.is_container && item.category_name
+                                    ? getCategoryIcon(item.category_name)
+                                    : undefined
+                                }
                                 onTogglePacked={() => props.onTogglePacked(item)}
                                 onEdit={() => props.onEditItem(item)}
                                 onToggleSelection={() => props.onToggleItemSelection(item.id)}
@@ -292,6 +297,8 @@ export function PackingListBagView(props: PackingListBagViewProps) {
               const contents = () => getContainerContents(container.id);
               const packedCount = () => contents().filter((item) => item.is_packed).length;
               const containerBag = () => getBagForItem(container);
+              const containerIcon = () =>
+                container.category_name ? getCategoryIcon(container.category_name) : '📦';
               // Sort contents alphabetically
               const sortedContents = () =>
                 [...contents()].sort((a, b) => a.name.localeCompare(b.name));
@@ -302,7 +309,7 @@ export function PackingListBagView(props: PackingListBagViewProps) {
                   class="mb-6 rounded-lg border border-blue-200 bg-blue-50/50 p-4 md:mb-3 md:p-2"
                 >
                   <div class="mb-3 flex items-center gap-2 md:mb-1.5">
-                    <span class="text-lg md:text-base">📦</span>
+                    <span class="text-lg md:text-base">{containerIcon()}</span>
                     <h3 class="flex-1 text-lg font-semibold text-gray-900 md:text-base">
                       {container.name}
                     </h3>

@@ -7,8 +7,12 @@ import { masterItems, categories } from '../../../../db/schema';
 import { masterItemUpdateSchema, validateRequestSafe } from '../../../lib/validation';
 import {
   createGetHandler,
-  createPatchHandler,
   createDeleteHandler,
+  getDatabaseConnection,
+  getUserId,
+  errorResponse,
+  successResponse,
+  handleApiError,
 } from '../../../lib/api-helpers';
 
 type MasterItemWithCategory = {
@@ -55,17 +59,37 @@ export const GET: APIRoute = createGetHandler(async ({ db, userId, params }) => 
   return item;
 }, 'fetch master item');
 
-export const PATCH: APIRoute = createPatchHandler<
-  z.infer<typeof masterItemUpdateSchema>,
-  MasterItemWithCategory
->(
-  async ({ db, userId, validatedData, params }) => {
-    const { id } = params;
+export const PATCH: APIRoute = async (context) => {
+  try {
+    const db = getDatabaseConnection(context.locals);
+    const userId = getUserId(context.locals);
+
+    const { id } = context.params;
     if (!id) {
-      throw new Error('Item ID is required');
+      return errorResponse('Item ID is required', 400);
     }
 
-    const { name, description, category_id, default_quantity, is_container } = validatedData;
+    // Validate request body
+    const body = await context.request.json();
+    const validation = validateRequestSafe(masterItemUpdateSchema, body);
+    if (!validation.success) {
+      return errorResponse(validation.error, 400);
+    }
+
+    const { name, description, category_id, default_quantity, is_container } = validation.data;
+
+    // Verify category ownership if category_id is being updated
+    if (category_id !== undefined && category_id !== null) {
+      const category = await db
+        .select()
+        .from(categories)
+        .where(and(eq(categories.id, category_id), eq(categories.clerk_user_id, userId)))
+        .get();
+
+      if (!category) {
+        return errorResponse('Category not found or does not belong to you', 400);
+      }
+    }
 
     // Build update object dynamically
     type MasterItemUpdate = Partial<
@@ -89,7 +113,7 @@ export const PATCH: APIRoute = createPatchHandler<
       .get();
 
     if (!updatedItem) {
-      return null;
+      return errorResponse('Item not found', 404);
     }
 
     // Fetch the item with category name
@@ -111,23 +135,47 @@ export const PATCH: APIRoute = createPatchHandler<
       .where(eq(masterItems.id, updatedItem.id))
       .get();
 
-    return result || null;
-  },
-  'update master item',
-  (data) => validateRequestSafe(masterItemUpdateSchema, data)
-);
-
-export const PUT: APIRoute = createPatchHandler<
-  z.infer<typeof masterItemUpdateSchema>,
-  MasterItemWithCategory
->(
-  async ({ db, userId, validatedData, params }) => {
-    const { id } = params;
-    if (!id) {
-      throw new Error('Item ID is required');
+    if (!result) {
+      return errorResponse('Failed to fetch updated item', 500);
     }
 
-    const { name, description, category_id, default_quantity, is_container } = validatedData;
+    return successResponse(result);
+  } catch (error) {
+    return handleApiError(error, 'update master item');
+  }
+};
+
+export const PUT: APIRoute = async (context) => {
+  try {
+    const db = getDatabaseConnection(context.locals);
+    const userId = getUserId(context.locals);
+
+    const { id } = context.params;
+    if (!id) {
+      return errorResponse('Item ID is required', 400);
+    }
+
+    // Validate request body
+    const body = await context.request.json();
+    const validation = validateRequestSafe(masterItemUpdateSchema, body);
+    if (!validation.success) {
+      return errorResponse(validation.error, 400);
+    }
+
+    const { name, description, category_id, default_quantity, is_container } = validation.data;
+
+    // Verify category ownership if category_id is provided
+    if (category_id !== undefined && category_id !== null) {
+      const category = await db
+        .select()
+        .from(categories)
+        .where(and(eq(categories.id, category_id), eq(categories.clerk_user_id, userId)))
+        .get();
+
+      if (!category) {
+        return errorResponse('Category not found or does not belong to you', 400);
+      }
+    }
 
     const updatedItem = await db
       .update(masterItems)
@@ -144,7 +192,7 @@ export const PUT: APIRoute = createPatchHandler<
       .get();
 
     if (!updatedItem) {
-      return null;
+      return errorResponse('Item not found', 404);
     }
 
     // Fetch the item with category name
@@ -166,11 +214,15 @@ export const PUT: APIRoute = createPatchHandler<
       .where(eq(masterItems.id, updatedItem.id))
       .get();
 
-    return result || null;
-  },
-  'update master item (PUT)',
-  (data) => validateRequestSafe(masterItemUpdateSchema, data)
-);
+    if (!result) {
+      return errorResponse('Failed to fetch updated item', 500);
+    }
+
+    return successResponse(result);
+  } catch (error) {
+    return handleApiError(error, 'update master item (PUT)');
+  }
+};
 
 export const DELETE: APIRoute = createDeleteHandler(async ({ db, userId, params, request }) => {
   const { id } = params;

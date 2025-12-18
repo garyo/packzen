@@ -15,6 +15,7 @@ interface PackingItemCardProps {
   bag?: Bag | null;
   showBagInfo?: boolean;
   showCategoryInfo?: boolean;
+  categoryIcon?: string; // Icon for the item's category (used for containers)
   onTogglePacked: () => void;
   onEdit: () => void;
   onToggleSelection: () => void;
@@ -51,7 +52,7 @@ export function PackingItemCard(props: PackingItemCardProps) {
         <div class="flex items-center gap-2">
           <Show when={isContainer()}>
             <span class="text-lg md:text-base" title="Container (sub-bag)">
-              📦
+              {props.categoryIcon || '📦'}
             </span>
           </Show>
           <p

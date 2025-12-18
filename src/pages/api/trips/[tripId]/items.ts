@@ -1,7 +1,7 @@
 export const prerender = false;
 
 import type { APIRoute } from 'astro';
-import { eq, and, asc } from 'drizzle-orm';
+import { eq, and, asc, count } from 'drizzle-orm';
 import { z } from 'zod';
 import { tripItems, trips, bags } from '../../../../../db/schema';
 import {
@@ -11,10 +11,16 @@ import {
 } from '../../../../lib/validation';
 import {
   createGetHandler,
-  createPostHandler,
   createPatchHandler,
   createDeleteHandler,
+  getDatabaseConnection,
+  getUserId,
+  getBillingStatus,
+  errorResponse,
+  successResponse,
+  handleApiError,
 } from '../../../../lib/api-helpers';
+import { checkTripItemLimit } from '../../../../lib/resource-limits';
 
 export const GET: APIRoute = createGetHandler(async ({ db, userId, params }) => {
   const { tripId } = params;
@@ -41,14 +47,22 @@ export const GET: APIRoute = createGetHandler(async ({ db, userId, params }) => 
     .all();
 }, 'fetch trip items');
 
-export const POST: APIRoute = createPostHandler<
-  z.infer<typeof tripItemCreateSchema>,
-  typeof tripItems.$inferSelect
->(
-  async ({ db, userId, validatedData, params }) => {
-    const { tripId } = params;
+export const POST: APIRoute = async (context) => {
+  try {
+    const db = getDatabaseConnection(context.locals);
+    const userId = getUserId(context.locals);
+    const billingStatus = getBillingStatus(context.locals);
+
+    const { tripId } = context.params;
     if (!tripId) {
-      throw new Error('Trip ID is required');
+      return errorResponse('Trip ID is required', 400);
+    }
+
+    // Validate request body
+    const body = await context.request.json();
+    const validation = validateRequestSafe(tripItemCreateSchema, body);
+    if (!validation.success) {
+      return errorResponse(validation.error, 400);
     }
 
     // Verify trip ownership
@@ -59,7 +73,18 @@ export const POST: APIRoute = createPostHandler<
       .get();
 
     if (!trip) {
-      throw new Error('Trip not found');
+      return errorResponse('Trip not found', 404);
+    }
+
+    // Check resource limit
+    const [{ itemCount }] = await db
+      .select({ itemCount: count() })
+      .from(tripItems)
+      .where(eq(tripItems.trip_id, tripId));
+
+    const limitCheck = checkTripItemLimit(itemCount, billingStatus);
+    if (!limitCheck.allowed) {
+      return errorResponse(limitCheck.message!, 403);
     }
 
     const {
@@ -70,7 +95,7 @@ export const POST: APIRoute = createPostHandler<
       master_item_id,
       container_item_id,
       is_container,
-    } = validatedData;
+    } = validation.data;
 
     // Verify bag ownership if bag_id is provided
     if (bag_id) {
@@ -81,7 +106,7 @@ export const POST: APIRoute = createPostHandler<
         .get();
 
       if (!bag) {
-        throw new Error('Bag not found or does not belong to this trip');
+        return errorResponse('Bag not found or does not belong to this trip', 400);
       }
     }
 
@@ -94,20 +119,20 @@ export const POST: APIRoute = createPostHandler<
         .get();
 
       if (!containerItem) {
-        throw new Error('Container item not found or does not belong to this trip');
+        return errorResponse('Container item not found or does not belong to this trip', 400);
       }
 
       if (!containerItem.is_container) {
-        throw new Error('Cannot add item to a non-container item');
+        return errorResponse('Cannot add item to a non-container item', 400);
       }
 
       // Containers cannot be nested inside other containers
       if (is_container) {
-        throw new Error('Containers cannot be nested inside other containers');
+        return errorResponse('Containers cannot be nested inside other containers', 400);
       }
     }
 
-    return await db
+    const newItem = await db
       .insert(tripItems)
       .values({
         trip_id: tripId,
@@ -122,10 +147,12 @@ export const POST: APIRoute = createPostHandler<
       })
       .returning()
       .get();
-  },
-  'create trip item',
-  (data) => validateRequestSafe(tripItemCreateSchema, data)
-);
+
+    return successResponse(newItem, 201);
+  } catch (error) {
+    return handleApiError(error, 'create trip item');
+  }
+};
 
 export const PATCH: APIRoute = createPatchHandler<
   z.infer<typeof tripItemUpdateSchema>,
