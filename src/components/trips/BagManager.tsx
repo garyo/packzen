@@ -1,6 +1,6 @@
 import { createSignal, createResource, For, Show } from 'solid-js';
 import { api, endpoints } from '../../lib/api';
-import type { Bag } from '../../lib/types';
+import type { Bag, BagTemplate } from '../../lib/types';
 import { BAG_TYPES } from '../../lib/types';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
@@ -45,6 +45,31 @@ export function BagManager(props: BagManagerProps) {
     }
     return [];
   });
+
+  const [bagTemplates] = createResource<BagTemplate[]>(async () => {
+    const response = await api.get<BagTemplate[]>(endpoints.bagTemplates);
+    if (response.success && response.data) {
+      return response.data;
+    }
+    return [];
+  });
+
+  const handleAddFromTemplate = async (template: BagTemplate) => {
+    const response = await api.post(endpoints.tripBags(props.tripId), {
+      name: template.name,
+      type: template.type,
+      color: template.color,
+      sort_order: bags()?.length || 0,
+    });
+
+    if (response.success) {
+      showToast('success', `Added ${template.name}`);
+      refetch();
+      props.onSaved();
+    } else {
+      showToast('error', response.error || 'Failed to add bag');
+    }
+  };
 
   const handleSubmit = async (e: Event) => {
     e.preventDefault();
@@ -288,13 +313,44 @@ export function BagManager(props: BagManagerProps) {
           </Show>
         </div>
 
+        {/* Add from Templates */}
+        <Show when={(bagTemplates()?.length || 0) > 0}>
+          <div class="border-t border-gray-200 pt-4">
+            <h3 class="mb-3 font-semibold text-gray-900">Quick Add from My Bags</h3>
+            <Show when={!bagTemplates.loading} fallback={<LoadingSpinner text="Loading..." />}>
+              <div class="grid grid-cols-2 gap-2">
+                <For each={bagTemplates()}>
+                  {(template) => (
+                    <button
+                      onClick={() => handleAddFromTemplate(template)}
+                      class="flex items-center gap-2 rounded-lg border border-gray-200 p-2 text-left hover:border-blue-500 hover:bg-blue-50"
+                    >
+                      <div
+                        class={`h-4 w-4 flex-shrink-0 rounded-full ${
+                          BAG_COLORS.find((c) => c.value === template.color)?.class || 'bg-gray-500'
+                        }`}
+                      />
+                      <div class="min-w-0 flex-1">
+                        <p class="truncate text-sm font-medium text-gray-900">{template.name}</p>
+                        <p class="truncate text-xs text-gray-500">
+                          {BAG_TYPES.find((t) => t.type === template.type)?.label || template.type}
+                        </p>
+                      </div>
+                    </button>
+                  )}
+                </For>
+              </div>
+            </Show>
+          </div>
+        </Show>
+
         {/* Add New Bag */}
         <div class="border-t border-gray-200 pt-4">
           <Show
             when={showForm()}
             fallback={
               <Button onClick={() => setShowForm(true)} variant="secondary" size="sm">
-                + Add Bag
+                + Add Custom Bag
               </Button>
             }
           >

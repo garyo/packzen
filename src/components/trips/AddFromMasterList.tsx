@@ -9,13 +9,18 @@ import { fetchWithErrorHandling } from '../../lib/resource-helpers';
 
 interface AddFromMasterListProps {
   tripId: string;
+  preSelectedBagId?: string | null;
+  preSelectedContainerId?: string | null;
   onClose: () => void;
   onAdded: () => void;
 }
 
 export function AddFromMasterList(props: AddFromMasterListProps) {
   const [addingItems, setAddingItems] = createSignal<Set<string>>(new Set());
-  const [selectedBag, setSelectedBag] = createSignal<string | null>(null);
+  const [selectedBag, setSelectedBag] = createSignal<string | null>(props.preSelectedBagId || null);
+  const [selectedContainer, setSelectedContainer] = createSignal<string | null>(
+    props.preSelectedContainerId || null
+  );
 
   const [masterItems] = createResource<MasterItemWithCategory[]>(async () => {
     return fetchWithErrorHandling(
@@ -31,6 +36,19 @@ export function AddFromMasterList(props: AddFromMasterListProps) {
     );
   });
 
+  const [tripItems] = createResource<TripItem[]>(async () => {
+    return fetchWithErrorHandling(
+      () => api.get<TripItem[]>(endpoints.tripItems(props.tripId)),
+      'Failed to load items'
+    );
+  });
+
+  // Get available containers
+  const availableContainers = () => {
+    const items = tripItems() || [];
+    return items.filter((item) => item.is_container);
+  };
+
   const handleAddItem = async (item: MasterItemWithCategory) => {
     // Optimistically mark as adding
     setAddingItems((prev) => new Set(prev).add(item.id));
@@ -40,7 +58,9 @@ export function AddFromMasterList(props: AddFromMasterListProps) {
       category_name: item.category_name,
       quantity: item.default_quantity,
       master_item_id: item.id,
-      bag_id: selectedBag() || null,
+      bag_id: selectedContainer() ? null : selectedBag() || null, // Clear bag if using container
+      container_item_id: selectedContainer() || null,
+      is_container: item.is_container || false,
     });
 
     if (response.success) {
@@ -74,20 +94,46 @@ export function AddFromMasterList(props: AddFromMasterListProps) {
 
   return (
     <Modal title="Add from All Items" onClose={props.onClose}>
-      {/* Bag Selector */}
-      <div class="mb-4">
-        <label class="mb-2 block text-sm font-medium text-gray-700">
-          Add items to bag (optional):
-        </label>
-        <select
-          value={selectedBag() || ''}
-          onChange={(e) => setSelectedBag(e.target.value || null)}
-          class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="">No bag (add to trip)</option>
-          <For each={bags()}>{(bag) => <option value={bag.id}>{bag.name}</option>}</For>
-        </select>
-      </div>
+      {/* Container Selector (if containers exist) */}
+      <Show when={availableContainers().length > 0}>
+        <div class="mb-4">
+          <label class="mb-2 block text-sm font-medium text-gray-700">
+            Add items to container (optional):
+          </label>
+          <select
+            value={selectedContainer() || ''}
+            onChange={(e) => {
+              setSelectedContainer(e.target.value || null);
+              if (e.target.value) {
+                setSelectedBag(null); // Clear bag if selecting container
+              }
+            }}
+            class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">Not in a container</option>
+            <For each={availableContainers()}>
+              {(container) => <option value={container.id}>📦 {container.name}</option>}
+            </For>
+          </select>
+        </div>
+      </Show>
+
+      {/* Bag Selector (only show if not using container) */}
+      <Show when={!selectedContainer()}>
+        <div class="mb-4">
+          <label class="mb-2 block text-sm font-medium text-gray-700">
+            Add items to bag (optional):
+          </label>
+          <select
+            value={selectedBag() || ''}
+            onChange={(e) => setSelectedBag(e.target.value || null)}
+            class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">No bag (add to trip)</option>
+            <For each={bags()}>{(bag) => <option value={bag.id}>{bag.name}</option>}</For>
+          </select>
+        </div>
+      </Show>
 
       <div class="max-h-96 space-y-4 overflow-y-auto">
         <Show when={!masterItems.loading} fallback={<LoadingSpinner text="Loading items..." />}>
@@ -111,7 +157,12 @@ export function AddFromMasterList(props: AddFromMasterListProps) {
                         return (
                           <div class="flex items-center justify-between rounded p-2 hover:bg-gray-50">
                             <div class="flex-1">
-                              <p class="font-medium text-gray-900">{item.name}</p>
+                              <p class="flex items-center gap-2 font-medium text-gray-900">
+                                <Show when={item.is_container}>
+                                  <span title="Container (sub-bag)">📦</span>
+                                </Show>
+                                {item.name}
+                              </p>
                               {item.description && (
                                 <p class="text-sm text-gray-600">{item.description}</p>
                               )}

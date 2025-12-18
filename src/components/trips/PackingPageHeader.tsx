@@ -171,7 +171,12 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
                     onClick={props.onToggleSortBy}
                     title={`Currently sorting by ${props.sortBy()}. Click to switch.`}
                   >
-                    {props.sortBy() === 'bag' ? '👜→📁' : '📁→👜'}
+                    <div class="text-center text-xs leading-tight">
+                      <div class="text-[10px] text-gray-500">Sorting:</div>
+                      <div class="font-medium">
+                        {props.sortBy() === 'bag' ? 'Bag→Category' : 'Category→Bag'}
+                      </div>
+                    </div>
                   </Button>
                   <div class="relative" ref={menuRef}>
                     <Button variant="secondary" size="sm" onClick={() => setShowMenu(!showMenu())}>

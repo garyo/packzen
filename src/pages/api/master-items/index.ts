@@ -16,6 +16,7 @@ export const GET: APIRoute = createGetHandler(async ({ db, userId }) => {
       name: masterItems.name,
       description: masterItems.description,
       default_quantity: masterItems.default_quantity,
+      is_container: masterItems.is_container,
       created_at: masterItems.created_at,
       updated_at: masterItems.updated_at,
       category_name: categories.name,
@@ -33,6 +34,7 @@ type MasterItemWithCategory = {
   name: string;
   description: string | null;
   default_quantity: number;
+  is_container: boolean;
   created_at: Date;
   updated_at: Date;
   category_name: string | null;
@@ -43,7 +45,7 @@ export const POST: APIRoute = createPostHandler<
   MasterItemWithCategory
 >(
   async ({ db, userId, validatedData }) => {
-    const { name, description, category_id, default_quantity } = validatedData;
+    const { name, description, category_id, default_quantity, is_container } = validatedData;
 
     const newItem = await db
       .insert(masterItems)
@@ -53,6 +55,7 @@ export const POST: APIRoute = createPostHandler<
         description: description || null,
         category_id: category_id || null,
         default_quantity: default_quantity || 1,
+        is_container: is_container || false,
       })
       .returning()
       .get();
@@ -66,6 +69,7 @@ export const POST: APIRoute = createPostHandler<
         name: masterItems.name,
         description: masterItems.description,
         default_quantity: masterItems.default_quantity,
+        is_container: masterItems.is_container,
         created_at: masterItems.created_at,
         updated_at: masterItems.updated_at,
         category_name: categories.name,

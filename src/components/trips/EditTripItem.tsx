@@ -9,6 +9,7 @@ import { showToast } from '../ui/Toast';
 interface EditTripItemProps {
   tripId: string;
   item: TripItem;
+  allItems?: TripItem[]; // All trip items for container selection
   onClose: () => void;
   onSaved: () => void;
 }
@@ -20,6 +21,10 @@ export function EditTripItem(props: EditTripItemProps) {
   const [categoryId, setCategoryId] = createSignal<string | null>(null);
   const [isNewCategory, setIsNewCategory] = createSignal(false);
   const [newCategoryName, setNewCategoryName] = createSignal('');
+  const [isContainer, setIsContainer] = createSignal(props.item.is_container || false);
+  const [containerItemId, setContainerItemId] = createSignal<string | null>(
+    props.item.container_item_id || null
+  );
 
   const [bags] = createResource<Bag[]>(async () => {
     const response = await api.get<Bag[]>(endpoints.tripBags(props.tripId));
@@ -36,6 +41,17 @@ export function EditTripItem(props: EditTripItemProps) {
     }
     return [];
   });
+
+  // Get available containers (containers that are not this item, and not inside this item if this is a container)
+  const availableContainers = () => {
+    const items = props.allItems || [];
+    return items.filter(
+      (item) =>
+        item.is_container &&
+        item.id !== props.item.id && // Can't put item in itself
+        item.container_item_id !== props.item.id // Can't put item in something that's inside it
+    );
+  };
 
   // Initialize bag and category after resources load
   createEffect(() => {
@@ -83,12 +99,20 @@ export function EditTripItem(props: EditTripItemProps) {
       finalCategoryName = cat?.name || '';
     }
 
+    // Validate container constraints
+    if (isContainer() && containerItemId()) {
+      showToast('error', 'A container cannot be placed inside another container');
+      return;
+    }
+
     const patchData = {
       id: props.item.id,
       name: name().trim(),
       quantity: quantity(),
-      bag_id: bagId(),
+      bag_id: containerItemId() ? null : bagId(), // If inside a container, clear bag_id
       category_name: finalCategoryName || null,
+      is_container: isContainer(),
+      container_item_id: isContainer() ? null : containerItemId(), // Containers can't be in containers
     };
 
     const response = await api.patch(endpoints.tripItems(props.tripId), patchData);
@@ -189,17 +213,64 @@ export function EditTripItem(props: EditTripItemProps) {
           </Show>
         </div>
 
-        <div>
-          <label class="mb-1 block text-sm font-medium text-gray-700">Bag</label>
-          <select
-            value={bagId() || ''}
-            onChange={(e) => setBagId(e.target.value || null)}
-            class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">No bag</option>
-            <For each={bags()}>{(bag) => <option value={bag.id}>{bag.name}</option>}</For>
-          </select>
+        {/* Container toggle */}
+        <div class="flex items-center gap-3">
+          <input
+            type="checkbox"
+            id="is-container"
+            checked={isContainer()}
+            onChange={(e) => {
+              setIsContainer(e.currentTarget.checked);
+              if (e.currentTarget.checked) {
+                setContainerItemId(null); // Containers can't be inside containers
+              }
+            }}
+            class="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
+          />
+          <label for="is-container" class="text-sm font-medium text-gray-700">
+            This is a container (sub-bag)
+          </label>
         </div>
+
+        {/* Container assignment (only show if not a container itself) */}
+        <Show when={!isContainer() && availableContainers().length > 0}>
+          <div>
+            <label class="mb-1 block text-sm font-medium text-gray-700">Inside Container</label>
+            <select
+              value={containerItemId() || ''}
+              onChange={(e) => {
+                setContainerItemId(e.target.value || null);
+                if (e.target.value) {
+                  setBagId(null); // Clear bag if assigning to container
+                }
+              }}
+              class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Not in a container</option>
+              <For each={availableContainers()}>
+                {(container) => <option value={container.id}>📦 {container.name}</option>}
+              </For>
+            </select>
+            <p class="mt-1 text-xs text-gray-500">
+              Place this item inside a container like a toilet kit
+            </p>
+          </div>
+        </Show>
+
+        {/* Bag assignment (only show if not inside a container) */}
+        <Show when={!containerItemId()}>
+          <div>
+            <label class="mb-1 block text-sm font-medium text-gray-700">Bag</label>
+            <select
+              value={bagId() || ''}
+              onChange={(e) => setBagId(e.target.value || null)}
+              class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">No bag</option>
+              <For each={bags()}>{(bag) => <option value={bag.id}>{bag.name}</option>}</For>
+            </select>
+          </div>
+        </Show>
 
         <div class="flex gap-2 pt-4">
           <Button onClick={handleSave} class="flex-1">

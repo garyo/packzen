@@ -18,6 +18,7 @@ export function ItemForm(props: ItemFormProps) {
   const [description, setDescription] = createSignal(props.item?.description || '');
   const [categoryId, setCategoryId] = createSignal(props.item?.category_id || '');
   const [quantity, setQuantity] = createSignal(props.item?.default_quantity || 1);
+  const [isContainer, setIsContainer] = createSignal(props.item?.is_container || false);
   const [saving, setSaving] = createSignal(false);
 
   const handleSubmit = async (e: Event) => {
@@ -35,6 +36,7 @@ export function ItemForm(props: ItemFormProps) {
       description: description().trim() || null,
       category_id: categoryId() || null,
       default_quantity: quantity(),
+      is_container: isContainer(),
     };
 
     const response = props.item
@@ -97,6 +99,20 @@ export function ItemForm(props: ItemFormProps) {
           value={quantity()}
           onInput={(e) => setQuantity(parseInt(e.currentTarget.value) || 1)}
         />
+
+        {/* Container checkbox */}
+        <div class="flex items-center gap-3">
+          <input
+            type="checkbox"
+            id="is-container-master"
+            checked={isContainer()}
+            onChange={(e) => setIsContainer(e.currentTarget.checked)}
+            class="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
+          />
+          <label for="is-container-master" class="text-sm font-medium text-gray-700">
+            This is a container (sub-bag like a toilet kit)
+          </label>
+        </div>
 
         <div class="flex justify-end gap-2 pt-4">
           <Button type="button" variant="secondary" onClick={props.onClose}>

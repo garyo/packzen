@@ -60,9 +60,19 @@ export function TripsPage() {
   };
 
   const upcomingTrips = () =>
-    trips()?.filter(
-      (t) => !t.start_date || getTripStatus(t.start_date, t.end_date || t.start_date) === 'upcoming'
-    ) || [];
+    trips()
+      ?.filter(
+        (t) =>
+          !t.start_date || getTripStatus(t.start_date, t.end_date || t.start_date) === 'upcoming'
+      )
+      .sort((a, b) => {
+        // Trips without dates go to the end
+        if (!a.start_date && !b.start_date) return 0;
+        if (!a.start_date) return 1;
+        if (!b.start_date) return -1;
+        // Sort by date ascending (soonest first)
+        return new Date(a.start_date).getTime() - new Date(b.start_date).getTime();
+      }) || [];
   const activeTrips = () =>
     trips()?.filter(
       (t) => t.start_date && getTripStatus(t.start_date, t.end_date || t.start_date) === 'active'

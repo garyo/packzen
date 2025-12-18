@@ -23,6 +23,8 @@ export interface TripExport {
     bag_name: string | null;
     is_packed: boolean;
     notes: string | null;
+    is_container?: boolean;
+    container_name?: string | null; // Name of parent container for items inside containers
   }>;
 }
 
@@ -39,6 +41,7 @@ export interface FullBackup {
     description: string | null;
     category_name: string | null;
     default_quantity: number;
+    is_container?: boolean;
   }>;
   bagTemplates: Array<{
     name: string;
@@ -65,6 +68,8 @@ export interface FullBackup {
       bag_name: string | null;
       is_packed: boolean;
       notes: string | null;
+      is_container?: boolean;
+      container_name?: string | null;
     }>;
   }>;
 }
@@ -89,6 +94,9 @@ export function tripToYAML(trip: Trip, bags: Bag[], items: TripItem[]): string {
     })),
     items: items.map((item) => {
       const bag = bags.find((b) => b.id === item.bag_id);
+      const container = item.container_item_id
+        ? items.find((i) => i.id === item.container_item_id)
+        : null;
       return {
         name: item.name,
         category_name: item.category_name,
@@ -96,6 +104,8 @@ export function tripToYAML(trip: Trip, bags: Bag[], items: TripItem[]): string {
         bag_name: bag?.name || null,
         is_packed: item.is_packed,
         notes: item.notes,
+        is_container: item.is_container || undefined,
+        container_name: container?.name || undefined,
       };
     }),
   };
@@ -145,6 +155,8 @@ export function yamlToTrip(yamlString: string): TripExport {
         bag_name: item.bag_name || null,
         is_packed: item.is_packed,
         notes: item.notes || null,
+        is_container: item.is_container || undefined,
+        container_name: item.container_name || undefined,
       })),
     };
   } catch (error) {
@@ -180,6 +192,7 @@ export function fullBackupToYAML(
       description: item.description,
       category_name: item.category_name || null,
       default_quantity: item.default_quantity,
+      is_container: item.is_container || undefined,
     })),
     bagTemplates: bagTemplates.map((template) => ({
       name: template.name,
@@ -201,6 +214,9 @@ export function fullBackupToYAML(
       })),
       items: items.map((item) => {
         const bag = bags.find((b) => b.id === item.bag_id);
+        const container = item.container_item_id
+          ? items.find((i) => i.id === item.container_item_id)
+          : null;
         return {
           name: item.name,
           category_name: item.category_name,
@@ -208,6 +224,8 @@ export function fullBackupToYAML(
           bag_name: bag?.name || null,
           is_packed: item.is_packed,
           notes: item.notes,
+          is_container: item.is_container || undefined,
+          container_name: container?.name || undefined,
         };
       }),
     })),
@@ -250,6 +268,7 @@ export function yamlToFullBackup(yamlString: string): FullBackup {
         description: item.description || null,
         category_name: item.category_name || null,
         default_quantity: item.default_quantity,
+        is_container: item.is_container || undefined,
       })),
       bagTemplates: validation.data.bagTemplates.map((template) => ({
         name: template.name,
@@ -276,6 +295,8 @@ export function yamlToFullBackup(yamlString: string): FullBackup {
           bag_name: item.bag_name || null,
           is_packed: item.is_packed,
           notes: item.notes || null,
+          is_container: item.is_container || undefined,
+          container_name: item.container_name || undefined,
         })),
       })),
     };

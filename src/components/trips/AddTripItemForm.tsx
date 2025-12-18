@@ -1,6 +1,6 @@
 import { createSignal, createResource, For, Show } from 'solid-js';
 import { api, endpoints } from '../../lib/api';
-import type { Bag, Category, MasterItemWithCategory } from '../../lib/types';
+import type { Bag, Category, MasterItemWithCategory, TripItem } from '../../lib/types';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
@@ -8,6 +8,8 @@ import { showToast } from '../ui/Toast';
 
 interface AddTripItemFormProps {
   tripId: string;
+  preSelectedBagId?: string | null;
+  preSelectedContainerId?: string | null;
   onClose: () => void;
   onSaved: () => void;
 }
@@ -16,10 +18,14 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
   const [name, setName] = createSignal('');
   const [quantity, setQuantity] = createSignal(1);
   const [categoryId, setCategoryId] = createSignal<string | null>(null);
-  const [bagId, setBagId] = createSignal<string | null>(null);
+  const [bagId, setBagId] = createSignal<string | null>(props.preSelectedBagId || null);
+  const [containerItemId, setContainerItemId] = createSignal<string | null>(
+    props.preSelectedContainerId || null
+  );
   const [keepOpen, setKeepOpen] = createSignal(false);
   const [isNewCategory, setIsNewCategory] = createSignal(false);
   const [newCategoryName, setNewCategoryName] = createSignal('');
+  const [isContainer, setIsContainer] = createSignal(false);
 
   const [bags] = createResource<Bag[]>(async () => {
     const response = await api.get<Bag[]>(endpoints.tripBags(props.tripId));
@@ -36,6 +42,20 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
     }
     return [];
   });
+
+  const [tripItems] = createResource<TripItem[]>(async () => {
+    const response = await api.get<TripItem[]>(endpoints.tripItems(props.tripId));
+    if (response.success && response.data) {
+      return response.data;
+    }
+    return [];
+  });
+
+  // Get available containers
+  const availableContainers = () => {
+    const items = tripItems() || [];
+    return items.filter((item) => item.is_container);
+  };
 
   const handleSubmit = async (e: Event) => {
     e.preventDefault();
@@ -83,6 +103,7 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
         name: itemName,
         category_id: finalCategoryId,
         default_quantity: quantity(),
+        is_container: isContainer(),
       });
       if (createMasterResponse.success && createMasterResponse.data) {
         masterItemId = createMasterResponse.data.id;
@@ -93,13 +114,21 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
       categoryName = existingMasterItem.category_name;
     }
 
+    // Validate: containers cannot be inside other containers
+    if (isContainer() && containerItemId()) {
+      showToast('error', 'Containers cannot be placed inside other containers');
+      return;
+    }
+
     // Add to trip
     const response = await api.post(endpoints.tripItems(props.tripId), {
       name: itemName,
       category_name: categoryName,
       quantity: quantity(),
-      bag_id: bagId(),
+      bag_id: containerItemId() ? null : bagId(), // Clear bag if assigning to container
       master_item_id: masterItemId,
+      is_container: isContainer(),
+      container_item_id: containerItemId(),
     });
 
     if (response.success) {
@@ -111,6 +140,8 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
         setName('');
         setIsNewCategory(false);
         setNewCategoryName('');
+        setIsContainer(false);
+        setContainerItemId(null);
         setKeepOpen(false);
         // Refetch categories to ensure new categories show up
         await refetchCategories();
@@ -203,16 +234,63 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
           />
         </div>
 
-        <div>
-          <label class="mb-1 block text-sm font-medium text-gray-700">Bag</label>
-          <select
-            value={bagId() || ''}
-            onChange={(e) => setBagId(e.target.value || null)}
-            class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">No bag</option>
-            <For each={bags()}>{(bag) => <option value={bag.id}>{bag.name}</option>}</For>
-          </select>
+        {/* Container assignment (only show if not a container itself and there are containers) */}
+        <Show when={!isContainer() && availableContainers().length > 0}>
+          <div>
+            <label class="mb-1 block text-sm font-medium text-gray-700">Inside Container</label>
+            <select
+              value={containerItemId() || ''}
+              onChange={(e) => {
+                setContainerItemId(e.target.value || null);
+                if (e.target.value) {
+                  setBagId(null); // Clear bag if assigning to container
+                }
+              }}
+              class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Not in a container</option>
+              <For each={availableContainers()}>
+                {(container) => <option value={container.id}>📦 {container.name}</option>}
+              </For>
+            </select>
+            <p class="mt-1 text-xs text-gray-500">
+              Place this item inside a container like a toilet kit
+            </p>
+          </div>
+        </Show>
+
+        {/* Bag selector (only show if not inside a container) */}
+        <Show when={!containerItemId()}>
+          <div>
+            <label class="mb-1 block text-sm font-medium text-gray-700">Bag</label>
+            <select
+              value={bagId() || ''}
+              onChange={(e) => setBagId(e.target.value || null)}
+              class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">No bag</option>
+              <For each={bags()}>{(bag) => <option value={bag.id}>{bag.name}</option>}</For>
+            </select>
+          </div>
+        </Show>
+
+        {/* Container checkbox */}
+        <div class="flex items-center gap-3">
+          <input
+            type="checkbox"
+            id="is-container-add"
+            checked={isContainer()}
+            onChange={(e) => {
+              setIsContainer(e.currentTarget.checked);
+              if (e.currentTarget.checked) {
+                setContainerItemId(null); // Containers can't be inside containers
+              }
+            }}
+            class="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
+          />
+          <label for="is-container-add" class="text-sm font-medium text-gray-700">
+            This is a container (sub-bag like a toilet kit)
+          </label>
         </div>
 
         <div class="flex flex-col gap-2 pt-4">

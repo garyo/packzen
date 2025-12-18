@@ -25,6 +25,7 @@ export const masterItems = sqliteTable('master_items', {
   name: text('name').notNull(),
   description: text('description'),
   default_quantity: integer('default_quantity').notNull().default(1),
+  is_container: integer('is_container', { mode: 'boolean' }).notNull().default(false),
   created_at: integer('created_at', { mode: 'timestamp' })
     .notNull()
     .$defaultFn(() => new Date()),
@@ -99,6 +100,9 @@ export const tripItems = sqliteTable('trip_items', {
   master_item_id: text('master_item_id').references(() => masterItems.id, {
     onDelete: 'set null',
   }),
+  // Container support: items can be containers (sub-bags) that hold other items
+  container_item_id: text('container_item_id'), // Self-reference to parent container item
+  is_container: integer('is_container', { mode: 'boolean' }).notNull().default(false),
   name: text('name').notNull(), // Denormalized for flexibility
   category_name: text('category_name'), // Denormalized
   quantity: integer('quantity').notNull().default(1),

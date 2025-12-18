@@ -62,7 +62,15 @@ export const POST: APIRoute = createPostHandler<
       throw new Error('Trip not found');
     }
 
-    const { name, category_name, quantity, bag_id, master_item_id } = validatedData;
+    const {
+      name,
+      category_name,
+      quantity,
+      bag_id,
+      master_item_id,
+      container_item_id,
+      is_container,
+    } = validatedData;
 
     // Verify bag ownership if bag_id is provided
     if (bag_id) {
@@ -77,6 +85,28 @@ export const POST: APIRoute = createPostHandler<
       }
     }
 
+    // Validate container assignment if container_item_id is provided
+    if (container_item_id) {
+      const containerItem = await db
+        .select()
+        .from(tripItems)
+        .where(and(eq(tripItems.id, container_item_id), eq(tripItems.trip_id, tripId)))
+        .get();
+
+      if (!containerItem) {
+        throw new Error('Container item not found or does not belong to this trip');
+      }
+
+      if (!containerItem.is_container) {
+        throw new Error('Cannot add item to a non-container item');
+      }
+
+      // Containers cannot be nested inside other containers
+      if (is_container) {
+        throw new Error('Containers cannot be nested inside other containers');
+      }
+    }
+
     return await db
       .insert(tripItems)
       .values({
@@ -86,6 +116,8 @@ export const POST: APIRoute = createPostHandler<
         quantity: quantity || 1,
         bag_id: bag_id || null,
         master_item_id: master_item_id || null,
+        container_item_id: container_item_id || null,
+        is_container: is_container || false,
         is_packed: false,
       })
       .returning()
@@ -116,7 +148,16 @@ export const PATCH: APIRoute = createPatchHandler<
       throw new Error('Trip not found');
     }
 
-    const { id, is_packed, quantity, bag_id, category_name, name } = validatedData;
+    const {
+      id,
+      is_packed,
+      quantity,
+      bag_id,
+      category_name,
+      name,
+      container_item_id,
+      is_container,
+    } = validatedData;
 
     // Verify bag ownership if bag_id is being updated
     if (bag_id !== undefined && bag_id !== null) {
@@ -131,11 +172,64 @@ export const PATCH: APIRoute = createPatchHandler<
       }
     }
 
+    // Validate container assignment if container_item_id is being updated
+    if (container_item_id !== undefined && container_item_id !== null) {
+      // Can't assign item to itself
+      if (container_item_id === id) {
+        throw new Error('Item cannot be placed inside itself');
+      }
+
+      const containerItem = await db
+        .select()
+        .from(tripItems)
+        .where(and(eq(tripItems.id, container_item_id), eq(tripItems.trip_id, tripId)))
+        .get();
+
+      if (!containerItem) {
+        throw new Error('Container item not found or does not belong to this trip');
+      }
+
+      if (!containerItem.is_container) {
+        throw new Error('Cannot add item to a non-container item');
+      }
+
+      // Get current item to check if it's a container
+      const currentItem = await db
+        .select()
+        .from(tripItems)
+        .where(and(eq(tripItems.id, id), eq(tripItems.trip_id, tripId)))
+        .get();
+
+      // Containers cannot be nested inside other containers
+      if (currentItem?.is_container || is_container) {
+        throw new Error('Containers cannot be nested inside other containers');
+      }
+    }
+
+    // If turning item into a container, ensure it's not inside another container
+    if (is_container === true) {
+      const currentItem = await db
+        .select()
+        .from(tripItems)
+        .where(and(eq(tripItems.id, id), eq(tripItems.trip_id, tripId)))
+        .get();
+
+      if (currentItem?.container_item_id && container_item_id !== null) {
+        throw new Error('Cannot make an item a container while it is inside another container');
+      }
+    }
+
     // Build update object dynamically
     type TripItemUpdate = Partial<
       Pick<
         typeof tripItems.$inferSelect,
-        'name' | 'category_name' | 'quantity' | 'bag_id' | 'is_packed'
+        | 'name'
+        | 'category_name'
+        | 'quantity'
+        | 'bag_id'
+        | 'is_packed'
+        | 'container_item_id'
+        | 'is_container'
       >
     >;
     const updates: TripItemUpdate & { updated_at: Date } = { updated_at: new Date() };
@@ -144,6 +238,8 @@ export const PATCH: APIRoute = createPatchHandler<
     if (bag_id !== undefined) updates.bag_id = bag_id;
     if (category_name !== undefined) updates.category_name = category_name;
     if (name !== undefined) updates.name = name;
+    if (container_item_id !== undefined) updates.container_item_id = container_item_id;
+    if (is_container !== undefined) updates.is_container = is_container;
 
     return await db
       .update(tripItems)

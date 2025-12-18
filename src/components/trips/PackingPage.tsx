@@ -36,6 +36,10 @@ export function PackingPage(props: PackingPageProps) {
   const [showBuiltInItems, setShowBuiltInItems] = createSignal(false);
   const [sortBy, setSortBy] = createSignal<'bag' | 'category'>('bag');
 
+  // Pre-selection for add modals
+  const [preSelectedBagId, setPreSelectedBagId] = createSignal<string | null>(null);
+  const [preSelectedContainerId, setPreSelectedContainerId] = createSignal<string | null>(null);
+
   const [items, { mutate, refetch }] = createResource<TripItem[]>(async () => {
     return fetchWithErrorHandling(
       () => api.get<TripItem[]>(endpoints.tripItems(props.tripId)),
@@ -85,6 +89,44 @@ export function PackingPage(props: PackingPageProps) {
 
   const handleAddItem = () => {
     setShowAddForm(true);
+  };
+
+  // Open add modals with pre-selected bag or container
+  const openAddForm = (bagId?: string, containerId?: string) => {
+    setPreSelectedBagId(bagId || null);
+    setPreSelectedContainerId(containerId || null);
+    setShowAddForm(true);
+  };
+
+  const openAddFromMaster = (bagId?: string, containerId?: string) => {
+    setPreSelectedBagId(bagId || null);
+    setPreSelectedContainerId(containerId || null);
+    setShowAddFromMaster(true);
+  };
+
+  const openBrowseTemplates = (bagId?: string, containerId?: string) => {
+    setPreSelectedBagId(bagId || null);
+    setPreSelectedContainerId(containerId || null);
+    setShowBuiltInItems(true);
+  };
+
+  // Clear pre-selection when closing modals
+  const closeAddForm = () => {
+    setShowAddForm(false);
+    setPreSelectedBagId(null);
+    setPreSelectedContainerId(null);
+  };
+
+  const closeAddFromMaster = () => {
+    setShowAddFromMaster(false);
+    setPreSelectedBagId(null);
+    setPreSelectedContainerId(null);
+  };
+
+  const closeBrowseTemplates = () => {
+    setShowBuiltInItems(false);
+    setPreSelectedBagId(null);
+    setPreSelectedContainerId(null);
   };
 
   const toggleSelectMode = () => {
@@ -313,10 +355,13 @@ export function PackingPage(props: PackingPageProps) {
                   title="No items yet"
                   description="Add items to your packing list to get started"
                   action={
-                    <div class="flex gap-2">
-                      <Button onClick={() => setShowAddFromMaster(true)}>Add from All Items</Button>
-                      <Button variant="secondary" onClick={handleAddItem}>
-                        Add Manually
+                    <div class="flex flex-wrap gap-2">
+                      <Button onClick={() => openAddFromMaster()}>Add from All Items</Button>
+                      <Button variant="secondary" onClick={() => openBrowseTemplates()}>
+                        Add from Templates
+                      </Button>
+                      <Button variant="secondary" onClick={() => openAddForm()}>
+                        Add New Item
                       </Button>
                     </div>
                   }
@@ -347,12 +392,28 @@ export function PackingPage(props: PackingPageProps) {
                   onTogglePacked={handleTogglePacked}
                   onEditItem={setEditingItem}
                   onToggleItemSelection={toggleItemSelection}
+                  onAddToBag={(bagId) => openAddForm(bagId)}
+                  onAddToContainer={(containerId) => openAddForm(undefined, containerId)}
+                  onAddFromMasterToBag={(bagId) => openAddFromMaster(bagId)}
+                  onAddFromMasterToContainer={(containerId) =>
+                    openAddFromMaster(undefined, containerId)
+                  }
+                  onBrowseTemplatesToBag={(bagId) => openBrowseTemplates(bagId)}
+                  onBrowseTemplatesToContainer={(containerId) =>
+                    openBrowseTemplates(undefined, containerId)
+                  }
                 />
               </Show>
 
-              {/* Add More Items Button */}
-              <div class="mt-6 flex justify-center">
-                <Button onClick={() => setShowAddFromMaster(true)}>Add More from All Items</Button>
+              {/* Add More Items Buttons */}
+              <div class="mt-6 flex flex-wrap justify-center gap-2">
+                <Button onClick={() => openAddFromMaster()}>Add from All Items</Button>
+                <Button variant="secondary" onClick={() => openBrowseTemplates()}>
+                  Add from Templates
+                </Button>
+                <Button variant="secondary" onClick={() => openAddForm()}>
+                  Add New Item
+                </Button>
               </div>
             </Show>
           </Show>
@@ -363,7 +424,9 @@ export function PackingPage(props: PackingPageProps) {
       <Show when={showAddForm()}>
         <AddTripItemForm
           tripId={props.tripId}
-          onClose={() => setShowAddForm(false)}
+          preSelectedBagId={preSelectedBagId()}
+          preSelectedContainerId={preSelectedContainerId()}
+          onClose={closeAddForm}
           onSaved={() => refetch()}
         />
       </Show>
@@ -373,6 +436,7 @@ export function PackingPage(props: PackingPageProps) {
         <EditTripItem
           tripId={props.tripId}
           item={editingItem()!}
+          allItems={items()}
           onClose={() => setEditingItem(null)}
           onSaved={() => {
             refetch();
@@ -397,7 +461,9 @@ export function PackingPage(props: PackingPageProps) {
       <Show when={showAddFromMaster()}>
         <AddFromMasterList
           tripId={props.tripId}
-          onClose={() => setShowAddFromMaster(false)}
+          preSelectedBagId={preSelectedBagId()}
+          preSelectedContainerId={preSelectedContainerId()}
+          onClose={closeAddFromMaster}
           onAdded={() => refetch()}
         />
       </Show>
@@ -418,7 +484,7 @@ export function PackingPage(props: PackingPageProps) {
       <Show when={showBuiltInItems()}>
         <BuiltInItemsBrowser
           tripId={props.tripId}
-          onClose={() => setShowBuiltInItems(false)}
+          onClose={closeBrowseTemplates}
           onAddToTrip={handleAddBuiltInItemsToTrip}
         />
       </Show>

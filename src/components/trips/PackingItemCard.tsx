@@ -18,12 +18,22 @@ interface PackingItemCardProps {
   onTogglePacked: () => void;
   onEdit: () => void;
   onToggleSelection: () => void;
+  // Container-specific props
+  containerContentsCount?: number; // Number of items inside (if this is a container)
+  containerPackedCount?: number; // Number of packed items inside (if this is a container)
+  onContainerClick?: () => void; // Click handler for navigating to container section
 }
 
 export function PackingItemCard(props: PackingItemCardProps) {
+  const isContainer = () => props.item.is_container;
+  const hasContents = () =>
+    isContainer() && props.containerContentsCount !== undefined && props.containerContentsCount > 0;
+
   return (
     <div
-      class={`flex items-center gap-4 rounded-lg bg-white p-4 shadow-sm md:gap-2 md:p-2 ${props.item.is_packed ? 'opacity-60' : ''} ${props.selectMode && props.isSelected ? 'ring-2 ring-blue-500' : ''} `}
+      class={`flex items-center gap-4 rounded-lg p-4 shadow-sm md:gap-2 md:p-2 ${
+        isContainer() ? 'border border-blue-200 bg-blue-50' : 'bg-white'
+      } ${props.item.is_packed ? 'opacity-60' : ''} ${props.selectMode && props.isSelected ? 'ring-2 ring-blue-500' : ''} `}
     >
       <Show when={!props.selectMode}>
         <input
@@ -31,20 +41,45 @@ export function PackingItemCard(props: PackingItemCardProps) {
           checked={props.item.is_packed}
           onChange={props.onTogglePacked}
           class="h-8 w-8 cursor-pointer rounded border-2 border-gray-300 text-green-600 focus:ring-2 focus:ring-green-500 md:h-6 md:w-6"
+          title={isContainer() ? 'Mark container as packed (in bag)' : 'Mark item as packed'}
         />
       </Show>
-      <div class="flex-1">
-        <p
-          class={`text-lg font-medium md:text-base ${props.item.is_packed ? 'text-gray-500 line-through' : 'text-gray-900'}`}
-        >
-          {props.item.name}
-        </p>
+      <div
+        class={`flex-1 ${hasContents() && props.onContainerClick ? 'cursor-pointer' : ''}`}
+        onClick={() => hasContents() && props.onContainerClick?.()}
+      >
+        <div class="flex items-center gap-2">
+          <Show when={isContainer()}>
+            <span class="text-lg md:text-base" title="Container (sub-bag)">
+              📦
+            </span>
+          </Show>
+          <p
+            class={`text-lg font-medium md:text-base ${props.item.is_packed ? 'text-gray-500 line-through' : 'text-gray-900'}`}
+          >
+            {props.item.name}
+          </p>
+          <Show when={hasContents()}>
+            <span
+              class={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                props.containerPackedCount === props.containerContentsCount
+                  ? 'bg-green-100 text-green-700'
+                  : 'bg-blue-100 text-blue-700'
+              }`}
+            >
+              {props.containerPackedCount}/{props.containerContentsCount}
+            </span>
+          </Show>
+        </div>
         <div class="mt-1 flex gap-3 text-sm text-gray-500 md:mt-0.5 md:gap-2 md:text-xs">
           {props.showBagInfo && props.bag && <span>👜 {props.bag.name}</span>}
           {props.showCategoryInfo && props.item.category_name && (
             <span>📁 {props.item.category_name}</span>
           )}
           {props.item.quantity > 1 && <span>×{props.item.quantity}</span>}
+          <Show when={hasContents() && props.onContainerClick}>
+            <span class="text-blue-600">tap to view contents →</span>
+          </Show>
         </div>
       </div>
       <Show

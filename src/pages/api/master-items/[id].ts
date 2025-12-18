@@ -18,6 +18,7 @@ type MasterItemWithCategory = {
   name: string;
   description: string | null;
   default_quantity: number;
+  is_container: boolean;
   created_at: Date;
   updated_at: Date;
   category_name: string | null;
@@ -37,6 +38,7 @@ export const GET: APIRoute = createGetHandler(async ({ db, userId, params }) => 
       name: masterItems.name,
       description: masterItems.description,
       default_quantity: masterItems.default_quantity,
+      is_container: masterItems.is_container,
       created_at: masterItems.created_at,
       updated_at: masterItems.updated_at,
       category_name: categories.name,
@@ -63,13 +65,13 @@ export const PATCH: APIRoute = createPatchHandler<
       throw new Error('Item ID is required');
     }
 
-    const { name, description, category_id, default_quantity } = validatedData;
+    const { name, description, category_id, default_quantity, is_container } = validatedData;
 
     // Build update object dynamically
     type MasterItemUpdate = Partial<
       Pick<
         typeof masterItems.$inferSelect,
-        'name' | 'description' | 'category_id' | 'default_quantity'
+        'name' | 'description' | 'category_id' | 'default_quantity' | 'is_container'
       >
     >;
     const updates: MasterItemUpdate & { updated_at: Date } = { updated_at: new Date() };
@@ -77,6 +79,7 @@ export const PATCH: APIRoute = createPatchHandler<
     if (description !== undefined) updates.description = description;
     if (category_id !== undefined) updates.category_id = category_id;
     if (default_quantity !== undefined) updates.default_quantity = default_quantity;
+    if (is_container !== undefined) updates.is_container = is_container;
 
     const updatedItem = await db
       .update(masterItems)
@@ -98,6 +101,7 @@ export const PATCH: APIRoute = createPatchHandler<
         name: masterItems.name,
         description: masterItems.description,
         default_quantity: masterItems.default_quantity,
+        is_container: masterItems.is_container,
         created_at: masterItems.created_at,
         updated_at: masterItems.updated_at,
         category_name: categories.name,
@@ -123,7 +127,7 @@ export const PUT: APIRoute = createPatchHandler<
       throw new Error('Item ID is required');
     }
 
-    const { name, description, category_id, default_quantity } = validatedData;
+    const { name, description, category_id, default_quantity, is_container } = validatedData;
 
     const updatedItem = await db
       .update(masterItems)
@@ -132,6 +136,7 @@ export const PUT: APIRoute = createPatchHandler<
         description,
         category_id,
         default_quantity,
+        is_container,
         updated_at: new Date(),
       })
       .where(and(eq(masterItems.id, id), eq(masterItems.clerk_user_id, userId)))
@@ -151,6 +156,7 @@ export const PUT: APIRoute = createPatchHandler<
         name: masterItems.name,
         description: masterItems.description,
         default_quantity: masterItems.default_quantity,
+        is_container: masterItems.is_container,
         created_at: masterItems.created_at,
         updated_at: masterItems.updated_at,
         category_name: categories.name,

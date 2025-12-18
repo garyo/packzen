@@ -90,6 +90,7 @@ export const masterItemCreateSchema = z.object({
   description: sanitizeString(MAX_DESCRIPTION_LENGTH).nullable().optional(),
   category_id: z.string().uuid().nullable().optional(),
   default_quantity: z.number().int().min(MIN_QUANTITY).max(MAX_QUANTITY).default(1),
+  is_container: z.boolean().default(false),
 });
 
 export const masterItemUpdateSchema = z.object({
@@ -97,6 +98,7 @@ export const masterItemUpdateSchema = z.object({
   description: sanitizeString(MAX_DESCRIPTION_LENGTH).nullable().optional(),
   category_id: z.string().uuid().nullable().optional(),
   default_quantity: z.number().int().min(MIN_QUANTITY).max(MAX_QUANTITY).optional(),
+  is_container: z.boolean().optional(),
 });
 
 // Trip schemas
@@ -153,6 +155,8 @@ export const tripItemCreateSchema = z.object({
   quantity: z.number().int().min(MIN_QUANTITY).max(MAX_QUANTITY).default(1),
   bag_id: z.string().uuid().nullable().optional(),
   master_item_id: z.string().uuid().nullable().optional(),
+  container_item_id: z.string().uuid().nullable().optional(),
+  is_container: z.boolean().default(false),
 });
 
 export const tripItemUpdateSchema = z.object({
@@ -162,6 +166,8 @@ export const tripItemUpdateSchema = z.object({
   quantity: z.number().int().min(MIN_QUANTITY).max(MAX_QUANTITY).optional(),
   bag_id: z.string().uuid().nullable().optional(),
   is_packed: z.boolean().optional(),
+  container_item_id: z.string().uuid().nullable().optional(),
+  is_container: z.boolean().optional(),
 });
 
 // Validation helper types
@@ -221,6 +227,8 @@ const yamlTripItemSchema = z.object({
   bag_name: sanitizeString(MAX_NAME_LENGTH).nullable().optional(),
   is_packed: z.boolean().default(false),
   notes: sanitizeString(MAX_NOTES_LENGTH).nullable().optional(),
+  is_container: z.boolean().default(false),
+  container_name: sanitizeString(MAX_NAME_LENGTH).nullable().optional(), // Name of parent container for YAML import
 });
 
 export const yamlTripExportSchema = z.object({
@@ -246,6 +254,7 @@ const yamlMasterItemSchema = z.object({
   description: sanitizeString(MAX_DESCRIPTION_LENGTH).nullable().optional(),
   category_name: sanitizeString(MAX_NAME_LENGTH).nullable().optional(),
   default_quantity: z.number().int().min(MIN_QUANTITY).max(MAX_QUANTITY).default(1),
+  is_container: z.boolean().default(false),
 });
 
 const yamlBagTemplateSchema = z.object({
