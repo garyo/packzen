@@ -540,12 +540,12 @@ export function PackingPage(props: PackingPageProps) {
             <div class="mt-6 flex flex-col items-center gap-3">
               <Button onClick={() => setShowBagManager(true)}>Add Bags</Button>
               <div class="flex flex-wrap justify-center gap-2">
-                <Button onClick={() => openAddFromMaster()}>Add from All Items</Button>
+                <Button onClick={() => openAddForm()}>Add Items</Button>
+                <Button variant="secondary" onClick={() => openAddFromMaster()}>
+                  Add from All Items
+                </Button>
                 <Button variant="secondary" onClick={() => openBrowseTemplates()}>
                   Add from Templates
-                </Button>
-                <Button variant="secondary" onClick={() => openAddForm()}>
-                  Add New Item
                 </Button>
               </div>
             </div>

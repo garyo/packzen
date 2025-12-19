@@ -134,6 +134,15 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
                       <div class="absolute top-full left-0 z-20 mt-1 w-56 rounded-lg border border-gray-200 bg-white shadow-lg">
                         <button
                           onClick={() => {
+                            props.onAddItem();
+                            setShowAddMenu(false);
+                          }}
+                          class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
+                        >
+                          ✏️ Add Items
+                        </button>
+                        <button
+                          onClick={() => {
                             props.onAddFromMaster();
                             setShowAddMenu(false);
                           }}
@@ -149,15 +158,6 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
                           class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
                         >
                           📚 Browse Templates
-                        </button>
-                        <button
-                          onClick={() => {
-                            props.onAddItem();
-                            setShowAddMenu(false);
-                          }}
-                          class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
-                        >
-                          ✏️ Add New Item
                         </button>
                       </div>
                     </Show>

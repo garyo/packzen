@@ -1,10 +1,13 @@
-import { createSignal, createResource, createEffect, For, Show } from 'solid-js';
+import { createSignal, createResource, createEffect, createMemo, For, Show } from 'solid-js';
 import { api, endpoints } from '../../lib/api';
 import type { Bag, Category, MasterItemWithCategory, TripItem } from '../../lib/types';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
+import { Combobox, type ComboboxItem } from '../ui/Combobox';
 import { showToast } from '../ui/Toast';
+import { searchItems } from '../../lib/search';
+import { builtInItems } from '../../lib/built-in-items';
 
 interface AddTripItemFormProps {
   tripId: string;
@@ -28,8 +31,14 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
   // Set pre-selected values from props using createEffect for proper reactivity
   // Wait for resources to load before setting to ensure dropdown options exist
   createEffect(() => {
-    if (bags() && props.preSelectedBagId) {
-      setBagId(props.preSelectedBagId);
+    const currentBags = bags();
+    if (currentBags) {
+      if (props.preSelectedBagId) {
+        setBagId(props.preSelectedBagId);
+      } else if (currentBags.length === 1 && bagId() === null) {
+        // Auto-select if there's only one bag
+        setBagId(currentBags[0].id);
+      }
     }
     if (tripItems() && props.preSelectedContainerId) {
       setContainerItemId(props.preSelectedContainerId);
@@ -60,10 +69,76 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
     return [];
   });
 
+  const [masterItems] = createResource<MasterItemWithCategory[]>(async () => {
+    const response = await api.get<MasterItemWithCategory[]>(endpoints.masterItems);
+    return response.success && response.data ? response.data : [];
+  });
+
   // Get available containers
   const availableContainers = () => {
     const items = tripItems() || [];
     return items.filter((item) => item.is_container);
+  };
+
+  // Search results for autocomplete
+  const searchResults = createMemo(() => {
+    const query = name().trim();
+    if (query.length < 2) return [];
+
+    // Search master items
+    const masterResults = searchItems(query, masterItems() || []);
+
+    // Search built-in items
+    const builtInResults = searchItems(query, builtInItems.items);
+
+    // Prioritize: show top 5 master, fill remaining with built-in (max 8 total)
+    const master = masterResults.slice(0, 5).map((item) => ({
+      id: item.id,
+      name: item.name,
+      description: item.description,
+      group: 'master' as const,
+      categoryId: item.category_id,
+      categoryName: item.category_name,
+      defaultQuantity: item.default_quantity,
+      isContainer: item.is_container,
+    }));
+
+    const builtin = builtInResults.slice(0, 8 - master.length).map((item, idx) => ({
+      id: `builtin-${idx}`,
+      name: item.name,
+      description: item.description,
+      group: 'builtin' as const,
+      categoryName: item.category,
+      defaultQuantity: item.default_quantity,
+      isContainer: false,
+    }));
+
+    return [...master, ...builtin];
+  });
+
+  const handleItemSelect = (item: ComboboxItem) => {
+    setName(item.name);
+
+    // Populate category
+    if (item.categoryId) {
+      setCategoryId(item.categoryId);
+    } else if (item.categoryName) {
+      // Match built-in category name to user's categories (case-insensitive)
+      const matchedCategory = categories()?.find(
+        (cat) => cat.name.toLowerCase() === item.categoryName!.toLowerCase()
+      );
+      setCategoryId(matchedCategory?.id || null);
+    }
+
+    // Populate quantity
+    if (item.defaultQuantity) {
+      setQuantity(item.defaultQuantity);
+    }
+
+    // Populate container flag
+    if (item.isContainer !== undefined) {
+      setIsContainer(item.isContainer);
+    }
   };
 
   const handleSubmit = async (e: Event) => {
@@ -98,8 +173,7 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
     }
 
     // Check if item exists in master list
-    const masterItemsResponse = await api.get<MasterItemWithCategory[]>(endpoints.masterItems);
-    const existingMasterItem = masterItemsResponse.data?.find(
+    const existingMasterItem = masterItems()?.find(
       (item) => item.name.toLowerCase() === itemName.toLowerCase()
     );
 
@@ -194,15 +268,18 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
 
   return (
     <Modal title="Add Item" onClose={props.onClose}>
-      <form onSubmit={handleSubmit} class="space-y-4">
+      <form onSubmit={handleAddAnother} class="space-y-4">
         <div>
           <label class="mb-1 block text-sm font-medium text-gray-700">Item Name</label>
-          <Input
-            type="text"
+          <Combobox
             value={name()}
-            onInput={(e) => setName(e.currentTarget.value)}
+            onInput={setName}
+            onSelect={handleItemSelect}
+            items={searchResults()}
             placeholder="e.g., Toothbrush"
             autofocus
+            minChars={2}
+            maxResults={8}
           />
         </div>
 
@@ -324,11 +401,12 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
         </div>
 
         <div class="flex flex-col gap-2 pt-4">
-          <Button type="button" onClick={handleAddAnother} class="w-full">
-            Add Another
+          <Button type="submit" class="flex w-full items-center justify-center gap-2">
+            <span>Add Another</span>
+            <span class="rounded bg-white/20 px-1.5 py-0.5 font-mono text-xs">↵</span>
           </Button>
           <div class="flex gap-2">
-            <Button type="submit" variant="secondary" class="flex-1">
+            <Button type="button" variant="secondary" onClick={handleSubmit} class="flex-1">
               Add & Close
             </Button>
             <Button type="button" variant="secondary" onClick={props.onClose}>

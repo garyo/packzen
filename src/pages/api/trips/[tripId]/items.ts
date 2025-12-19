@@ -97,6 +97,34 @@ export const POST: APIRoute = async (context) => {
       is_container,
     } = validation.data;
 
+    // Check if an item with the same name and category already exists
+    const existingItems = await db
+      .select()
+      .from(tripItems)
+      .where(eq(tripItems.trip_id, tripId))
+      .all();
+
+    const duplicateItem = existingItems.find(
+      (item) =>
+        item.name.toLowerCase() === name.toLowerCase() &&
+        (item.category_name?.toLowerCase() || null) === (category_name?.toLowerCase() || null)
+    );
+
+    // If duplicate exists, increment its quantity instead of creating a new item
+    if (duplicateItem) {
+      const updatedItem = await db
+        .update(tripItems)
+        .set({
+          quantity: duplicateItem.quantity + (quantity || 1),
+          updated_at: new Date(),
+        })
+        .where(eq(tripItems.id, duplicateItem.id))
+        .returning()
+        .get();
+
+      return successResponse(updatedItem, 200);
+    }
+
     // Verify bag ownership if bag_id is provided
     if (bag_id) {
       const bag = await db

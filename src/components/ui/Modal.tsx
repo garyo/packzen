@@ -25,10 +25,7 @@ export function Modal(props: ModalProps) {
     <Portal>
       <div class="fixed inset-0 z-50 overflow-y-auto">
         {/* Backdrop */}
-        <div
-          class="bg-opacity-50 fixed inset-0 bg-black transition-opacity"
-          onClick={props.onClose}
-        />
+        <div class="fixed inset-0 bg-black/50 transition-opacity" onClick={props.onClose} />
 
         {/* Modal */}
         <div class="flex min-h-screen items-center justify-center p-4">
