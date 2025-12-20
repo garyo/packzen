@@ -25,6 +25,7 @@ export function getBagColorClass(color: string | null | undefined): string | und
     purple: 'bg-purple-500',
     black: 'bg-black',
     gray: 'bg-gray-500',
+    white: 'bg-white',
   };
 
   return colorMap[color as ColorName] || 'bg-gray-500';

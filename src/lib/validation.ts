@@ -21,8 +21,17 @@ const MAX_QUANTITY = 9999;
 const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
 // Color name type and values
-export type ColorName = 'blue' | 'red' | 'green' | 'yellow' | 'purple' | 'gray' | 'black';
-const COLOR_NAMES: ColorName[] = ['blue', 'red', 'green', 'yellow', 'purple', 'gray', 'black'];
+export type ColorName = 'blue' | 'red' | 'green' | 'yellow' | 'purple' | 'gray' | 'black' | 'white';
+const COLOR_NAMES: ColorName[] = [
+  'blue',
+  'red',
+  'green',
+  'yellow',
+  'purple',
+  'gray',
+  'black',
+  'white',
+];
 const HEX_COLOR_REGEX = /^#[0-9A-Fa-f]{6}$/;
 
 // Sanitization helpers

@@ -12,18 +12,14 @@ import { LoadingSpinner } from '../ui/LoadingSpinner';
 import { EmptyState } from '../ui/EmptyState';
 import { Toast, showToast } from '../ui/Toast';
 import { ItemForm } from './ItemForm';
-import { CategoryManager } from './CategoryManager';
-import { BagTemplateManager } from '../bag-templates/BagTemplateManager';
 import { AllItemsPageHeader } from './AllItemsPageHeader';
-import { ItemsList } from './ItemsList';
+import { AllItemsPageTabs } from './AllItemsPageTabs';
 import { BuiltInItemsBrowser } from '../built-in-items/BuiltInItemsBrowser';
 import { fetchWithErrorHandling } from '../../lib/resource-helpers';
 import { getCategoryIcon } from '../../lib/built-in-items';
 
 export function AllItemsPage() {
   const [showItemForm, setShowItemForm] = createSignal(false);
-  const [showCategoryManager, setShowCategoryManager] = createSignal(false);
-  const [showBagTemplateManager, setShowBagTemplateManager] = createSignal(false);
   const [showBuiltInItems, setShowBuiltInItems] = createSignal(false);
   const [editingItem, setEditingItem] = createSignal<MasterItemWithCategory | null>(null);
 
@@ -167,8 +163,6 @@ export function AllItemsPage() {
         items={items}
         categories={categories}
         onAddItem={handleAddItem}
-        onManageCategories={() => setShowCategoryManager(true)}
-        onManageBagTemplates={() => setShowBagTemplateManager(true)}
         onBrowseTemplates={() => setShowBuiltInItems(true)}
         onDataChanged={handleDataChanged}
       />
@@ -187,24 +181,15 @@ export function AllItemsPage() {
               />
             }
           >
-            <Show
-              when={(items()?.length || 0) > 0}
-              fallback={
-                <EmptyState
-                  icon="📝"
-                  title="No items yet"
-                  description="Start building your packing list by adding your first item"
-                  action={<Button onClick={handleAddItem}>Add Your First Item</Button>}
-                />
-              }
-            >
-              <ItemsList
-                items={items}
-                categories={categories}
-                onEditItem={handleEditItem}
-                onDeleteItem={handleDeleteItem}
-              />
-            </Show>
+            <AllItemsPageTabs
+              items={items}
+              categories={categories}
+              bagTemplates={bagTemplates}
+              onEditItem={handleEditItem}
+              onDeleteItem={handleDeleteItem}
+              onCategoriesSaved={handleDataChanged}
+              onBagTemplatesSaved={handleBagTemplatesChanged}
+            />
           </Show>
         </Show>
       </main>
@@ -219,22 +204,6 @@ export function AllItemsPage() {
             setEditingItem(null);
           }}
           onSaved={handleItemSaved}
-        />
-      </Show>
-
-      <Show when={showCategoryManager()}>
-        <CategoryManager
-          categories={categories() || []}
-          onClose={() => setShowCategoryManager(false)}
-          onSaved={handleDataChanged}
-        />
-      </Show>
-
-      <Show when={showBagTemplateManager()}>
-        <BagTemplateManager
-          templates={bagTemplates() || []}
-          onClose={() => setShowBagTemplateManager(false)}
-          onSaved={handleBagTemplatesChanged}
         />
       </Show>
 

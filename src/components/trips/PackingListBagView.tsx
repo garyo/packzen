@@ -164,7 +164,7 @@ export function PackingListBagView(props: PackingListBagViewProps) {
                     fallback={<span class="text-lg md:text-base">👕</span>}
                   >
                     <div
-                      class={`h-3 w-3 rounded-full md:h-2.5 md:w-2.5 ${getBagColorClass(bag.color)}`}
+                      class={`h-3 w-3 rounded-full border border-gray-300 md:h-2.5 md:w-2.5 ${getBagColorClass(bag.color)}`}
                       style={getBagColorStyle(bag.color)}
                     />
                   </Show>

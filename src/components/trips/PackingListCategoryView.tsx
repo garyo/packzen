@@ -163,7 +163,7 @@ export function PackingListCategoryView(props: PackingListCategoryViewProps) {
                             fallback={<span class="text-base md:text-sm">👕</span>}
                           >
                             <div
-                              class={`h-2.5 w-2.5 rounded-full md:h-2 md:w-2 ${getBagColorClass(bag()?.color)}`}
+                              class={`h-2.5 w-2.5 rounded-full border border-gray-300 md:h-2 md:w-2 ${getBagColorClass(bag()?.color)}`}
                               style={getBagColorStyle(bag()?.color)}
                             />
                           </Show>

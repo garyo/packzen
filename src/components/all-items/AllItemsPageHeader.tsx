@@ -17,18 +17,14 @@ interface AllItemsPageHeaderProps {
   items: Accessor<MasterItemWithCategory[] | undefined>;
   categories: Accessor<Category[] | undefined>;
   onAddItem: () => void;
-  onManageCategories: () => void;
-  onManageBagTemplates: () => void;
   onBrowseTemplates: () => void;
   onDataChanged: () => void;
 }
 
 export function AllItemsPageHeader(props: AllItemsPageHeaderProps) {
   const [showMenu, setShowMenu] = createSignal(false);
-  const [showManageMenu, setShowManageMenu] = createSignal(false);
   const [showAddMenu, setShowAddMenu] = createSignal(false);
   let menuRef: HTMLDivElement | undefined;
-  let manageMenuRef: HTMLDivElement | undefined;
   let addMenuRef: HTMLDivElement | undefined;
   let fileInputRef: HTMLInputElement | undefined;
 
@@ -38,9 +34,6 @@ export function AllItemsPageHeader(props: AllItemsPageHeaderProps) {
       if (showMenu() && menuRef && !menuRef.contains(e.target as Node)) {
         setShowMenu(false);
       }
-      if (showManageMenu() && manageMenuRef && !manageMenuRef.contains(e.target as Node)) {
-        setShowManageMenu(false);
-      }
       if (showAddMenu() && addMenuRef && !addMenuRef.contains(e.target as Node)) {
         setShowAddMenu(false);
       }
@@ -49,7 +42,6 @@ export function AllItemsPageHeader(props: AllItemsPageHeaderProps) {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         if (showMenu()) setShowMenu(false);
-        if (showManageMenu()) setShowManageMenu(false);
         if (showAddMenu()) setShowAddMenu(false);
       }
     };
@@ -195,39 +187,6 @@ export function AllItemsPageHeader(props: AllItemsPageHeaderProps) {
 
           {/* Buttons row */}
           <div class="flex flex-shrink-0 gap-2">
-            {/* Manage menu */}
-            <div class="relative" ref={manageMenuRef}>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => setShowManageMenu(!showManageMenu())}
-              >
-                Manage...
-              </Button>
-              <Show when={showManageMenu()}>
-                <div class="absolute top-full left-0 z-20 mt-1 w-48 rounded-lg border border-gray-200 bg-white shadow-lg">
-                  <button
-                    onClick={() => {
-                      props.onManageCategories();
-                      setShowManageMenu(false);
-                    }}
-                    class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
-                  >
-                    📁 Categories
-                  </button>
-                  <button
-                    onClick={() => {
-                      props.onManageBagTemplates();
-                      setShowManageMenu(false);
-                    }}
-                    class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
-                  >
-                    👜 My Bags
-                  </button>
-                </div>
-              </Show>
-            </div>
-
             {/* Add menu */}
             <div class="relative" ref={addMenuRef}>
               <Button size="sm" onClick={() => setShowAddMenu(!showAddMenu())}>

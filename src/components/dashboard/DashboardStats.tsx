@@ -29,7 +29,7 @@ export function DashboardStats(props: DashboardStatsProps) {
         value={props.masterItems()?.length || 0}
         icon="📦"
         linkTo="/all-items"
-        linkText="Manage items, categories and bags"
+        linkText="View/edit all items, categories and bags"
       />
     </div>
   );

@@ -29,6 +29,7 @@ const BAG_COLORS = [
   { value: 'purple', label: 'Purple', class: 'bg-purple-500' },
   { value: 'gray', label: 'Gray', class: 'bg-gray-500' },
   { value: 'black', label: 'Black', class: 'bg-black' },
+  { value: 'white', label: 'White', class: 'bg-white' },
 ];
 
 export function BagSelectionForm(props: BagSelectionFormProps) {
@@ -92,7 +93,7 @@ export function BagSelectionForm(props: BagSelectionFormProps) {
                     }`}
                   >
                     <div
-                      class={`h-4 w-4 rounded-full ${
+                      class={`h-4 w-4 rounded-full border border-gray-300 ${
                         BAG_COLORS.find((c) => c.value === template.color)?.class || 'bg-gray-500'
                       }`}
                     />
@@ -178,7 +179,7 @@ export function BagSelectionForm(props: BagSelectionFormProps) {
                     <button
                       type="button"
                       onClick={() => setNewBagColor(color.value)}
-                      class={`h-6 w-6 rounded-full ${color.class} ${
+                      class={`h-6 w-6 rounded-full border border-gray-300 ${color.class} ${
                         newBagColor() === color.value
                           ? 'ring-2 ring-blue-500 ring-offset-2'
                           : 'hover:scale-110'
@@ -217,7 +218,7 @@ export function BagSelectionForm(props: BagSelectionFormProps) {
                 <div class="flex items-center justify-between rounded-lg border border-gray-200 bg-white p-3">
                   <div class="flex items-center gap-3">
                     <div
-                      class={`h-4 w-4 rounded-full ${
+                      class={`h-4 w-4 rounded-full border border-gray-300 ${
                         BAG_COLORS.find((c) => c.value === bag.color)?.class || 'bg-gray-500'
                       }`}
                     />
