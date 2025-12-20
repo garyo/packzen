@@ -233,11 +233,10 @@ export function PackingListBagView(props: PackingListBagViewProps) {
                     const sortedItems = [...categoryItems].sort((a, b) =>
                       a.name.localeCompare(b.name)
                     );
-                    const categoryIcon = getCategoryIcon(category);
                     return (
                       <div class="mb-4 md:mb-2">
                         <h3 class="mb-2 flex items-center gap-1 px-1 text-sm font-medium text-gray-600 md:mb-1 md:text-xs">
-                          <span class="text-base md:text-sm">{categoryIcon}</span>
+                          <span class="text-base md:text-sm">{getCategoryIcon(category)}</span>
                           {category}
                         </h3>
                         <div

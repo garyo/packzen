@@ -1,4 +1,4 @@
-import { createSignal, createResource, For, Show, createEffect } from 'solid-js';
+import { createSignal, createResource, For, Show, createEffect, createMemo } from 'solid-js';
 import { api, endpoints } from '../../lib/api';
 import type { TripItem, Bag, Category } from '../../lib/types';
 import { Modal } from '../ui/Modal';
@@ -54,6 +54,12 @@ export function EditTripItem(props: EditTripItemProps) {
         item.container_item_id !== props.item.id // Can't put item in something that's inside it
     );
   };
+
+  // Sort categories alphabetically
+  const sortedCategories = createMemo(() => {
+    const cats = categories() || [];
+    return [...cats].sort((a, b) => a.name.localeCompare(b.name));
+  });
 
   // Initialize bag and category after resources load
   createEffect(() => {
@@ -253,7 +259,7 @@ export function EditTripItem(props: EditTripItemProps) {
               class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
             >
               <option value="">No category</option>
-              <For each={categories()}>
+              <For each={sortedCategories()}>
                 {(category) => <option value={category.id}>{category.name}</option>}
               </For>
               <option value="__new__">+ New category...</option>

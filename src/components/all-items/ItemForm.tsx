@@ -1,4 +1,4 @@
-import { createSignal, Show } from 'solid-js';
+import { createSignal, createMemo, Show } from 'solid-js';
 import { Modal } from '../ui/Modal';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
@@ -20,6 +20,11 @@ export function ItemForm(props: ItemFormProps) {
   const [quantity, setQuantity] = createSignal(props.item?.default_quantity || 1);
   const [isContainer, setIsContainer] = createSignal(props.item?.is_container || false);
   const [saving, setSaving] = createSignal(false);
+
+  // Sort categories alphabetically
+  const sortedCategories = createMemo(() => {
+    return [...props.categories].sort((a, b) => a.name.localeCompare(b.name));
+  });
 
   const handleSubmit = async (e: Event) => {
     e.preventDefault();
@@ -73,7 +78,7 @@ export function ItemForm(props: ItemFormProps) {
             class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
           >
             <option value="">No category</option>
-            {props.categories.map((cat) => (
+            {sortedCategories().map((cat) => (
               <option value={cat.id}>
                 {cat.icon} {cat.name}
               </option>

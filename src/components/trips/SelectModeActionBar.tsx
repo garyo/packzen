@@ -5,7 +5,7 @@
  * Extracted from PackingPage for better separation of concerns
  */
 
-import { For, Show, createSignal, type Accessor } from 'solid-js';
+import { For, Show, createSignal, createMemo, type Accessor } from 'solid-js';
 import type { Bag, Category, TripItem } from '../../lib/types';
 import { Button } from '../ui/Button';
 
@@ -22,6 +22,12 @@ interface SelectModeActionBarProps {
 
 export function SelectModeActionBar(props: SelectModeActionBarProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = createSignal(false);
+
+  // Sort categories alphabetically
+  const sortedCategories = createMemo(() => {
+    const cats = props.categories() || [];
+    return [...cats].sort((a, b) => a.name.localeCompare(b.name));
+  });
 
   return (
     <div class="fixed right-0 bottom-0 left-0 z-20 border-t-2 border-gray-200 bg-white shadow-lg">
@@ -71,7 +77,7 @@ export function SelectModeActionBar(props: SelectModeActionBarProps) {
               >
                 <option value="">Choose...</option>
                 <option value="">No category</option>
-                <For each={props.categories()}>
+                <For each={sortedCategories()}>
                   {(category) => <option value={category.id}>{category.name}</option>}
                 </For>
               </select>

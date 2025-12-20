@@ -17,6 +17,7 @@ interface AllItemsPageHeaderProps {
   items: Accessor<MasterItemWithCategory[] | undefined>;
   categories: Accessor<Category[] | undefined>;
   onDataChanged: () => void;
+  onBrowseTemplates: () => void;
 }
 
 export function AllItemsPageHeader(props: AllItemsPageHeaderProps) {
@@ -179,6 +180,11 @@ export function AllItemsPageHeader(props: AllItemsPageHeaderProps) {
 
           {/* Buttons row */}
           <div class="flex flex-shrink-0 gap-2">
+            {/* Browse Item Templates button */}
+            <Button variant="secondary" size="sm" onClick={props.onBrowseTemplates}>
+              Browse Item Templates
+            </Button>
+
             {/* More menu (Import/Export) */}
             <div class="relative" ref={menuRef}>
               <Button variant="secondary" size="sm" onClick={() => setShowMenu(!showMenu())}>

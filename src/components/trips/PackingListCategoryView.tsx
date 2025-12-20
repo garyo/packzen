@@ -138,13 +138,11 @@ export function PackingListCategoryView(props: PackingListCategoryViewProps) {
             );
           };
 
-          const categoryIcon = getCategoryIcon(category);
-
           return (
             <Show when={totalItems() > 0}>
               <div>
                 <div class="mb-3 flex items-center gap-2 md:mb-1.5">
-                  <span class="text-xl md:text-lg">{categoryIcon}</span>
+                  <span class="text-xl md:text-lg">{getCategoryIcon(category)}</span>
                   <h2 class="text-lg font-semibold text-gray-900 md:text-base">{category}</h2>
                   <span class="text-sm text-gray-500 md:text-xs">({totalItems()})</span>
                 </div>

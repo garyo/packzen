@@ -140,7 +140,12 @@ export function AllItemsPage() {
     <div class="min-h-screen bg-gray-50">
       <Toast />
 
-      <AllItemsPageHeader items={items} categories={categories} onDataChanged={handleDataChanged} />
+      <AllItemsPageHeader
+        items={items}
+        categories={categories}
+        onDataChanged={handleDataChanged}
+        onBrowseTemplates={() => setShowBuiltInItems(true)}
+      />
 
       {/* Main Content */}
       <main class="container mx-auto px-4 py-6 md:px-3 md:py-3">

@@ -147,6 +147,12 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
     }
   };
 
+  // Sort categories alphabetically
+  const sortedCategories = createMemo(() => {
+    const cats = categories() || [];
+    return [...cats].sort((a, b) => a.name.localeCompare(b.name));
+  });
+
   const handleSubmit = async (e: Event) => {
     e.preventDefault();
 
@@ -329,7 +335,7 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
               class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
             >
               <option value="">No category</option>
-              <For each={categories()}>
+              <For each={sortedCategories()}>
                 {(category) => <option value={category.id}>{category.name}</option>}
               </For>
               <option value="__new__">+ New category...</option>
