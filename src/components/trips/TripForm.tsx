@@ -1,6 +1,7 @@
 import { createSignal } from 'solid-js';
 import { Modal } from '../ui/Modal';
 import { Input } from '../ui/Input';
+import { DateInput } from '../ui/DateInput';
 import { Button } from '../ui/Button';
 import { showToast } from '../ui/Toast';
 import { api, endpoints } from '../../lib/api';
@@ -73,18 +74,8 @@ export function TripForm(props: TripFormProps) {
         />
 
         <div class="grid grid-cols-2 gap-4">
-          <Input
-            label="Start Date"
-            type="date"
-            value={startDate()}
-            onInput={(e) => setStartDate(e.currentTarget.value)}
-          />
-          <Input
-            label="End Date"
-            type="date"
-            value={endDate()}
-            onInput={(e) => setEndDate(e.currentTarget.value)}
-          />
+          <DateInput label="Start Date" value={startDate()} onInput={setStartDate} />
+          <DateInput label="End Date" value={endDate()} onInput={setEndDate} min={startDate()} />
         </div>
 
         <div>

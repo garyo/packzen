@@ -1,15 +1,21 @@
 // Utility functions
 
+// Parse date string in local timezone (YYYY-MM-DD format)
+// Appending 'T00:00:00' makes the date parse as local time instead of UTC
+function parseLocalDate(dateStr: string): Date {
+  return new Date(dateStr + 'T00:00:00');
+}
+
 // Format date for display
 export function formatDate(date: string | Date): string {
-  const d = typeof date === 'string' ? new Date(date) : date;
+  const d = typeof date === 'string' ? parseLocalDate(date) : date;
   return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 // Calculate trip duration in days
 export function getTripDuration(startDate: string, endDate: string): number {
-  const start = new Date(startDate);
-  const end = new Date(endDate);
+  const start = parseLocalDate(startDate);
+  const end = parseLocalDate(endDate);
   const diff = end.getTime() - start.getTime();
   return Math.ceil(diff / (1000 * 60 * 60 * 24)) + 1; // +1 to include both start and end days
 }
@@ -19,10 +25,10 @@ export function getTripStatus(startDate: string, endDate: string): 'upcoming' | 
   const now = new Date();
   now.setHours(0, 0, 0, 0); // Strip time component
 
-  const start = new Date(startDate);
+  const start = parseLocalDate(startDate);
   start.setHours(0, 0, 0, 0);
 
-  const end = new Date(endDate);
+  const end = parseLocalDate(endDate);
   end.setHours(0, 0, 0, 0);
 
   if (now < start) return 'upcoming';
