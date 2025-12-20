@@ -16,16 +16,12 @@ import { api, endpoints } from '../../lib/api';
 interface AllItemsPageHeaderProps {
   items: Accessor<MasterItemWithCategory[] | undefined>;
   categories: Accessor<Category[] | undefined>;
-  onAddItem: () => void;
-  onBrowseTemplates: () => void;
   onDataChanged: () => void;
 }
 
 export function AllItemsPageHeader(props: AllItemsPageHeaderProps) {
   const [showMenu, setShowMenu] = createSignal(false);
-  const [showAddMenu, setShowAddMenu] = createSignal(false);
   let menuRef: HTMLDivElement | undefined;
-  let addMenuRef: HTMLDivElement | undefined;
   let fileInputRef: HTMLInputElement | undefined;
 
   // Handle clicks outside menu and ESC key
@@ -34,15 +30,11 @@ export function AllItemsPageHeader(props: AllItemsPageHeaderProps) {
       if (showMenu() && menuRef && !menuRef.contains(e.target as Node)) {
         setShowMenu(false);
       }
-      if (showAddMenu() && addMenuRef && !addMenuRef.contains(e.target as Node)) {
-        setShowAddMenu(false);
-      }
     };
 
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         if (showMenu()) setShowMenu(false);
-        if (showAddMenu()) setShowAddMenu(false);
       }
     };
 
@@ -187,35 +179,6 @@ export function AllItemsPageHeader(props: AllItemsPageHeaderProps) {
 
           {/* Buttons row */}
           <div class="flex flex-shrink-0 gap-2">
-            {/* Add menu */}
-            <div class="relative" ref={addMenuRef}>
-              <Button size="sm" onClick={() => setShowAddMenu(!showAddMenu())}>
-                Add...
-              </Button>
-              <Show when={showAddMenu()}>
-                <div class="absolute top-full left-0 z-20 mt-1 w-56 rounded-lg border border-gray-200 bg-white shadow-lg">
-                  <button
-                    onClick={() => {
-                      props.onBrowseTemplates();
-                      setShowAddMenu(false);
-                    }}
-                    class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
-                  >
-                    📚 Browse Templates
-                  </button>
-                  <button
-                    onClick={() => {
-                      props.onAddItem();
-                      setShowAddMenu(false);
-                    }}
-                    class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
-                  >
-                    ✏️ Add New Item
-                  </button>
-                </div>
-              </Show>
-            </div>
-
             {/* More menu (Import/Export) */}
             <div class="relative" ref={menuRef}>
               <Button variant="secondary" size="sm" onClick={() => setShowMenu(!showMenu())}>

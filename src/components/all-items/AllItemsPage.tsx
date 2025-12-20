@@ -12,6 +12,7 @@ import { LoadingSpinner } from '../ui/LoadingSpinner';
 import { EmptyState } from '../ui/EmptyState';
 import { Toast, showToast } from '../ui/Toast';
 import { ItemForm } from './ItemForm';
+import { AddMasterItemForm } from './AddMasterItemForm';
 import { AllItemsPageHeader } from './AllItemsPageHeader';
 import { AllItemsPageTabs } from './AllItemsPageTabs';
 import { BuiltInItemsBrowser } from '../built-in-items/BuiltInItemsBrowser';
@@ -159,13 +160,7 @@ export function AllItemsPage() {
     <div class="min-h-screen bg-gray-50">
       <Toast />
 
-      <AllItemsPageHeader
-        items={items}
-        categories={categories}
-        onAddItem={handleAddItem}
-        onBrowseTemplates={() => setShowBuiltInItems(true)}
-        onDataChanged={handleDataChanged}
-      />
+      <AllItemsPageHeader items={items} categories={categories} onDataChanged={handleDataChanged} />
 
       {/* Main Content */}
       <main class="container mx-auto px-4 py-6 md:px-3 md:py-3">
@@ -187,6 +182,9 @@ export function AllItemsPage() {
               bagTemplates={bagTemplates}
               onEditItem={handleEditItem}
               onDeleteItem={handleDeleteItem}
+              onItemSaved={refetchItems}
+              onAddItem={handleAddItem}
+              onBrowseTemplates={() => setShowBuiltInItems(true)}
               onCategoriesSaved={handleDataChanged}
               onBagTemplatesSaved={handleBagTemplatesChanged}
             />
@@ -195,7 +193,16 @@ export function AllItemsPage() {
       </main>
 
       {/* Modals */}
-      <Show when={showItemForm()}>
+      <Show when={showItemForm() && !editingItem()}>
+        <AddMasterItemForm
+          onClose={() => {
+            setShowItemForm(false);
+          }}
+          onSaved={handleItemSaved}
+        />
+      </Show>
+
+      <Show when={showItemForm() && editingItem()}>
         <ItemForm
           item={editingItem()}
           categories={categories() || []}
