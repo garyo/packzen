@@ -11,8 +11,6 @@ import { Button } from '../ui/Button';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
 import { EmptyState } from '../ui/EmptyState';
 import { Toast, showToast } from '../ui/Toast';
-import { ItemForm } from './ItemForm';
-import { AddMasterItemForm } from './AddMasterItemForm';
 import { AllItemsPageHeader } from './AllItemsPageHeader';
 import { AllItemsPageTabs } from './AllItemsPageTabs';
 import { BuiltInItemsBrowser } from '../built-in-items/BuiltInItemsBrowser';
@@ -20,9 +18,7 @@ import { fetchWithErrorHandling } from '../../lib/resource-helpers';
 import { getCategoryIcon } from '../../lib/built-in-items';
 
 export function AllItemsPage() {
-  const [showItemForm, setShowItemForm] = createSignal(false);
   const [showBuiltInItems, setShowBuiltInItems] = createSignal(false);
-  const [editingItem, setEditingItem] = createSignal<MasterItemWithCategory | null>(null);
 
   // Fetch categories
   const [categories, { refetch: refetchCategories }] = createResource<Category[]>(async () => {
@@ -55,16 +51,6 @@ export function AllItemsPage() {
     await authStore.initAuth();
   });
 
-  const handleAddItem = () => {
-    setEditingItem(null);
-    setShowItemForm(true);
-  };
-
-  const handleEditItem = (item: MasterItemWithCategory) => {
-    setEditingItem(item);
-    setShowItemForm(true);
-  };
-
   const handleDeleteItem = async (id: string) => {
     if (!confirm('Are you sure you want to delete this item?')) return;
 
@@ -75,12 +61,6 @@ export function AllItemsPage() {
     } else {
       showToast('error', response.error || 'Failed to delete item');
     }
-  };
-
-  const handleItemSaved = () => {
-    setShowItemForm(false);
-    setEditingItem(null);
-    refetchItems();
   };
 
   const handleDataChanged = () => {
@@ -180,11 +160,8 @@ export function AllItemsPage() {
               items={items}
               categories={categories}
               bagTemplates={bagTemplates}
-              onEditItem={handleEditItem}
               onDeleteItem={handleDeleteItem}
               onItemSaved={refetchItems}
-              onAddItem={handleAddItem}
-              onBrowseTemplates={() => setShowBuiltInItems(true)}
               onCategoriesSaved={handleDataChanged}
               onBagTemplatesSaved={handleBagTemplatesChanged}
             />
@@ -193,27 +170,6 @@ export function AllItemsPage() {
       </main>
 
       {/* Modals */}
-      <Show when={showItemForm() && !editingItem()}>
-        <AddMasterItemForm
-          onClose={() => {
-            setShowItemForm(false);
-          }}
-          onSaved={handleItemSaved}
-        />
-      </Show>
-
-      <Show when={showItemForm() && editingItem()}>
-        <ItemForm
-          item={editingItem()}
-          categories={categories() || []}
-          onClose={() => {
-            setShowItemForm(false);
-            setEditingItem(null);
-          }}
-          onSaved={handleItemSaved}
-        />
-      </Show>
-
       <Show when={showBuiltInItems()}>
         <BuiltInItemsBrowser
           onClose={() => setShowBuiltInItems(false)}

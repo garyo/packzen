@@ -103,7 +103,13 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
       isContainer: item.is_container,
     }));
 
-    const builtin = builtInResults.slice(0, 8 - master.length).map((item, idx) => ({
+    // Filter out built-in items that have the same name as master items (case-insensitive)
+    const masterItemNames = new Set(masterResults.map((item) => item.name.toLowerCase().trim()));
+    const filteredBuiltIn = builtInResults.filter(
+      (item) => !masterItemNames.has(item.name.toLowerCase().trim())
+    );
+
+    const builtin = filteredBuiltIn.slice(0, 8 - master.length).map((item, idx) => ({
       id: `builtin-${idx}`,
       name: item.name,
       description: item.description,

@@ -18,7 +18,6 @@ import type { Category, MasterItemWithCategory } from '../../lib/types';
 interface ItemsListProps {
   items: Accessor<MasterItemWithCategory[] | undefined>;
   categories: Accessor<Category[] | undefined>;
-  onEditItem: (item: MasterItemWithCategory) => void;
   onDeleteItem: (id: string) => void;
   onItemSaved?: () => void;
 }
