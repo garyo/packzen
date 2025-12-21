@@ -5,15 +5,18 @@
  * Extracted from DashboardPage for better separation of concerns
  */
 
-import { For, Show, type Accessor } from 'solid-js';
+import { For, Show, createSignal, type Accessor } from 'solid-js';
 import type { Trip } from '../../lib/types';
 import { formatDate, getTripStatus } from '../../lib/utils';
+import { TripForm } from '../trips/TripForm';
 
 interface UpcomingTripsListProps {
   trips: Accessor<Trip[] | undefined>;
+  onTripUpdated?: () => void;
 }
 
 export function UpcomingTripsList(props: UpcomingTripsListProps) {
+  const [editingTrip, setEditingTrip] = createSignal<Trip | null>(null);
   const upcomingTrips = () => {
     const allTrips = props.trips() || [];
     return allTrips
@@ -64,8 +67,22 @@ export function UpcomingTripsList(props: UpcomingTripsListProps) {
         }
       >
         <div class="space-y-4">
-          <For each={upcomingTrips()}>{(trip) => <TripCard trip={trip} />}</For>
+          <For each={upcomingTrips()}>
+            {(trip) => <TripCard trip={trip} onEdit={() => setEditingTrip(trip)} />}
+          </For>
         </div>
+      </Show>
+
+      {/* Trip Edit Modal */}
+      <Show when={editingTrip()}>
+        <TripForm
+          trip={editingTrip()}
+          onClose={() => setEditingTrip(null)}
+          onSaved={() => {
+            setEditingTrip(null);
+            props.onTripUpdated?.();
+          }}
+        />
       </Show>
     </div>
   );
@@ -73,6 +90,7 @@ export function UpcomingTripsList(props: UpcomingTripsListProps) {
 
 interface TripCardProps {
   trip: Trip;
+  onEdit: () => void;
 }
 
 function TripCard(props: TripCardProps) {
@@ -100,7 +118,24 @@ function TripCard(props: TripCardProps) {
             </Show>
           </p>
         </div>
-        <div class="ml-4">
+        <div class="ml-4 flex items-center gap-2">
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              props.onEdit();
+            }}
+            class="rounded p-1 text-gray-600 hover:bg-gray-200 hover:text-gray-900"
+            title="Edit trip"
+          >
+            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+              />
+            </svg>
+          </button>
           <span class="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800">
             Upcoming
           </span>

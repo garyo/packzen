@@ -21,6 +21,7 @@ import { builtInItems } from '../../lib/built-in-items';
 import { fetchWithErrorHandling, fetchSingleWithErrorHandling } from '../../lib/resource-helpers';
 import { tripToYAML, downloadYAML } from '../../lib/yaml';
 import { deleteTripWithConfirm } from '../../lib/trip-actions';
+import { TripForm } from './TripForm';
 
 interface PackingPageProps {
   tripId: string;
@@ -35,6 +36,7 @@ export function PackingPage(props: PackingPageProps) {
   const [selectedItems, setSelectedItems] = createSignal<Set<string>>(new Set());
   const [showImport, setShowImport] = createSignal(false);
   const [showBuiltInItems, setShowBuiltInItems] = createSignal(false);
+  const [showEditTrip, setShowEditTrip] = createSignal(false);
   const [sortBy, setSortBy] = createSignal<'bag' | 'category'>('bag');
 
   // Pre-selection for add modals
@@ -48,7 +50,7 @@ export function PackingPage(props: PackingPageProps) {
     );
   });
 
-  const [trip] = createResource<Trip | null>(async () => {
+  const [trip, { refetch: refetchTrip }] = createResource<Trip | null>(async () => {
     return fetchSingleWithErrorHandling(
       () => api.get<Trip>(endpoints.trip(props.tripId)),
       'Failed to load trip'
@@ -351,6 +353,61 @@ export function PackingPage(props: PackingPageProps) {
     });
   };
 
+  // Drag-and-drop handlers
+  const handleMoveItemToBag = async (itemId: string, bagId: string | null) => {
+    const item = items()?.find((i) => i.id === itemId);
+    if (!item || item.bag_id === bagId) return;
+
+    // Optimistic update
+    mutate((prev) =>
+      prev?.map((i) => (i.id === itemId ? { ...i, bag_id: bagId, container_item_id: null } : i))
+    );
+
+    const response = await api.patch(endpoints.tripItems(props.tripId), {
+      id: itemId,
+      bag_id: bagId,
+      container_item_id: null, // Clear container when changing bag
+    });
+
+    if (!response.success) {
+      showToast('error', response.error || 'Failed to move item');
+      refetch();
+    }
+  };
+
+  const handleMoveItemToCategory = async (
+    itemId: string,
+    categoryName: string | null,
+    bagId: string | null
+  ) => {
+    const item = items()?.find((i) => i.id === itemId);
+    if (!item) return;
+
+    // Skip if nothing changed
+    if (item.category_name === categoryName && item.bag_id === bagId) return;
+
+    // Optimistic update
+    mutate((prev) =>
+      prev?.map((i) =>
+        i.id === itemId
+          ? { ...i, category_name: categoryName, bag_id: bagId, container_item_id: null }
+          : i
+      )
+    );
+
+    const response = await api.patch(endpoints.tripItems(props.tripId), {
+      id: itemId,
+      category_name: categoryName,
+      bag_id: bagId,
+      container_item_id: null,
+    });
+
+    if (!response.success) {
+      showToast('error', response.error || 'Failed to move item');
+      refetch();
+    }
+  };
+
   const handleAddBuiltInItemsToTrip = async (
     itemsToAdd: SelectedBuiltInItem[],
     bagId?: string | null,
@@ -472,6 +529,7 @@ export function PackingPage(props: PackingPageProps) {
         onImport={() => setShowImport(true)}
         onClearAll={handleClearAll}
         onDeleteTrip={handleDeleteTrip}
+        onEditTrip={() => setShowEditTrip(true)}
       />
 
       {/* Packing List */}
@@ -510,6 +568,7 @@ export function PackingPage(props: PackingPageProps) {
                     onTogglePacked={handleTogglePacked}
                     onEditItem={setEditingItem}
                     onToggleItemSelection={toggleItemSelection}
+                    onMoveItemToBag={handleMoveItemToBag}
                   />
                 }
               >
@@ -532,6 +591,8 @@ export function PackingPage(props: PackingPageProps) {
                   onBrowseTemplatesToContainer={(containerId) =>
                     openBrowseTemplates(undefined, containerId)
                   }
+                  onMoveItemToBag={handleMoveItemToBag}
+                  onMoveItemToCategory={handleMoveItemToCategory}
                 />
               </Show>
             </Show>
@@ -619,6 +680,18 @@ export function PackingPage(props: PackingPageProps) {
           tripId={props.tripId}
           onClose={closeBrowseTemplates}
           onAddToTrip={handleAddBuiltInItemsToTrip}
+        />
+      </Show>
+
+      {/* Edit Trip Modal */}
+      <Show when={showEditTrip()}>
+        <TripForm
+          trip={trip()}
+          onClose={() => setShowEditTrip(false)}
+          onSaved={() => {
+            setShowEditTrip(false);
+            refetchTrip();
+          }}
         />
       </Show>
 

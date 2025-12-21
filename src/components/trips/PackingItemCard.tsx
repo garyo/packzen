@@ -5,8 +5,11 @@
  * Extracted from PackingPage to reduce code duplication
  */
 
-import { Show } from 'solid-js';
+import { Show, type JSX } from 'solid-js';
 import type { TripItem, Bag } from '../../lib/types';
+
+// Type for drag activators from solid-dnd
+type DragActivators = Record<string, (event: any) => void>;
 
 interface PackingItemCardProps {
   item: TripItem;
@@ -23,6 +26,9 @@ interface PackingItemCardProps {
   containerContentsCount?: number; // Number of items inside (if this is a container)
   containerPackedCount?: number; // Number of packed items inside (if this is a container)
   onContainerClick?: () => void; // Click handler for navigating to container section
+  // Drag-and-drop props
+  dragActivators?: DragActivators; // Event handlers for drag handle
+  isDragging?: boolean; // Whether this item is currently being dragged
 }
 
 export function PackingItemCard(props: PackingItemCardProps) {
@@ -34,8 +40,25 @@ export function PackingItemCard(props: PackingItemCardProps) {
     <div
       class={`flex items-center gap-4 rounded-lg p-4 shadow-sm md:gap-2 md:p-2 ${
         isContainer() ? 'border border-blue-200 bg-blue-50' : 'bg-white'
-      } ${props.item.is_packed ? 'opacity-60' : ''} ${props.selectMode && props.isSelected ? 'ring-2 ring-blue-500' : ''} `}
+      } ${props.item.is_packed ? 'opacity-60' : ''} ${props.selectMode && props.isSelected ? 'ring-2 ring-blue-500' : ''} ${props.isDragging ? 'opacity-50' : ''}`}
     >
+      {/* Drag handle - only shown when drag is enabled */}
+      <Show when={props.dragActivators}>
+        <div
+          class="flex cursor-grab items-center justify-center text-gray-400 hover:text-gray-600 active:cursor-grabbing"
+          style={{ 'touch-action': 'none' }}
+          {...props.dragActivators}
+        >
+          <svg class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+            <circle cx="9" cy="6" r="1.5" />
+            <circle cx="15" cy="6" r="1.5" />
+            <circle cx="9" cy="12" r="1.5" />
+            <circle cx="15" cy="12" r="1.5" />
+            <circle cx="9" cy="18" r="1.5" />
+            <circle cx="15" cy="18" r="1.5" />
+          </svg>
+        </div>
+      </Show>
       <Show when={!props.selectMode}>
         <input
           type="checkbox"

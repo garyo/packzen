@@ -9,6 +9,7 @@ import { Show, type Accessor, onMount, onCleanup } from 'solid-js';
 import type { Trip } from '../../lib/types';
 import { Button } from '../ui/Button';
 import { createSignal } from 'solid-js';
+import { formatDate } from '../../lib/utils';
 
 interface PackingPageHeaderProps {
   trip: Accessor<Trip | null | undefined>;
@@ -27,6 +28,7 @@ interface PackingPageHeaderProps {
   onImport: () => void;
   onClearAll: () => void;
   onDeleteTrip: () => void;
+  onEditTrip: () => void;
 }
 
 export function PackingPageHeader(props: PackingPageHeaderProps) {
@@ -108,9 +110,31 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
               </svg>
             </a>
             <div class="min-w-0 flex-1">
-              <h1 class="truncate text-xl font-bold text-gray-900 md:text-lg">
-                {props.trip()?.name || 'Packing'}
-              </h1>
+              <div class="flex items-center">
+                <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0">
+                  <h1 class="text-xl font-bold break-words text-gray-900 md:text-lg">
+                    {props.trip()?.name || 'Packing'}
+                  </h1>
+                  <p class="text-xs text-gray-600">
+                    {formatDate(props.trip()?.start_date || 'no date planned')}
+                    {props.trip()?.end_date && ` - ${formatDate(props.trip()?.end_date || '')}`}
+                  </p>
+                </div>
+                <button
+                  onClick={props.onEditTrip}
+                  class="flex-shrink-0 rounded p-1 text-gray-600 hover:bg-gray-200 hover:text-gray-900"
+                  title="Edit trip details"
+                >
+                  <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                    />
+                  </svg>
+                </button>
+              </div>
               <p class="text-xs text-gray-600">
                 {props.packedCount()} of {props.totalCount()} packed
               </p>

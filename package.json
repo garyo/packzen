@@ -27,6 +27,7 @@
     "@clerk/clerk-js": "^5.114.1",
     "@cloudflare/workers-types": "^4.20251212.0",
     "@tailwindcss/vite": "^4.1.18",
+    "@thisbeyond/solid-dnd": "^0.7.5",
     "astro": "^5.16.5",
     "drizzle-orm": "^0.45.1",
     "js-yaml": "^4.1.1",

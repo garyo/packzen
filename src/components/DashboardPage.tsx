@@ -117,7 +117,7 @@ export function DashboardPage() {
                 <DashboardStats trips={trips} masterItems={masterItems} categories={categories} />
 
                 {/* Upcoming Trips */}
-                <UpcomingTripsList trips={trips} />
+                <UpcomingTripsList trips={trips} onTripUpdated={() => refetchTrips()} />
 
                 {/* Quick Links */}
                 <div class="flex justify-center">
