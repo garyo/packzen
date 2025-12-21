@@ -174,12 +174,16 @@ export function AllItemsPageHeader(props: AllItemsPageHeaderProps) {
             </a>
             <div class="min-w-0 flex-1">
               <h1 class="truncate text-xl font-bold text-gray-900 md:text-lg">All Items</h1>
-              <p class="text-xs text-gray-600">Your reusable packing essentials</p>
+              <p class="text-xs text-gray-600">Your reusable packing essentials, for all trips</p>
             </div>
           </div>
 
           {/* Buttons row */}
           <div class="flex flex-shrink-0 gap-2">
+            <Button variant="secondary" size="sm" onClick={() => (window.location.href = '/trips')}>
+              Create/View Trips
+            </Button>
+
             {/* Browse Item Templates button */}
             <Button variant="secondary" size="sm" onClick={props.onBrowseTemplates}>
               Browse Item Templates
