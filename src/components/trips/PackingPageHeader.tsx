@@ -187,7 +187,7 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
                     </Show>
                   </div>
                   <Button variant="secondary" size="sm" onClick={props.onToggleSelectMode}>
-                    Select
+                    Select Batch
                   </Button>
                   <Button
                     variant="secondary"

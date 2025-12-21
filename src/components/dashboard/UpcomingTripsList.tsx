@@ -59,7 +59,7 @@ export function UpcomingTripsList(props: UpcomingTripsListProps) {
             <p class="text-gray-500">No upcoming trips</p>
             <a
               href="/trips"
-              class="mt-2 inline-block text-sm font-medium text-blue-600 hover:text-blue-500"
+              class="mt-2 inline-block text-lg font-medium text-blue-600 hover:text-blue-500"
             >
               Plan a trip →
             </a>

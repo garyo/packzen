@@ -182,8 +182,8 @@ export function ItemsList(props: ItemsListProps) {
   return (
     <div class="space-y-6 md:space-y-3">
       {/* Add New Item Form */}
-      <form onSubmit={handleAdd} class="rounded-lg bg-white p-4 shadow-sm md:p-3">
-        <h3 class="mb-3 text-sm font-medium text-gray-700">Add New Item</h3>
+      <form onSubmit={handleAdd} class="rounded-lg bg-white p-4 shadow-md md:p-3">
+        <h3 class="mb-3 text-sm font-medium text-gray-700">Add a new item to your master list:</h3>
         <div class="space-y-3">
           {/* Name, Category, and Quantity in a responsive flex row */}
           <div class="flex flex-wrap gap-3">

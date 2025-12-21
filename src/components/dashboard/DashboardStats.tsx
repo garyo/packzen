@@ -22,14 +22,14 @@ export function DashboardStats(props: DashboardStatsProps) {
         value={props.trips()?.length || 0}
         icon="✈️"
         linkTo="/trips"
-        linkText="View all trips"
+        linkText="View and create trips"
       />
       <StatCard
-        title="All Items"
+        title="All Saved Items"
         value={props.masterItems()?.length || 0}
         icon="📦"
         linkTo="/all-items"
-        linkText="View/edit all items, categories and bags"
+        linkText="View/edit all items, categories and saved bags"
       />
     </div>
   );
