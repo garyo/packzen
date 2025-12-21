@@ -25,11 +25,11 @@ interface PlanLimits {
 const PLAN_LIMITS: Record<BillingPlan | 'none', PlanLimits> = {
   // Free users - baseline limits
   free_user: {
-    maxTrips: 100,
-    maxItemsPerTrip: 500,
-    maxCategories: 100,
-    maxMasterItems: 500,
-    maxBagTemplates: 50,
+    maxTrips: 3,
+    maxItemsPerTrip: 50,
+    maxCategories: 50,
+    maxMasterItems: 50,
+    maxBagTemplates: 3,
   },
   // Standard (paid) plan - same for now, can increase later
   standard: {
@@ -41,11 +41,11 @@ const PLAN_LIMITS: Record<BillingPlan | 'none', PlanLimits> = {
   },
   // Fallback for users without a plan (shouldn't happen, but be safe)
   none: {
-    maxTrips: 100,
-    maxItemsPerTrip: 500,
-    maxCategories: 100,
-    maxMasterItems: 500,
-    maxBagTemplates: 50,
+    maxTrips: 3,
+    maxItemsPerTrip: 50,
+    maxCategories: 50,
+    maxMasterItems: 50,
+    maxBagTemplates: 3,
   },
 };
 

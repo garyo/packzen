@@ -1,7 +1,7 @@
 /**
  * Billing Utilities
  *
- * Helper functions for checking Clerk Billing plans and features
+ * Back-end helper functions for checking Clerk Billing plans and features
  */
 
 import type { AuthObject } from '@clerk/backend';
@@ -15,6 +15,7 @@ export interface BillingStatus {
   hasFreeUserPlan: boolean;
   hasStandardPlan: boolean;
   activePlan: BillingPlan | 'none';
+  billingOverride?: string;
 }
 
 /**
@@ -22,22 +23,22 @@ export interface BillingStatus {
  * @param auth - Clerk auth object from middleware or API route
  * @returns Billing status with plan information
  */
-export function checkBillingStatus(auth: AuthObject): BillingStatus {
+export function checkBillingStatus(auth: AuthObject, billingOverride?: string): BillingStatus {
   const hasFreeUserPlan = auth.has({ plan: 'free_user' });
   const hasStandardPlan = auth.has({ plan: 'standard' });
 
   // Determine active plan (standard takes precedence if user has both)
   let activePlan: BillingPlan | 'none' = 'none';
-  if (hasStandardPlan) {
+  if (hasStandardPlan || billingOverride === 'standard') {
     activePlan = 'standard';
   } else if (hasFreeUserPlan) {
     activePlan = 'free_user';
   }
-
   return {
     hasFreeUserPlan,
     hasStandardPlan,
     activePlan,
+    billingOverride,
   };
 }
 
@@ -49,6 +50,7 @@ export function logBillingStatus(userId: string, status: BillingStatus): void {
     activePlan: status.activePlan,
     hasFreeUserPlan: status.hasFreeUserPlan,
     hasStandardPlan: status.hasStandardPlan,
+    billingOverride: status.billingOverride,
   });
 }
 

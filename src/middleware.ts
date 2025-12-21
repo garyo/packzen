@@ -25,9 +25,11 @@ export const onRequest = clerkMiddleware(async (auth, context, next) => {
 
   // Add user ID to locals for API routes to use
   context.locals.userId = authObject.userId;
+  const user = await clerkClient(context).users.getUser(authObject.userId);
+  const metadata = user.publicMetadata;
 
   // Check and log billing status
-  const billingStatus = checkBillingStatus(authObject);
+  const billingStatus = checkBillingStatus(authObject, metadata?.billingOverride as string);
   logBillingStatus(authObject.userId, billingStatus);
 
   // Store billing status in locals for API routes to use
