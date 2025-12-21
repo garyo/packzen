@@ -353,10 +353,21 @@ export function PackingPage(props: PackingPageProps) {
     });
   };
 
-  // Drag-and-drop handlers
+  // Helper to get bag name for display
+  const getBagName = (bagId: string | null) => {
+    if (!bagId) return 'No Bag';
+    return bags()?.find((b) => b.id === bagId)?.name || 'Unknown Bag';
+  };
+
+  // Drag-and-drop handlers with undo support
   const handleMoveItemToBag = async (itemId: string, bagId: string | null) => {
     const item = items()?.find((i) => i.id === itemId);
     if (!item || item.bag_id === bagId) return;
+
+    // Capture previous state for undo
+    const previousBagId = item.bag_id;
+    const previousContainerId = item.container_item_id;
+    const itemName = item.name;
 
     // Optimistic update
     mutate((prev) =>
@@ -366,12 +377,38 @@ export function PackingPage(props: PackingPageProps) {
     const response = await api.patch(endpoints.tripItems(props.tripId), {
       id: itemId,
       bag_id: bagId,
-      container_item_id: null, // Clear container when changing bag
+      container_item_id: null,
     });
 
     if (!response.success) {
       showToast('error', response.error || 'Failed to move item');
       refetch();
+    } else {
+      // Show undo toast
+      showToast('info', `Moved "${itemName}" to ${getBagName(bagId)}`, {
+        action: {
+          label: 'Undo',
+          onClick: async () => {
+            // Optimistic undo
+            mutate((prev) =>
+              prev?.map((i) =>
+                i.id === itemId
+                  ? { ...i, bag_id: previousBagId, container_item_id: previousContainerId }
+                  : i
+              )
+            );
+            const undoResponse = await api.patch(endpoints.tripItems(props.tripId), {
+              id: itemId,
+              bag_id: previousBagId,
+              container_item_id: previousContainerId,
+            });
+            if (!undoResponse.success) {
+              showToast('error', 'Failed to undo');
+              refetch();
+            }
+          },
+        },
+      });
     }
   };
 
@@ -385,6 +422,12 @@ export function PackingPage(props: PackingPageProps) {
 
     // Skip if nothing changed
     if (item.category_name === categoryName && item.bag_id === bagId) return;
+
+    // Capture previous state for undo
+    const previousCategoryName = item.category_name;
+    const previousBagId = item.bag_id;
+    const previousContainerId = item.container_item_id;
+    const itemName = item.name;
 
     // Optimistic update
     mutate((prev) =>
@@ -405,6 +448,42 @@ export function PackingPage(props: PackingPageProps) {
     if (!response.success) {
       showToast('error', response.error || 'Failed to move item');
       refetch();
+    } else {
+      // Show undo toast
+      const destination =
+        categoryName && bagId !== previousBagId
+          ? `${categoryName} in ${getBagName(bagId)}`
+          : categoryName || getBagName(bagId);
+      showToast('info', `Moved "${itemName}" to ${destination}`, {
+        action: {
+          label: 'Undo',
+          onClick: async () => {
+            // Optimistic undo
+            mutate((prev) =>
+              prev?.map((i) =>
+                i.id === itemId
+                  ? {
+                      ...i,
+                      category_name: previousCategoryName,
+                      bag_id: previousBagId,
+                      container_item_id: previousContainerId,
+                    }
+                  : i
+              )
+            );
+            const undoResponse = await api.patch(endpoints.tripItems(props.tripId), {
+              id: itemId,
+              category_name: previousCategoryName,
+              bag_id: previousBagId,
+              container_item_id: previousContainerId,
+            });
+            if (!undoResponse.success) {
+              showToast('error', 'Failed to undo');
+              refetch();
+            }
+          },
+        },
+      });
     }
   };
 
