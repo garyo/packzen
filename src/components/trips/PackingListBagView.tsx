@@ -291,155 +291,151 @@ export function PackingListBagView(props: PackingListBagViewProps) {
               return Array.from(bagCategories().entries()).sort(([a], [b]) => a.localeCompare(b));
             };
             return (
-              <Show when={totalItems() > 0}>
-                <div id={bag.id ? `bag-section-${bag.id}` : undefined}>
-                  <DroppableBagHeader bagId={bag.id}>
-                    <div class="mb-3 flex items-center gap-2 px-2 py-1 md:mb-1.5">
-                      <Show
-                        when={bag.id !== null}
-                        fallback={<span class="text-lg md:text-base">👕</span>}
-                      >
-                        <div
-                          class={`h-3 w-3 rounded-full border border-gray-300 md:h-2.5 md:w-2.5 ${getBagColorClass(bag.color)}`}
-                          style={getBagColorStyle(bag.color)}
-                        />
-                      </Show>
-                      <h2 class="flex-1 text-lg font-semibold text-gray-900 md:text-base">
-                        {bag.name}
-                      </h2>
-                      <span class="text-sm text-gray-500 md:text-xs">
-                        {packedItems()} / {totalItems()}
-                      </span>
-                      {/* Add items button */}
-                      <Show when={bag.id !== null}>
-                        <div class="relative">
-                          <button
-                            onClick={() =>
-                              setOpenBagMenu(openBagMenu() === bag.id ? null : (bag.id as string))
-                            }
-                            class="flex h-7 w-7 items-center justify-center rounded-full bg-blue-500 text-white hover:bg-blue-600"
-                            title="Add items to this bag"
+              <div id={bag.id ? `bag-section-${bag.id}` : undefined}>
+                <DroppableBagHeader bagId={bag.id}>
+                  <div class="mb-3 flex items-center gap-2 px-2 py-1 md:mb-1.5">
+                    <Show
+                      when={bag.id !== null}
+                      fallback={<span class="text-lg md:text-base">👕</span>}
+                    >
+                      <div
+                        class={`h-3 w-3 rounded-full border border-gray-300 md:h-2.5 md:w-2.5 ${getBagColorClass(bag.color)}`}
+                        style={getBagColorStyle(bag.color)}
+                      />
+                    </Show>
+                    <h2 class="flex-1 text-lg font-semibold text-gray-900 md:text-base">
+                      {bag.name}
+                    </h2>
+                    <span class="text-sm text-gray-500 md:text-xs">
+                      {packedItems()} / {totalItems()}
+                    </span>
+                    {/* Add items button */}
+                    <Show when={bag.id !== null}>
+                      <div class="relative">
+                        <button
+                          onClick={() =>
+                            setOpenBagMenu(openBagMenu() === bag.id ? null : (bag.id as string))
+                          }
+                          class="flex h-7 w-7 items-center justify-center rounded-full bg-blue-500 text-white hover:bg-blue-600"
+                          title="Add items to this bag"
+                        >
+                          <svg
+                            class="h-4 w-4"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
                           >
-                            <svg
-                              class="h-4 w-4"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                            >
-                              <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M12 4v16m8-8H4"
-                              />
-                            </svg>
-                          </button>
-                          <Show when={openBagMenu() === bag.id}>
-                            <div class="absolute top-full right-0 z-20 mt-1 w-48 rounded-lg border border-gray-200 bg-white shadow-lg">
-                              <button
-                                onClick={() => {
-                                  props.onAddToBag?.(bag.id as string);
-                                  setOpenBagMenu(null);
-                                }}
-                                class="w-full px-4 py-2 text-left text-sm font-bold hover:bg-gray-100"
-                              >
-                                ✏️ New Item
-                              </button>
-                              <button
-                                onClick={() => {
-                                  props.onAddFromMasterToBag?.(bag.id as string);
-                                  setOpenBagMenu(null);
-                                }}
-                                class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
-                              >
-                                📋 From All Items
-                              </button>
-                              <button
-                                onClick={() => {
-                                  props.onBrowseTemplatesToBag?.(bag.id as string);
-                                  setOpenBagMenu(null);
-                                }}
-                                class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
-                              >
-                                📚 From Templates
-                              </button>
-                            </div>
-                          </Show>
-                        </div>
-                      </Show>
-                    </div>
-                  </DroppableBagHeader>
-                  <For each={sortedCategories()}>
-                    {([category, categoryItems]) => {
-                      // Sort items alphabetically by name
-                      const sortedItems = [...categoryItems].sort((a, b) =>
-                        a.name.localeCompare(b.name)
-                      );
-                      // Check if dragging is enabled (not in select mode)
-                      const isDragEnabled = () => !props.selectMode();
-                      return (
-                        <DroppableCategorySection bagId={bag.id} categoryName={category}>
-                          <h3 class="mb-2 flex items-center gap-1 px-1 text-sm font-medium text-gray-600 md:mb-1 md:text-xs">
-                            <span class="text-base md:text-sm">{getCategoryIcon(category)}</span>
-                            {category}
-                          </h3>
-                          <div
-                            class="grid gap-2 md:gap-1.5"
-                            style="grid-template-columns: repeat(auto-fill, minmax(320px, 400px))"
-                          >
-                            <For each={sortedItems}>
-                              {(item) => {
-                                // Items inside containers are not draggable
-                                const canDrag = () => isDragEnabled() && !item.container_item_id;
-                                return (
-                                  <DraggableItem item={item} enabled={canDrag()}>
-                                    {(dragProps) => (
-                                      <PackingItemCard
-                                        item={item}
-                                        selectMode={props.selectMode()}
-                                        isSelected={props.selectedItems().has(item.id)}
-                                        showCategoryInfo={true}
-                                        categoryIcon={
-                                          item.is_container && item.category_name
-                                            ? getCategoryIcon(item.category_name)
-                                            : undefined
-                                        }
-                                        onTogglePacked={() => props.onTogglePacked(item)}
-                                        onEdit={() => props.onEditItem(item)}
-                                        onToggleSelection={() =>
-                                          props.onToggleItemSelection(item.id)
-                                        }
-                                        containerContentsCount={
-                                          item.is_container
-                                            ? getContainerContents(item.id).length
-                                            : undefined
-                                        }
-                                        containerPackedCount={
-                                          item.is_container
-                                            ? getContainerPackedCount(item.id)
-                                            : undefined
-                                        }
-                                        onContainerClick={
-                                          item.is_container &&
-                                          getContainerContents(item.id).length > 0
-                                            ? () => scrollToContainer(item.id)
-                                            : undefined
-                                        }
-                                        dragActivators={dragProps.dragActivators}
-                                        isDragging={dragProps.isDragging}
-                                      />
-                                    )}
-                                  </DraggableItem>
-                                );
+                            <path
+                              stroke-linecap="round"
+                              stroke-linejoin="round"
+                              stroke-width="2"
+                              d="M12 4v16m8-8H4"
+                            />
+                          </svg>
+                        </button>
+                        <Show when={openBagMenu() === bag.id}>
+                          <div class="absolute top-full right-0 z-20 mt-1 w-48 rounded-lg border border-gray-200 bg-white shadow-lg">
+                            <button
+                              onClick={() => {
+                                props.onAddToBag?.(bag.id as string);
+                                setOpenBagMenu(null);
                               }}
-                            </For>
+                              class="w-full px-4 py-2 text-left text-sm font-bold hover:bg-gray-100"
+                            >
+                              ✏️ New Item
+                            </button>
+                            <button
+                              onClick={() => {
+                                props.onAddFromMasterToBag?.(bag.id as string);
+                                setOpenBagMenu(null);
+                              }}
+                              class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
+                            >
+                              📋 From All Items
+                            </button>
+                            <button
+                              onClick={() => {
+                                props.onBrowseTemplatesToBag?.(bag.id as string);
+                                setOpenBagMenu(null);
+                              }}
+                              class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
+                            >
+                              📚 From Templates
+                            </button>
                           </div>
-                        </DroppableCategorySection>
-                      );
-                    }}
-                  </For>
-                </div>
-              </Show>
+                        </Show>
+                      </div>
+                    </Show>
+                  </div>
+                </DroppableBagHeader>
+                <For each={sortedCategories()}>
+                  {([category, categoryItems]) => {
+                    // Sort items alphabetically by name
+                    const sortedItems = [...categoryItems].sort((a, b) =>
+                      a.name.localeCompare(b.name)
+                    );
+                    // Check if dragging is enabled (not in select mode)
+                    const isDragEnabled = () => !props.selectMode();
+                    return (
+                      <DroppableCategorySection bagId={bag.id} categoryName={category}>
+                        <h3 class="mb-2 flex items-center gap-1 px-1 text-sm font-medium text-gray-600 md:mb-1 md:text-xs">
+                          <span class="text-base md:text-sm">{getCategoryIcon(category)}</span>
+                          {category}
+                        </h3>
+                        <div
+                          class="grid gap-2 md:gap-1.5"
+                          style="grid-template-columns: repeat(auto-fill, minmax(320px, 400px))"
+                        >
+                          <For each={sortedItems}>
+                            {(item) => {
+                              // Items inside containers are not draggable
+                              const canDrag = () => isDragEnabled() && !item.container_item_id;
+                              return (
+                                <DraggableItem item={item} enabled={canDrag()}>
+                                  {(dragProps) => (
+                                    <PackingItemCard
+                                      item={item}
+                                      selectMode={props.selectMode()}
+                                      isSelected={props.selectedItems().has(item.id)}
+                                      showCategoryInfo={true}
+                                      categoryIcon={
+                                        item.is_container && item.category_name
+                                          ? getCategoryIcon(item.category_name)
+                                          : undefined
+                                      }
+                                      onTogglePacked={() => props.onTogglePacked(item)}
+                                      onEdit={() => props.onEditItem(item)}
+                                      onToggleSelection={() => props.onToggleItemSelection(item.id)}
+                                      containerContentsCount={
+                                        item.is_container
+                                          ? getContainerContents(item.id).length
+                                          : undefined
+                                      }
+                                      containerPackedCount={
+                                        item.is_container
+                                          ? getContainerPackedCount(item.id)
+                                          : undefined
+                                      }
+                                      onContainerClick={
+                                        item.is_container &&
+                                        getContainerContents(item.id).length > 0
+                                          ? () => scrollToContainer(item.id)
+                                          : undefined
+                                      }
+                                      dragActivators={dragProps.dragActivators}
+                                      isDragging={dragProps.isDragging}
+                                    />
+                                  )}
+                                </DraggableItem>
+                              );
+                            }}
+                          </For>
+                        </div>
+                      </DroppableCategorySection>
+                    );
+                  }}
+                </For>
+              </div>
             );
           }}
         </For>
