@@ -7,7 +7,7 @@
 
 import { For, Show, createSignal, type Accessor } from 'solid-js';
 import type { Trip } from '../../lib/types';
-import { formatDate, getTripStatus } from '../../lib/utils';
+import { formatDateRange, getTripStatus } from '../../lib/utils';
 import { TripForm } from '../trips/TripForm';
 
 interface UpcomingTripsListProps {
@@ -106,16 +106,9 @@ function TripCard(props: TripCardProps) {
             <p class="mt-1 text-sm text-gray-600">📍 {props.trip.destination}</p>
           </Show>
           <p class="mt-1 text-sm text-gray-500">
-            <Show
-              when={props.trip.start_date}
-              fallback={<span class="text-gray-400">No date set</span>}
-            >
-              {formatDate(props.trip.start_date!)}
-              <Show when={props.trip.end_date && props.trip.end_date !== props.trip.start_date}>
-                {' '}
-                - {formatDate(props.trip.end_date!)}
-              </Show>
-            </Show>
+            {formatDateRange(props.trip.start_date, props.trip.end_date) || (
+              <span class="text-gray-400">No date set</span>
+            )}
           </p>
         </div>
         <div class="ml-4 flex items-center gap-2">

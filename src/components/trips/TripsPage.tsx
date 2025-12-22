@@ -9,7 +9,7 @@ import { Toast, showToast } from '../ui/Toast';
 import { TripForm } from './TripForm';
 import { TripFormWithBags } from './TripFormWithBags';
 import { NewTripImportModal } from './NewTripImportModal';
-import { formatDate, getTripStatus } from '../../lib/utils';
+import { formatDateRange, getTripStatus } from '../../lib/utils';
 import { fetchWithErrorHandling } from '../../lib/resource-helpers';
 import { deleteTripWithConfirm } from '../../lib/trip-actions';
 
@@ -286,12 +286,7 @@ function TripCard(props: {
       </div>
 
       <p class="mb-2 text-sm text-gray-600">
-        {props.trip.start_date ? (
-          <>
-            {formatDate(props.trip.start_date)}
-            {props.trip.end_date && ` - ${formatDate(props.trip.end_date)}`}
-          </>
-        ) : (
+        {formatDateRange(props.trip.start_date, props.trip.end_date) || (
           <span class="text-gray-400">No date set</span>
         )}
       </p>

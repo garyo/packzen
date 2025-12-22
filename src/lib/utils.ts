@@ -12,6 +12,55 @@ export function formatDate(date: string | Date): string {
   return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
+// Format a date range intelligently based on overlap
+// Examples:
+//   "Jan 1-4, 2026" (same month and year)
+//   "Jan 1-Feb 2, 2026" (different months, same year)
+//   "Dec 31, 2025 - Jan 2, 2026" (spans years)
+//   "Jan 1, 2026" (only start date)
+//   "Through Feb 2, 2026" (only end date)
+export function formatDateRange(
+  startDate: string | null | undefined,
+  endDate: string | null | undefined
+): string {
+  // Handle missing dates
+  if (!startDate && !endDate) return '';
+  if (!startDate && endDate) {
+    return `Through ${formatDate(endDate)}`;
+  }
+  if (startDate && !endDate) {
+    return formatDate(startDate);
+  }
+
+  const start = parseLocalDate(startDate!);
+  const end = parseLocalDate(endDate!);
+
+  const startMonth = start.toLocaleDateString('en-US', { month: 'short' });
+  const endMonth = end.toLocaleDateString('en-US', { month: 'short' });
+  const startDay = start.getDate();
+  const endDay = end.getDate();
+  const startYear = start.getFullYear();
+  const endYear = end.getFullYear();
+
+  // Same date
+  if (startDate === endDate) {
+    return formatDate(start);
+  }
+
+  // Spans multiple years
+  if (startYear !== endYear) {
+    return `${formatDate(start)} - ${formatDate(end)}`;
+  }
+
+  // Same month and year
+  if (startMonth === endMonth) {
+    return `${startMonth} ${startDay}-${endDay}, ${startYear}`;
+  }
+
+  // Different months, same year
+  return `${startMonth} ${startDay}-${endMonth} ${endDay}, ${startYear}`;
+}
+
 // Calculate trip duration in days
 export function getTripDuration(startDate: string, endDate: string): number {
   const start = parseLocalDate(startDate);

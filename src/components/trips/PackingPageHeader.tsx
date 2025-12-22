@@ -9,7 +9,7 @@ import { Show, type Accessor, onMount, onCleanup } from 'solid-js';
 import type { Trip } from '../../lib/types';
 import { Button } from '../ui/Button';
 import { createSignal } from 'solid-js';
-import { formatDate } from '../../lib/utils';
+import { formatDateRange } from '../../lib/utils';
 
 interface PackingPageHeaderProps {
   trip: Accessor<Trip | null | undefined>;
@@ -116,8 +116,8 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
                     {props.trip()?.name || 'Packing'}
                   </h1>
                   <p class="text-xs text-gray-600">
-                    {formatDate(props.trip()?.start_date || 'no date planned')}
-                    {props.trip()?.end_date && ` - ${formatDate(props.trip()?.end_date || '')}`}
+                    {formatDateRange(props.trip()?.start_date, props.trip()?.end_date) ||
+                      'No dates set'}
                   </p>
                 </div>
                 <button
