@@ -1,4 +1,4 @@
-import { createSignal } from 'solid-js';
+import { createSignal, Show } from 'solid-js';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { showToast } from '../ui/Toast';

@@ -763,9 +763,9 @@ export function PackingPage(props: PackingPageProps) {
       </Show>
 
       {/* Edit Trip Modal */}
-      <Show when={showEditTrip()}>
+      <Show when={showEditTrip() && trip()}>
         <TripForm
-          trip={trip()}
+          trip={trip()!}
           onClose={() => setShowEditTrip(false)}
           onSaved={() => {
             setShowEditTrip(false);

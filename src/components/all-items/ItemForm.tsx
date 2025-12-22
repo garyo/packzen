@@ -59,7 +59,7 @@ export function ItemForm(props: ItemFormProps) {
   };
 
   return (
-    <Modal isOpen={true} onClose={props.onClose} title={props.item ? 'Edit Item' : 'Add Item'}>
+    <Modal onClose={props.onClose} title={props.item ? 'Edit Item' : 'Add Item'}>
       <form onSubmit={handleSubmit} class="space-y-4">
         <Input
           label="Item Name *"

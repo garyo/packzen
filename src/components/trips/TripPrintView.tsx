@@ -342,7 +342,7 @@ export function TripPrintView(props: TripPrintViewProps) {
             <p class="print-date">
               {trip()?.start_date && (
                 <>
-                  {new Date(trip()!.start_date).toLocaleDateString('en-US', {
+                  {new Date(trip()!.start_date!).toLocaleDateString('en-US', {
                     month: 'long',
                     day: 'numeric',
                     year: 'numeric',
@@ -350,7 +350,7 @@ export function TripPrintView(props: TripPrintViewProps) {
                   {trip()?.end_date && (
                     <>
                       {' - '}
-                      {new Date(trip()!.end_date).toLocaleDateString('en-US', {
+                      {new Date(trip()!.end_date!).toLocaleDateString('en-US', {
                         month: 'long',
                         day: 'numeric',
                         year: 'numeric',
