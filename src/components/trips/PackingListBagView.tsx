@@ -7,7 +7,15 @@
  * Supports drag-and-drop to move items between bags and categories
  */
 
-import { For, Show, type Accessor, createMemo, createSignal, onMount, onCleanup } from 'solid-js';
+import {
+  For,
+  Show,
+  type Accessor,
+  createMemo,
+  createSignal,
+  createEffect,
+  onCleanup,
+} from 'solid-js';
 import {
   DragDropProvider,
   DragDropSensors,
@@ -357,7 +365,12 @@ export function PackingListBagView(props: PackingListBagViewProps) {
 
   // Set up Intersection Observer to track which section is visible
   // We track all visible sections and pick the topmost one
-  onMount(() => {
+  // Use createEffect to wait for bags to be loaded before setting up observer
+  createEffect(() => {
+    // Wait for bags to be loaded
+    const bags = props.bags();
+    if (!bags || bags.length === 0) return;
+
     const visibleSections = new Set<string>();
 
     // Find the scroll container to use as root
