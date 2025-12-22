@@ -130,7 +130,7 @@ function WayfindingNavBar(props: {
                     style={getBagColorStyle(bag.color)}
                   />
                 </Show>
-                <span class="max-w-[100px] truncate">{bag.name}</span>
+                <span class="max-w-[130px] truncate">{bag.name}</span>
               </button>
             );
           }}
@@ -153,7 +153,7 @@ function WayfindingNavBar(props: {
                   style="min-height: 16px"
                 >
                   <span class="text-[10px]">📦</span>
-                  <span class="max-w-[100px] truncate">{container.name}</span>
+                  <span class="max-w-[130px] truncate">{container.name}</span>
                 </button>
               );
             }}
