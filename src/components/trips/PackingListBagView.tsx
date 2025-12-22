@@ -363,6 +363,18 @@ export function PackingListBagView(props: PackingListBagViewProps) {
     // Find the scroll container to use as root
     const scrollContainer = document.querySelector('main.overflow-y-auto') as HTMLElement | null;
 
+    const updateCurrentSection = () => {
+      const allSections = document.querySelectorAll(
+        '[id^="bag-section-"], [id^="container-section-"]'
+      );
+      for (const section of allSections) {
+        if (visibleSections.has(section.id)) {
+          setCurrentSection(section.id);
+          return;
+        }
+      }
+    };
+
     const observer = new IntersectionObserver(
       (entries) => {
         // Update the set of visible sections
@@ -373,19 +385,7 @@ export function PackingListBagView(props: PackingListBagViewProps) {
             visibleSections.delete(entry.target.id);
           }
         }
-
-        // Find the topmost visible section by checking DOM order
-        const allSections = document.querySelectorAll(
-          '[id^="bag-section-"], [id^="container-section-"]'
-        );
-        for (const section of allSections) {
-          if (visibleSections.has(section.id)) {
-            setCurrentSection(section.id);
-            return;
-          }
-        }
-
-        // If nothing visible, keep the last one
+        updateCurrentSection();
       },
       {
         root: scrollContainer, // Use scroll container as root
@@ -394,13 +394,26 @@ export function PackingListBagView(props: PackingListBagViewProps) {
       }
     );
 
-    // Observe all sections after a short delay to ensure DOM is ready
-    setTimeout(() => {
-      const bagSections = document.querySelectorAll('[id^="bag-section-"]');
-      const containerSections = document.querySelectorAll('[id^="container-section-"]');
-      bagSections.forEach((el) => observer.observe(el));
-      containerSections.forEach((el) => observer.observe(el));
-    }, 100);
+    // Wait for layout to settle, then set up observer
+    // Use RAF to ensure rendering is complete
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        const bagSections = document.querySelectorAll('[id^="bag-section-"]');
+        const containerSections = document.querySelectorAll('[id^="container-section-"]');
+
+        // Set initial section to first bag if available
+        if (bagSections.length > 0) {
+          setCurrentSection(bagSections[0].id);
+        }
+
+        // Start observing
+        bagSections.forEach((el) => observer.observe(el));
+        containerSections.forEach((el) => observer.observe(el));
+
+        // Trigger immediate check after a brief moment to let observer settle
+        setTimeout(updateCurrentSection, 50);
+      }, 150);
+    });
 
     onCleanup(() => observer.disconnect());
   });
