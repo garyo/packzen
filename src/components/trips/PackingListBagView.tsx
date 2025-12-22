@@ -14,6 +14,7 @@ import {
   createMemo,
   createSignal,
   createEffect,
+  onMount,
   onCleanup,
 } from 'solid-js';
 import {
@@ -295,7 +296,7 @@ export function PackingListBagView(props: PackingListBagViewProps) {
     }
   };
 
-  const itemsByBag = () => {
+  const itemsByBag = createMemo(() => {
     const allItems = props.items() || [];
     const allBags = props.bags() || [];
     const grouped = new Map<string | null, Map<string, TripItem[]>>();
@@ -335,60 +336,64 @@ export function PackingListBagView(props: PackingListBagViewProps) {
     ];
 
     return { grouped, allBags: bagsWithWearing };
-  };
+  });
 
-  // Get category icon by name
+  // Create lookup maps for O(1) access
+  const bagLookup = createMemo(() => {
+    const bags = props.bags() || [];
+    return new Map(bags.map((b) => [b.id, b]));
+  });
+
+  const categoryLookup = createMemo(() => {
+    const categories = props.categories() || [];
+    return new Map(categories.map((c) => [c.name, c]));
+  });
+
+  // Get category icon by name - using lookup map for O(1) access
   const getCategoryIcon = (categoryName: string) => {
-    const allCategories = props.categories() || [];
-    const category = allCategories.find((c) => c.name === categoryName);
-    return category?.icon || '📦';
+    return categoryLookup().get(categoryName)?.icon || '📦';
   };
 
   // Sort bags alphabetically
-  const sortedBags = () => {
+  const sortedBags = createMemo(() => {
     return [...itemsByBag().allBags].sort((a, b) => a.name.localeCompare(b.name));
-  };
+  });
 
   // Get all containers (even empty ones), sorted by name
   const allContainers = () => {
     return containerData().containers.sort((a, b) => a.name.localeCompare(b.name));
   };
 
-  // Find the bag for a container (for display purposes)
+  // Find the bag for a container (for display purposes) - using lookup map for O(1) access
   const getBagForItem = (item: TripItem) => {
-    const allBags = props.bags() || [];
-    return allBags.find((b) => b.id === item.bag_id);
+    if (!item.bag_id) return undefined;
+    return bagLookup().get(item.bag_id);
   };
 
   // Track current visible section for wayfinding nav bar
   const [currentSection, setCurrentSection] = createSignal<string | null>(null);
 
-  // Set up Intersection Observer to track which section is visible
-  // We track all visible sections and pick the topmost one
-  // Use createEffect to wait for bags to be loaded before setting up observer
-  createEffect(() => {
-    // Wait for bags to be loaded
-    const bags = props.bags();
-    if (!bags || bags.length === 0) return;
+  // Set up Intersection Observer to track which section is visible (created once)
+  const visibleSections = new Set<string>();
+  let observer: IntersectionObserver | null = null;
 
-    const visibleSections = new Set<string>();
+  const updateCurrentSection = () => {
+    const allSections = document.querySelectorAll(
+      '[id^="bag-section-"], [id^="container-section-"]'
+    );
+    for (const section of allSections) {
+      if (visibleSections.has(section.id)) {
+        setCurrentSection(section.id);
+        return;
+      }
+    }
+  };
 
-    // Find the scroll container to use as root
+  // Create observer once on mount
+  onMount(() => {
     const scrollContainer = document.querySelector('main.overflow-y-auto') as HTMLElement | null;
 
-    const updateCurrentSection = () => {
-      const allSections = document.querySelectorAll(
-        '[id^="bag-section-"], [id^="container-section-"]'
-      );
-      for (const section of allSections) {
-        if (visibleSections.has(section.id)) {
-          setCurrentSection(section.id);
-          return;
-        }
-      }
-    };
-
-    const observer = new IntersectionObserver(
+    observer = new IntersectionObserver(
       (entries) => {
         // Update the set of visible sections
         for (const entry of entries) {
@@ -401,34 +406,46 @@ export function PackingListBagView(props: PackingListBagViewProps) {
         updateCurrentSection();
       },
       {
-        root: scrollContainer, // Use scroll container as root
-        rootMargin: '-28px 0px 0px 0px', // Account for sticky nav bar height
+        root: scrollContainer,
+        rootMargin: '-28px 0px 0px 0px',
         threshold: 0,
       }
     );
 
-    // Wait for layout to settle, then set up observer
-    // Use RAF to ensure rendering is complete
+    onCleanup(() => {
+      if (observer) {
+        observer.disconnect();
+      }
+    });
+  });
+
+  // Update observed elements when bags/containers change
+  createEffect(() => {
+    const bags = props.bags();
+    const containers = containerData().containers;
+
+    // Wait for bags to be loaded and observer to be created
+    if (!bags || bags.length === 0 || !observer) return;
+
+    // Wait for layout to settle before observing
     requestAnimationFrame(() => {
       setTimeout(() => {
         const bagSections = document.querySelectorAll('[id^="bag-section-"]');
         const containerSections = document.querySelectorAll('[id^="container-section-"]');
 
         // Set initial section to first bag if available
-        if (bagSections.length > 0) {
+        if (bagSections.length > 0 && !currentSection()) {
           setCurrentSection(bagSections[0].id);
         }
 
-        // Start observing
-        bagSections.forEach((el) => observer.observe(el));
-        containerSections.forEach((el) => observer.observe(el));
+        // Start observing (note: observing same element multiple times is safe, it's a no-op)
+        bagSections.forEach((el) => observer!.observe(el));
+        containerSections.forEach((el) => observer!.observe(el));
 
-        // Trigger immediate check after a brief moment to let observer settle
+        // Trigger immediate check
         setTimeout(updateCurrentSection, 50);
       }, 150);
     });
-
-    onCleanup(() => observer.disconnect());
   });
 
   // Scroll to a section smoothly within the scroll container
@@ -471,9 +488,17 @@ export function PackingListBagView(props: PackingListBagViewProps) {
             const allBagItems = () => Array.from(bagCategories().values()).flat();
             const totalItems = () => allBagItems().length;
             const packedItems = () => allBagItems().filter((item) => item.is_packed).length;
-            // Sort categories alphabetically within bag
+            // Sort categories alphabetically within bag and pre-sort items within each category
             const sortedCategories = () => {
-              return Array.from(bagCategories().entries()).sort(([a], [b]) => a.localeCompare(b));
+              return Array.from(bagCategories().entries())
+                .sort(([a], [b]) => a.localeCompare(b))
+                .map(
+                  ([category, items]) =>
+                    [category, [...items].sort((a, b) => a.name.localeCompare(b.name))] as [
+                      string,
+                      TripItem[],
+                    ]
+                );
             };
             // Check if dragging is enabled (not in select mode)
             const isDragEnabled = () => !props.selectMode();
@@ -556,10 +581,7 @@ export function PackingListBagView(props: PackingListBagViewProps) {
                   </div>
                   <For each={sortedCategories()}>
                     {([category, categoryItems]) => {
-                      // Sort items alphabetically by name
-                      const sortedItems = [...categoryItems].sort((a, b) =>
-                        a.name.localeCompare(b.name)
-                      );
+                      // Items are already sorted in sortedCategories()
                       return (
                         <div class="mb-4 md:mb-2">
                           <h3 class="mb-2 flex items-center gap-1 px-1 text-sm font-medium text-gray-600 md:mb-1 md:text-xs">
@@ -570,7 +592,7 @@ export function PackingListBagView(props: PackingListBagViewProps) {
                             class="grid gap-2 md:gap-1.5"
                             style="grid-template-columns: repeat(auto-fill, minmax(320px, 400px))"
                           >
-                            <For each={sortedItems}>
+                            <For each={categoryItems}>
                               {(item) => {
                                 // All items are now draggable (including those in containers)
                                 const canDrag = () => isDragEnabled();

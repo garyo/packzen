@@ -1,7 +1,14 @@
 import { createSignal, createResource, Show, onMount } from 'solid-js';
 import { authStore } from '../../stores/auth';
 import { api, endpoints } from '../../lib/api';
-import type { Trip, TripItem, Bag, Category, SelectedBuiltInItem } from '../../lib/types';
+import type {
+  Trip,
+  TripItem,
+  Bag,
+  Category,
+  SelectedBuiltInItem,
+  MasterItemWithCategory,
+} from '../../lib/types';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
 import { EmptyState } from '../ui/EmptyState';
 import { Button } from '../ui/Button';
@@ -68,6 +75,13 @@ export function PackingPage(props: PackingPageProps) {
     return fetchWithErrorHandling(
       () => api.get<Category[]>(endpoints.categories),
       'Failed to load categories'
+    );
+  });
+
+  const [masterItems] = createResource<MasterItemWithCategory[]>(async () => {
+    return fetchWithErrorHandling(
+      () => api.get<MasterItemWithCategory[]>(endpoints.masterItems),
+      'Failed to load master items'
     );
   });
 
@@ -736,6 +750,9 @@ export function PackingPage(props: PackingPageProps) {
           tripId={props.tripId}
           preSelectedBagId={preSelectedBagId()}
           preSelectedContainerId={preSelectedContainerId()}
+          bags={bags}
+          tripItems={items}
+          masterItems={masterItems}
           onClose={closeAddFromMaster}
           onAdded={() => refetch()}
         />

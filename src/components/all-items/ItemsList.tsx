@@ -165,19 +165,38 @@ export function ItemsList(props: ItemsListProps) {
     }
   };
 
+  // Pre-group and sort items by category for O(1) access
+  const itemsByCategory = createMemo(() => {
+    const items = props.items() || [];
+    const grouped = new Map<string | null, MasterItem[]>();
+
+    items.forEach((item) => {
+      const categoryId = item.category_id || null;
+      if (!grouped.has(categoryId)) {
+        grouped.set(categoryId, []);
+      }
+      grouped.get(categoryId)!.push(item);
+    });
+
+    // Sort items within each category
+    grouped.forEach((items) => {
+      items.sort((a, b) => a.name.localeCompare(b.name));
+    });
+
+    return grouped;
+  });
+
   const getItemsByCategory = (categoryId: string | null) => {
-    const items = props.items()?.filter((item) => item.category_id === categoryId) || [];
-    // Sort items alphabetically by name
-    return items.sort((a, b) => a.name.localeCompare(b.name));
+    return itemsByCategory().get(categoryId) || [];
   };
 
   const uncategorizedItems = () => getItemsByCategory(null);
 
   // Sort categories alphabetically by name
-  const sortedCategories = () => {
+  const sortedCategories = createMemo(() => {
     const cats = props.categories() || [];
     return [...cats].sort((a, b) => a.name.localeCompare(b.name));
-  };
+  });
 
   return (
     <div class="space-y-6 md:space-y-3">

@@ -104,12 +104,20 @@ export function BuiltInItemsBrowser(props: BuiltInItemsBrowserProps) {
       groups.get(item.category)!.push(item);
     });
 
-    // Sort categories by sort_order
-    return Array.from(groups.entries()).sort(([a], [b]) => {
-      const categoryA = builtInItems.categories.find((c) => c.name === a);
-      const categoryB = builtInItems.categories.find((c) => c.name === b);
-      return (categoryA?.sort_order || 999) - (categoryB?.sort_order || 999);
-    });
+    // Sort categories by sort_order and pre-sort items within each category
+    return Array.from(groups.entries())
+      .sort(([a], [b]) => {
+        const categoryA = builtInItems.categories.find((c) => c.name === a);
+        const categoryB = builtInItems.categories.find((c) => c.name === b);
+        return (categoryA?.sort_order || 999) - (categoryB?.sort_order || 999);
+      })
+      .map(
+        ([category, categoryItems]) =>
+          [category, categoryItems.sort((a, b) => a.name.localeCompare(b.name))] as [
+            string,
+            typeof items,
+          ]
+      );
   });
 
   // Get available categories for current filters
@@ -383,7 +391,7 @@ export function BuiltInItemsBrowser(props: BuiltInItemsBrowserProps) {
                   </div>
                   <Show when={isExpanded()}>
                     <div class="space-y-2">
-                      <For each={categoryItems.sort((a, b) => a.name.localeCompare(b.name))}>
+                      <For each={categoryItems}>
                         {(item) => {
                           const isSelected = () => selectedItems().has(item.name);
                           const quantity = () =>

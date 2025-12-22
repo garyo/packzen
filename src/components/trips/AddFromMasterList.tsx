@@ -1,16 +1,18 @@
-import { createResource, createEffect, For, Show, createSignal } from 'solid-js';
+import { createEffect, For, Show, createSignal, type Accessor } from 'solid-js';
 import { api, endpoints } from '../../lib/api';
 import type { MasterItemWithCategory, Bag, TripItem } from '../../lib/types';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
 import { showToast } from '../ui/Toast';
-import { fetchWithErrorHandling } from '../../lib/resource-helpers';
 
 interface AddFromMasterListProps {
   tripId: string;
   preSelectedBagId?: string | null;
   preSelectedContainerId?: string | null;
+  bags: Accessor<Bag[] | undefined>;
+  tripItems: Accessor<TripItem[] | undefined>;
+  masterItems: Accessor<MasterItemWithCategory[] | undefined>;
   onClose: () => void;
   onAdded: () => void;
 }
@@ -23,38 +25,17 @@ export function AddFromMasterList(props: AddFromMasterListProps) {
   // Set pre-selected values from props using createEffect for proper reactivity
   // Wait for resources to load before setting to ensure dropdown options exist
   createEffect(() => {
-    if (bags() && props.preSelectedBagId) {
+    if (props.bags() && props.preSelectedBagId) {
       setSelectedBag(props.preSelectedBagId);
     }
-    if (tripItems() && props.preSelectedContainerId) {
+    if (props.tripItems() && props.preSelectedContainerId) {
       setSelectedContainer(props.preSelectedContainerId);
     }
   });
 
-  const [masterItems] = createResource<MasterItemWithCategory[]>(async () => {
-    return fetchWithErrorHandling(
-      () => api.get<MasterItemWithCategory[]>(endpoints.masterItems),
-      'Failed to load items'
-    );
-  });
-
-  const [bags] = createResource<Bag[]>(async () => {
-    return fetchWithErrorHandling(
-      () => api.get<Bag[]>(endpoints.tripBags(props.tripId)),
-      'Failed to load bags'
-    );
-  });
-
-  const [tripItems] = createResource<TripItem[]>(async () => {
-    return fetchWithErrorHandling(
-      () => api.get<TripItem[]>(endpoints.tripItems(props.tripId)),
-      'Failed to load items'
-    );
-  });
-
   // Get available containers
   const availableContainers = () => {
-    const items = tripItems() || [];
+    const items = props.tripItems() || [];
     return items.filter((item) => item.is_container);
   };
 
@@ -87,7 +68,7 @@ export function AddFromMasterList(props: AddFromMasterListProps) {
   };
 
   const groupedItems = () => {
-    const items = masterItems();
+    const items = props.masterItems();
     if (!items) return new Map<string, MasterItemWithCategory[]>();
 
     const groups = new Map<string, MasterItemWithCategory[]>();
@@ -139,15 +120,15 @@ export function AddFromMasterList(props: AddFromMasterListProps) {
             class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
           >
             <option value="">No bag (add to trip)</option>
-            <For each={bags()}>{(bag) => <option value={bag.id}>{bag.name}</option>}</For>
+            <For each={props.bags()}>{(bag) => <option value={bag.id}>{bag.name}</option>}</For>
           </select>
         </div>
       </Show>
 
       <div class="max-h-96 space-y-4 overflow-y-auto">
-        <Show when={!masterItems.loading} fallback={<LoadingSpinner text="Loading items..." />}>
+        <Show when={props.masterItems()} fallback={<LoadingSpinner text="Loading items..." />}>
           <Show
-            when={(masterItems()?.length || 0) > 0}
+            when={(props.masterItems()?.length || 0) > 0}
             fallback={
               <div class="py-8 text-center text-gray-500">
                 <p>No items in all items list</p>

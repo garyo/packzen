@@ -6,7 +6,7 @@
  * Supports drag-and-drop to move items between bags within the same category
  */
 
-import { For, Show, type Accessor, createSignal } from 'solid-js';
+import { For, Show, type Accessor, createSignal, createMemo } from 'solid-js';
 import {
   DragDropProvider,
   DragDropSensors,
@@ -180,7 +180,7 @@ export function PackingListCategoryView(props: PackingListCategoryViewProps) {
     return activeCategoryName() === categoryName;
   };
 
-  const itemsByCategory = () => {
+  const itemsByCategory = createMemo(() => {
     const allItems = props.items() || [];
     const allBags = props.bags() || [];
 
@@ -245,22 +245,31 @@ export function PackingListCategoryView(props: PackingListCategoryViewProps) {
     ];
 
     return { bagGrouped, containerGrouped, allBags: bagsWithWearing, containers };
-  };
+  });
 
-  // Get category icon by name
+  // Create lookup maps for O(1) access
+  const bagLookup = createMemo(() => {
+    const bags = props.bags() || [];
+    return new Map(bags.map((b) => [b.id, b]));
+  });
+
+  const categoryLookup = createMemo(() => {
+    const categories = props.categories() || [];
+    return new Map(categories.map((c) => [c.name, c]));
+  });
+
+  // Get category icon by name - using lookup map for O(1) access
   const getCategoryIcon = (categoryName: string) => {
-    const allCategories = props.categories() || [];
-    const category = allCategories.find((c) => c.name === categoryName);
-    return category?.icon || '📦';
+    return categoryLookup().get(categoryName)?.icon || '📦';
   };
 
   // Sort categories alphabetically - combine categories from both bags and containers
-  const sortedCategories = () => {
+  const sortedCategories = createMemo(() => {
     const allCategories = new Set<string>();
     itemsByCategory().bagGrouped.forEach((_, category) => allCategories.add(category));
     itemsByCategory().containerGrouped.forEach((_, category) => allCategories.add(category));
     return Array.from(allCategories).sort((a, b) => a.localeCompare(b));
-  };
+  });
 
   return (
     <DragDropProvider
