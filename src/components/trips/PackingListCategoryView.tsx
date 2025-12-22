@@ -20,8 +20,11 @@ import { PackingItemCard } from './PackingItemCard';
 import { getBagColorClass, getBagColorStyle } from '../../lib/color-utils';
 import { liveRectCollision, useAutoScroll, EscapeCancelHandler } from './drag-drop-utils';
 
-// Drop zone type - only bag sections in category view
-const DROP_ZONE_TYPE = 'bag-section' as const;
+// Drop zone types - bag sections and container sections
+const DROP_ZONE_TYPES = {
+  BAG: 'bag-section',
+  CONTAINER: 'container-section',
+} as const;
 
 interface DragData {
   itemId: string;
@@ -30,8 +33,9 @@ interface DragData {
 }
 
 interface DropData {
-  type: typeof DROP_ZONE_TYPE;
-  bagId: string | null;
+  type: (typeof DROP_ZONE_TYPES)[keyof typeof DROP_ZONE_TYPES];
+  bagId?: string | null;
+  containerId?: string;
   categoryName: string;
 }
 
@@ -43,7 +47,7 @@ function DroppableBagSection(props: {
   children: any;
 }) {
   const droppable = createDroppable(`bag-section-${props.categoryName}-${props.bagId ?? 'none'}`, {
-    type: DROP_ZONE_TYPE,
+    type: DROP_ZONE_TYPES.BAG,
     bagId: props.bagId,
     categoryName: props.categoryName,
   } as DropData);
@@ -54,6 +58,38 @@ function DroppableBagSection(props: {
       class={`mb-4 rounded-lg transition-all duration-150 md:mb-2 ${
         droppable.isActiveDroppable && props.isValidDrop()
           ? 'bg-blue-50 ring-2 ring-blue-400'
+          : droppable.isActiveDroppable
+            ? 'bg-red-50 ring-2 ring-red-300'
+            : ''
+      }`}
+    >
+      {props.children}
+    </div>
+  );
+}
+
+// Droppable wrapper for container sections within a category
+function DroppableContainerSection(props: {
+  containerId: string;
+  categoryName: string;
+  isValidDrop: () => boolean;
+  children: any;
+}) {
+  const droppable = createDroppable(
+    `container-section-${props.categoryName}-${props.containerId}`,
+    {
+      type: DROP_ZONE_TYPES.CONTAINER,
+      containerId: props.containerId,
+      categoryName: props.categoryName,
+    } as DropData
+  );
+
+  return (
+    <div
+      ref={droppable.ref}
+      class={`mb-4 rounded-lg transition-all duration-150 md:mb-2 ${
+        droppable.isActiveDroppable && props.isValidDrop()
+          ? 'bg-purple-50 ring-2 ring-purple-400'
           : droppable.isActiveDroppable
             ? 'bg-red-50 ring-2 ring-red-300'
             : ''
@@ -98,8 +134,9 @@ interface PackingListCategoryViewProps {
   onTogglePacked: (item: TripItem) => void;
   onEditItem: (item: TripItem) => void;
   onToggleItemSelection: (itemId: string) => void;
-  // Drag-and-drop handler - only moves between bags, keeps category
+  // Drag-and-drop handlers - only moves between locations, keeps category
   onMoveItemToBag?: (itemId: string, bagId: string | null) => void;
+  onMoveItemToContainer?: (itemId: string, containerId: string) => void;
 }
 
 export function PackingListCategoryView(props: PackingListCategoryViewProps) {
@@ -122,8 +159,13 @@ export function PackingListCategoryView(props: PackingListCategoryViewProps) {
     // Only allow drops within the same category
     if (dragData.categoryName !== dropData.categoryName) return;
 
-    // Move item to the target bag (keeps category)
-    props.onMoveItemToBag?.(dragData.itemId, dropData.bagId);
+    if (dropData.type === DROP_ZONE_TYPES.BAG) {
+      // Move item to the target bag (keeps category)
+      props.onMoveItemToBag?.(dragData.itemId, dropData.bagId ?? null);
+    } else if (dropData.type === DROP_ZONE_TYPES.CONTAINER && dropData.containerId) {
+      // Move item into container
+      props.onMoveItemToContainer?.(dragData.itemId, dropData.containerId);
+    }
   };
 
   const handleDragStart = (event: DragEvent) => {
@@ -317,8 +359,8 @@ export function PackingListCategoryView(props: PackingListCategoryViewProps) {
                           >
                             <For each={sortedItems}>
                               {(item) => {
-                                // Items inside containers are not draggable
-                                const canDrag = () => isDragEnabled() && !item.container_item_id;
+                                // All items are now draggable (including those in containers)
+                                const canDrag = () => isDragEnabled();
                                 return (
                                   <DraggableItem
                                     item={item}
@@ -370,7 +412,11 @@ export function PackingListCategoryView(props: PackingListCategoryViewProps) {
                         a.name.localeCompare(b.name)
                       );
                       return (
-                        <div class="mb-4 md:mb-2">
+                        <DroppableContainerSection
+                          containerId={containerId}
+                          categoryName={category}
+                          isValidDrop={() => isValidDropTarget(category)}
+                        >
                           <h3 class="mb-2 flex items-center gap-1.5 px-1 text-sm font-medium text-blue-700 md:mb-1 md:text-xs">
                             <span class="text-base md:text-sm">{containerIcon()}</span>
                             {container()?.name || 'Container'}
@@ -384,19 +430,29 @@ export function PackingListCategoryView(props: PackingListCategoryViewProps) {
                           >
                             <For each={sortedItems}>
                               {(item) => (
-                                <PackingItemCard
+                                <DraggableItem
                                   item={item}
-                                  selectMode={props.selectMode()}
-                                  isSelected={props.selectedItems().has(item.id)}
-                                  showBagInfo={false}
-                                  onTogglePacked={() => props.onTogglePacked(item)}
-                                  onEdit={() => props.onEditItem(item)}
-                                  onToggleSelection={() => props.onToggleItemSelection(item.id)}
-                                />
+                                  categoryName={category}
+                                  enabled={isDragEnabled()}
+                                >
+                                  {(dragProps) => (
+                                    <PackingItemCard
+                                      item={item}
+                                      selectMode={props.selectMode()}
+                                      isSelected={props.selectedItems().has(item.id)}
+                                      showBagInfo={false}
+                                      onTogglePacked={() => props.onTogglePacked(item)}
+                                      onEdit={() => props.onEditItem(item)}
+                                      onToggleSelection={() => props.onToggleItemSelection(item.id)}
+                                      dragActivators={dragProps.dragActivators}
+                                      isDragging={dragProps.isDragging}
+                                    />
+                                  )}
+                                </DraggableItem>
                               )}
                             </For>
                           </div>
-                        </div>
+                        </DroppableContainerSection>
                       );
                     }}
                   </For>

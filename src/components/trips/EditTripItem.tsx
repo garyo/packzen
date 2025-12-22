@@ -27,6 +27,7 @@ export function EditTripItem(props: EditTripItemProps) {
   );
   const [showDeleteConfirm, setShowDeleteConfirm] = createSignal(false);
   const [containedItemsCount, setContainedItemsCount] = createSignal(0);
+  const [categoryInitialized, setCategoryInitialized] = createSignal(false);
 
   const [bags] = createResource<Bag[]>(async () => {
     const response = await api.get<Bag[]>(endpoints.tripBags(props.tripId));
@@ -69,11 +70,13 @@ export function EditTripItem(props: EditTripItemProps) {
   });
 
   createEffect(() => {
-    if (categories() && props.item.category_name && categoryId() === null) {
+    // Only initialize category once when categories load
+    if (categories() && props.item.category_name && !categoryInitialized()) {
       const cat = categories()!.find((c) => c.name === props.item.category_name);
       if (cat) {
         setCategoryId(cat.id);
       }
+      setCategoryInitialized(true);
     }
   });
 

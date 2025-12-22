@@ -362,7 +362,8 @@ export function PackingPage(props: PackingPageProps) {
   // Drag-and-drop handlers with undo support
   const handleMoveItemToBag = async (itemId: string, bagId: string | null) => {
     const item = items()?.find((i) => i.id === itemId);
-    if (!item || item.bag_id === bagId) return;
+    // Skip if nothing would change (same bag AND not in a container)
+    if (!item || (item.bag_id === bagId && !item.container_item_id)) return;
 
     // Capture previous state for undo
     const previousBagId = item.bag_id;
@@ -412,37 +413,43 @@ export function PackingPage(props: PackingPageProps) {
     }
   };
 
-  const handleMoveItemToCategory = async (
-    itemId: string,
-    categoryName: string | null,
-    bagId: string | null
-  ) => {
-    const item = items()?.find((i) => i.id === itemId);
-    if (!item) return;
+  // Helper to get container name for display
+  const getContainerName = (containerId: string | null) => {
+    if (!containerId) return 'No Container';
+    return items()?.find((i) => i.id === containerId)?.name || 'Unknown Container';
+  };
 
-    // Skip if nothing changed
-    if (item.category_name === categoryName && item.bag_id === bagId) return;
+  const handleMoveItemToContainer = async (itemId: string, containerId: string) => {
+    const item = items()?.find((i) => i.id === itemId);
+    const container = items()?.find((i) => i.id === containerId);
+    if (!item || !container) return;
+
+    // Skip if already in this container
+    if (item.container_item_id === containerId) return;
+
+    // Prevent containers from being nested
+    if (item.is_container) {
+      showToast('error', "Containers can't go inside other containers");
+      return;
+    }
 
     // Capture previous state for undo
-    const previousCategoryName = item.category_name;
-    const previousBagId = item.bag_id;
     const previousContainerId = item.container_item_id;
+    const previousBagId = item.bag_id;
     const itemName = item.name;
+    const containerName = container.name;
 
-    // Optimistic update
+    // Optimistic update - item goes into container, bag_id is cleared
     mutate((prev) =>
       prev?.map((i) =>
-        i.id === itemId
-          ? { ...i, category_name: categoryName, bag_id: bagId, container_item_id: null }
-          : i
+        i.id === itemId ? { ...i, container_item_id: containerId, bag_id: null } : i
       )
     );
 
     const response = await api.patch(endpoints.tripItems(props.tripId), {
       id: itemId,
-      category_name: categoryName,
-      bag_id: bagId,
-      container_item_id: null,
+      container_item_id: containerId,
+      bag_id: null,
     });
 
     if (!response.success) {
@@ -450,11 +457,7 @@ export function PackingPage(props: PackingPageProps) {
       refetch();
     } else {
       // Show undo toast
-      const destination =
-        categoryName && bagId !== previousBagId
-          ? `${categoryName} in ${getBagName(bagId)}`
-          : categoryName || getBagName(bagId);
-      showToast('info', `Moved "${itemName}" to ${destination}`, {
+      showToast('info', `Moved "${itemName}" to ${containerName}`, {
         action: {
           label: 'Undo',
           onClick: async () => {
@@ -462,20 +465,14 @@ export function PackingPage(props: PackingPageProps) {
             mutate((prev) =>
               prev?.map((i) =>
                 i.id === itemId
-                  ? {
-                      ...i,
-                      category_name: previousCategoryName,
-                      bag_id: previousBagId,
-                      container_item_id: previousContainerId,
-                    }
+                  ? { ...i, container_item_id: previousContainerId, bag_id: previousBagId }
                   : i
               )
             );
             const undoResponse = await api.patch(endpoints.tripItems(props.tripId), {
               id: itemId,
-              category_name: previousCategoryName,
-              bag_id: previousBagId,
               container_item_id: previousContainerId,
+              bag_id: previousBagId,
             });
             if (!undoResponse.success) {
               showToast('error', 'Failed to undo');
@@ -648,6 +645,7 @@ export function PackingPage(props: PackingPageProps) {
                     onEditItem={setEditingItem}
                     onToggleItemSelection={toggleItemSelection}
                     onMoveItemToBag={handleMoveItemToBag}
+                    onMoveItemToContainer={handleMoveItemToContainer}
                   />
                 }
               >
@@ -671,7 +669,7 @@ export function PackingPage(props: PackingPageProps) {
                     openBrowseTemplates(undefined, containerId)
                   }
                   onMoveItemToBag={handleMoveItemToBag}
-                  onMoveItemToCategory={handleMoveItemToCategory}
+                  onMoveItemToContainer={handleMoveItemToContainer}
                 />
               </Show>
             </Show>
@@ -682,7 +680,7 @@ export function PackingPage(props: PackingPageProps) {
               <div class="flex flex-wrap justify-center gap-2">
                 <Button onClick={() => openAddForm()}>Add Items</Button>
                 <Button variant="secondary" onClick={() => openAddFromMaster()}>
-                  Add from All Items
+                  Add from My Items
                 </Button>
                 <Button variant="secondary" onClick={() => openBrowseTemplates()}>
                   Add from Templates
