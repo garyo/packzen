@@ -618,7 +618,6 @@ export function PackingListBagView(props: PackingListBagViewProps) {
                 const sortedContents = () =>
                   [...contents()].sort((a, b) => a.name.localeCompare(b.name));
 
-                // Items in containers are now draggable
                 const isDragEnabled = () => !props.selectMode();
                 return (
                   <DroppableContainerSection containerId={container.id}>
@@ -631,6 +630,26 @@ export function PackingListBagView(props: PackingListBagViewProps) {
                         <h3 class="flex-1 text-lg font-semibold text-gray-900 md:text-base">
                           {container.name}
                         </h3>
+
+                        {/* Container Edit button */}
+                        <button
+                          class="text-sm text-gray-500"
+                          onClick={() => props.onEditItem(container)}
+                        >
+                          <svg
+                            class="h-4 w-4"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              stroke-linecap="round"
+                              stroke-linejoin="round"
+                              stroke-width="2"
+                              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                            />
+                          </svg>
+                        </button>
                         <Show
                           when={contents().length > 0}
                           fallback={<span class="text-xs text-gray-500">(empty)</span>}
