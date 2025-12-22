@@ -585,7 +585,7 @@ export function PackingPage(props: PackingPageProps) {
   };
 
   return (
-    <div class="min-h-screen bg-gray-50">
+    <div class="flex h-screen flex-col bg-gray-50">
       <Toast />
 
       <PackingPageHeader
@@ -608,34 +608,49 @@ export function PackingPage(props: PackingPageProps) {
         onEditTrip={() => setShowEditTrip(true)}
       />
 
-      {/* Packing List */}
-      <main class="container mx-auto px-4 py-6 pb-20 md:px-3 md:py-3 md:pb-16">
-        <Show when={!items.loading} fallback={<LoadingSpinner text="Loading items..." />}>
-          <Show
-            when={!items.error}
-            fallback={
-              <EmptyState
-                icon="⚠️"
-                title="Unable to connect"
-                description="Cannot reach the server. Please check your connection and try again."
-                action={<Button onClick={() => refetch()}>Retry</Button>}
-              />
-            }
-          >
+      {/* Packing List - scrollable area */}
+      <main class="flex-1 overflow-y-auto">
+        <div class="container mx-auto px-4 py-6 pb-20 md:px-3 md:py-3 md:pb-16">
+          <Show when={!items.loading} fallback={<LoadingSpinner text="Loading items..." />}>
             <Show
-              when={totalCount() > 0}
+              when={!items.error}
               fallback={
                 <EmptyState
-                  icon="📦"
-                  title="No items yet"
-                  description="Add items to your packing list to get started"
+                  icon="⚠️"
+                  title="Unable to connect"
+                  description="Cannot reach the server. Please check your connection and try again."
+                  action={<Button onClick={() => refetch()}>Retry</Button>}
                 />
               }
             >
               <Show
-                when={sortBy() === 'bag'}
+                when={totalCount() > 0}
                 fallback={
-                  <PackingListCategoryView
+                  <EmptyState
+                    icon="📦"
+                    title="No items yet"
+                    description="Add items to your packing list to get started"
+                  />
+                }
+              >
+                <Show
+                  when={sortBy() === 'bag'}
+                  fallback={
+                    <PackingListCategoryView
+                      items={items}
+                      bags={bags}
+                      categories={categories}
+                      selectMode={selectMode}
+                      selectedItems={selectedItems}
+                      onTogglePacked={handleTogglePacked}
+                      onEditItem={setEditingItem}
+                      onToggleItemSelection={toggleItemSelection}
+                      onMoveItemToBag={handleMoveItemToBag}
+                      onMoveItemToContainer={handleMoveItemToContainer}
+                    />
+                  }
+                >
+                  <PackingListBagView
                     items={items}
                     bags={bags}
                     categories={categories}
@@ -644,51 +659,38 @@ export function PackingPage(props: PackingPageProps) {
                     onTogglePacked={handleTogglePacked}
                     onEditItem={setEditingItem}
                     onToggleItemSelection={toggleItemSelection}
+                    onAddToBag={(bagId) => openAddForm(bagId)}
+                    onAddToContainer={(containerId) => openAddForm(undefined, containerId)}
+                    onAddFromMasterToBag={(bagId) => openAddFromMaster(bagId)}
+                    onAddFromMasterToContainer={(containerId) =>
+                      openAddFromMaster(undefined, containerId)
+                    }
+                    onBrowseTemplatesToBag={(bagId) => openBrowseTemplates(bagId)}
+                    onBrowseTemplatesToContainer={(containerId) =>
+                      openBrowseTemplates(undefined, containerId)
+                    }
                     onMoveItemToBag={handleMoveItemToBag}
                     onMoveItemToContainer={handleMoveItemToContainer}
                   />
-                }
-              >
-                <PackingListBagView
-                  items={items}
-                  bags={bags}
-                  categories={categories}
-                  selectMode={selectMode}
-                  selectedItems={selectedItems}
-                  onTogglePacked={handleTogglePacked}
-                  onEditItem={setEditingItem}
-                  onToggleItemSelection={toggleItemSelection}
-                  onAddToBag={(bagId) => openAddForm(bagId)}
-                  onAddToContainer={(containerId) => openAddForm(undefined, containerId)}
-                  onAddFromMasterToBag={(bagId) => openAddFromMaster(bagId)}
-                  onAddFromMasterToContainer={(containerId) =>
-                    openAddFromMaster(undefined, containerId)
-                  }
-                  onBrowseTemplatesToBag={(bagId) => openBrowseTemplates(bagId)}
-                  onBrowseTemplatesToContainer={(containerId) =>
-                    openBrowseTemplates(undefined, containerId)
-                  }
-                  onMoveItemToBag={handleMoveItemToBag}
-                  onMoveItemToContainer={handleMoveItemToContainer}
-                />
+                </Show>
               </Show>
-            </Show>
 
-            {/* Add Items Buttons - shown for both empty and non-empty states */}
-            <div class="mt-6 flex flex-col items-center gap-3">
-              <Button onClick={() => setShowBagManager(true)}>Add Bags</Button>
-              <div class="flex flex-wrap justify-center gap-2">
-                <Button onClick={() => openAddForm()}>Add Items</Button>
-                <Button variant="secondary" onClick={() => openAddFromMaster()}>
-                  Add from My Items
-                </Button>
-                <Button variant="secondary" onClick={() => openBrowseTemplates()}>
-                  Add from Templates
-                </Button>
+              {/* Add Items Buttons - shown for both empty and non-empty states */}
+              <div class="mt-6 flex flex-col items-center gap-3">
+                <Button onClick={() => setShowBagManager(true)}>Add Bags</Button>
+                <div class="flex flex-wrap justify-center gap-2">
+                  <Button onClick={() => openAddForm()}>Add Items</Button>
+                  <Button variant="secondary" onClick={() => openAddFromMaster()}>
+                    Add from My Items
+                  </Button>
+                  <Button variant="secondary" onClick={() => openBrowseTemplates()}>
+                    Add from Templates
+                  </Button>
+                </div>
               </div>
-            </div>
+            </Show>
           </Show>
-        </Show>
+        </div>
       </main>
 
       {/* Add Item Form Modal */}

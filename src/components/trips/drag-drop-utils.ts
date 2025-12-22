@@ -49,8 +49,8 @@ export const liveRectCollision = (
 };
 
 /**
- * Auto-scroll when dragging near viewport edges.
- * Accounts for sticky headers.
+ * Auto-scroll when dragging near edges of scroll container.
+ * Works with the main content area as the scroll container.
  */
 export function useAutoScroll() {
   const EDGE_THRESHOLD = 60; // pixels from edge to start scrolling
@@ -68,28 +68,33 @@ export function useAutoScroll() {
   };
 
   const scrollLoop = () => {
-    const viewportHeight = window.innerHeight;
+    // Find the scroll container (main element with overflow-y-auto)
+    const scrollContainer = document.querySelector('main.overflow-y-auto') as HTMLElement | null;
+    if (!scrollContainer) {
+      rafId = requestAnimationFrame(scrollLoop);
+      return;
+    }
 
-    // Get the sticky header's bottom edge to find where visible content starts
-    const header = document.querySelector('header.sticky');
-    const contentTop = header ? header.getBoundingClientRect().bottom : 0;
+    const rect = scrollContainer.getBoundingClientRect();
+    const containerTop = rect.top;
+    const containerBottom = rect.bottom;
 
-    // Calculate scroll zones relative to the visible content area
-    const topZoneEnd = contentTop + EDGE_THRESHOLD;
-    const bottomZoneStart = viewportHeight - EDGE_THRESHOLD;
+    // Calculate scroll zones relative to the scroll container
+    const topZoneEnd = containerTop + EDGE_THRESHOLD;
+    const bottomZoneStart = containerBottom - EDGE_THRESHOLD;
 
-    if (pointerY >= 0 && pointerY >= contentTop && pointerY < topZoneEnd) {
-      // Near top of visible content - scroll up
-      const distanceFromTop = pointerY - contentTop;
+    if (pointerY >= 0 && pointerY >= containerTop && pointerY < topZoneEnd) {
+      // Near top of scroll container - scroll up
+      const distanceFromTop = pointerY - containerTop;
       const intensity = 1 - distanceFromTop / EDGE_THRESHOLD;
       const speed = Math.max(2, intensity * MAX_SCROLL_SPEED);
-      window.scrollBy({ left: 0, top: -speed, behavior: 'instant' });
-    } else if (pointerY >= 0 && pointerY > bottomZoneStart) {
-      // Near bottom - scroll down
-      const distanceFromBottom = viewportHeight - pointerY;
+      scrollContainer.scrollBy({ left: 0, top: -speed, behavior: 'instant' });
+    } else if (pointerY >= 0 && pointerY > bottomZoneStart && pointerY <= containerBottom) {
+      // Near bottom of scroll container - scroll down
+      const distanceFromBottom = containerBottom - pointerY;
       const intensity = 1 - distanceFromBottom / EDGE_THRESHOLD;
       const speed = Math.max(2, intensity * MAX_SCROLL_SPEED);
-      window.scrollBy({ left: 0, top: speed, behavior: 'instant' });
+      scrollContainer.scrollBy({ left: 0, top: speed, behavior: 'instant' });
     }
 
     rafId = requestAnimationFrame(scrollLoop);

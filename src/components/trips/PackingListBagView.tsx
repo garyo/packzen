@@ -7,13 +7,14 @@
  * Supports drag-and-drop to move items between bags and categories
  */
 
-import { For, Show, type Accessor, createMemo, createSignal } from 'solid-js';
+import { For, Show, type Accessor, createMemo, createSignal, onMount, onCleanup } from 'solid-js';
 import {
   DragDropProvider,
   DragDropSensors,
   DragOverlay,
   createDraggable,
   createDroppable,
+  useDragDropContext,
   type DragEvent,
 } from '@thisbeyond/solid-dnd';
 import type { TripItem, Bag, Category } from '../../lib/types';
@@ -74,6 +75,91 @@ function DroppableContainerSection(props: { containerId: string; children: any }
       }`}
     >
       {props.children}
+    </div>
+  );
+}
+
+// Wayfinding nav bar component - needs to be inside DragDropProvider to access context
+function WayfindingNavBar(props: {
+  bags: Array<{ id: string | null; name: string; color: string | null }>;
+  containers: TripItem[];
+  currentSection: () => string | null;
+  activeItem: () => TripItem | null;
+  onScrollToSection: (sectionId: string) => void;
+}) {
+  const [dndState] = useDragDropContext()!;
+
+  // Determine which nav item to highlight
+  const highlightedNavItem = () => {
+    // If dragging and hovering over a droppable, highlight that
+    if (props.activeItem() && dndState.active.droppable) {
+      const droppableId = String(dndState.active.droppable.id);
+      // Convert "bag-abc123" to "bag-section-abc123"
+      if (droppableId.startsWith('bag-')) {
+        const bagId = droppableId.slice(4);
+        return bagId === 'none' ? 'bag-section-none' : `bag-section-${bagId}`;
+      } else if (droppableId.startsWith('container-')) {
+        return `container-section-${droppableId.slice(10)}`;
+      }
+    }
+    // Otherwise show current scroll position
+    return props.currentSection();
+  };
+
+  return (
+    <div class="sticky top-0 z-10 -mx-4 bg-gray-50/95 px-4 py-1.5 backdrop-blur-sm md:-mx-3 md:px-3">
+      <div class="flex flex-wrap gap-x-1 gap-y-0">
+        {/* Bags */}
+        <For each={props.bags}>
+          {(bag) => {
+            const sectionId = bag.id ? `bag-section-${bag.id}` : 'bag-section-none';
+            const isHighlighted = () => highlightedNavItem() === sectionId;
+            return (
+              <button
+                onClick={() => props.onScrollToSection(sectionId)}
+                class={`flex items-center gap-1 px-1.5 py-0.5 text-xs ${
+                  isHighlighted()
+                    ? 'text-gray-900 underline decoration-2 underline-offset-2'
+                    : 'text-gray-500 hover:text-gray-900'
+                }`}
+                style="min-height: 16px"
+              >
+                <Show when={bag.id !== null} fallback={<span class="text-[10px]">👕</span>}>
+                  <div
+                    class={`h-2 w-2 rounded-full border border-gray-300 ${getBagColorClass(bag.color)}`}
+                    style={getBagColorStyle(bag.color)}
+                  />
+                </Show>
+                <span class="max-w-[100px] truncate">{bag.name}</span>
+              </button>
+            );
+          }}
+        </For>
+        {/* Containers */}
+        <Show when={props.containers.length > 0}>
+          <span class="mx-1 self-center text-gray-300">|</span>
+          <For each={props.containers}>
+            {(container) => {
+              const sectionId = `container-section-${container.id}`;
+              const isHighlighted = () => highlightedNavItem() === sectionId;
+              return (
+                <button
+                  onClick={() => props.onScrollToSection(sectionId)}
+                  class={`flex items-center gap-1 px-1.5 py-0.5 text-xs ${
+                    isHighlighted()
+                      ? 'text-gray-900 underline decoration-2 underline-offset-2'
+                      : 'text-gray-500 hover:text-gray-900'
+                  }`}
+                  style="min-height: 16px"
+                >
+                  <span class="text-[10px]">📦</span>
+                  <span class="max-w-[100px] truncate">{container.name}</span>
+                </button>
+              );
+            }}
+          </For>
+        </Show>
+      </div>
     </div>
   );
 }
@@ -266,6 +352,72 @@ export function PackingListBagView(props: PackingListBagViewProps) {
     return allBags.find((b) => b.id === item.bag_id);
   };
 
+  // Track current visible section for wayfinding nav bar
+  const [currentSection, setCurrentSection] = createSignal<string | null>(null);
+
+  // Set up Intersection Observer to track which section is visible
+  // We track all visible sections and pick the topmost one
+  onMount(() => {
+    const visibleSections = new Set<string>();
+
+    // Find the scroll container to use as root
+    const scrollContainer = document.querySelector('main.overflow-y-auto') as HTMLElement | null;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        // Update the set of visible sections
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            visibleSections.add(entry.target.id);
+          } else {
+            visibleSections.delete(entry.target.id);
+          }
+        }
+
+        // Find the topmost visible section by checking DOM order
+        const allSections = document.querySelectorAll(
+          '[id^="bag-section-"], [id^="container-section-"]'
+        );
+        for (const section of allSections) {
+          if (visibleSections.has(section.id)) {
+            setCurrentSection(section.id);
+            return;
+          }
+        }
+
+        // If nothing visible, keep the last one
+      },
+      {
+        root: scrollContainer, // Use scroll container as root
+        rootMargin: '-28px 0px 0px 0px', // Account for sticky nav bar height
+        threshold: 0,
+      }
+    );
+
+    // Observe all sections after a short delay to ensure DOM is ready
+    setTimeout(() => {
+      const bagSections = document.querySelectorAll('[id^="bag-section-"]');
+      const containerSections = document.querySelectorAll('[id^="container-section-"]');
+      bagSections.forEach((el) => observer.observe(el));
+      containerSections.forEach((el) => observer.observe(el));
+    }, 100);
+
+    onCleanup(() => observer.disconnect());
+  });
+
+  // Scroll to a section smoothly within the scroll container
+  const scrollToSection = (sectionId: string) => {
+    const element = document.getElementById(sectionId);
+    const scrollContainer = document.querySelector('main.overflow-y-auto');
+    if (element && scrollContainer) {
+      // Get position relative to scroll container
+      const containerRect = scrollContainer.getBoundingClientRect();
+      const elementRect = element.getBoundingClientRect();
+      const offset = elementRect.top - containerRect.top + scrollContainer.scrollTop - 28; // ~28px for nav bar
+      scrollContainer.scrollTo({ top: offset, behavior: 'smooth' });
+    }
+  };
+
   return (
     <DragDropProvider
       onDragStart={handleDragStart}
@@ -275,6 +427,17 @@ export function PackingListBagView(props: PackingListBagViewProps) {
       <DragDropSensors />
       <EscapeCancelHandler onCancel={() => setActiveItem(null)} />
       <div class="space-y-6 md:space-y-3">
+        {/* Sticky Wayfinding Nav Bar */}
+        <Show when={sortedBags().length > 1 || allContainers().length > 0}>
+          <WayfindingNavBar
+            bags={sortedBags()}
+            containers={allContainers()}
+            currentSection={currentSection}
+            activeItem={activeItem}
+            onScrollToSection={scrollToSection}
+          />
+        </Show>
+
         {/* Bag Sections */}
         <For each={sortedBags()}>
           {(bag) => {
@@ -290,7 +453,7 @@ export function PackingListBagView(props: PackingListBagViewProps) {
             const isDragEnabled = () => !props.selectMode();
             return (
               <DroppableBagSection bagId={bag.id}>
-                <div id={bag.id ? `bag-section-${bag.id}` : undefined} class="p-2">
+                <div id={bag.id ? `bag-section-${bag.id}` : 'bag-section-none'} class="p-2">
                   <div class="mb-3 flex items-center gap-2 px-2 py-1 md:mb-1.5">
                     <Show
                       when={bag.id !== null}

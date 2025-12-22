@@ -65,7 +65,7 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
   });
 
   return (
-    <header class="sticky top-0 z-10 border-b border-gray-200 bg-white">
+    <header class="flex-shrink-0 border-b border-gray-200 bg-white">
       <div class="container mx-auto px-4 py-4 md:py-2">
         {/* Two-row layout on mobile, single row on desktop */}
         <div class="mb-3 flex flex-col gap-2 md:mb-2 md:flex-row md:items-center md:justify-between">
