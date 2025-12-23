@@ -16,9 +16,15 @@ import { DashboardStats } from './dashboard/DashboardStats';
 import { UpcomingTripsList } from './dashboard/UpcomingTripsList';
 import { AboutModal } from './dashboard/AboutModal';
 import { UserMenu } from './dashboard/UserMenu';
+import {
+  OnboardingModal,
+  hasSeenOnboarding,
+  markOnboardingAsSeen,
+} from './dashboard/OnboardingModal';
 
 export function DashboardPage() {
   const [showAbout, setShowAbout] = createSignal(false);
+  const [showOnboarding, setShowOnboarding] = createSignal(false);
   // Data fetching
   const [masterItems, { refetch: refetchItems }] = createResource<MasterItem[]>(async () => {
     return fetchWithErrorHandling(
@@ -40,7 +46,17 @@ export function DashboardPage() {
 
   onMount(async () => {
     await authStore.initAuth();
+
+    // Show onboarding for new users
+    if (!hasSeenOnboarding()) {
+      setShowOnboarding(true);
+    }
   });
+
+  const handleCloseOnboarding = () => {
+    markOnboardingAsSeen();
+    setShowOnboarding(false);
+  };
 
   const handleBackupRestored = () => {
     refetchCategories();
@@ -76,6 +92,7 @@ export function DashboardPage() {
                   categories={categories}
                   masterItems={masterItems}
                   onBackupRestored={handleBackupRestored}
+                  onShowOnboarding={() => setShowOnboarding(true)}
                 />
               </div>
             </div>
@@ -138,6 +155,10 @@ export function DashboardPage() {
 
       <Show when={showAbout()}>
         <AboutModal onClose={() => setShowAbout(false)} />
+      </Show>
+
+      <Show when={showOnboarding()}>
+        <OnboardingModal onClose={handleCloseOnboarding} />
       </Show>
     </>
   );

@@ -15,6 +15,7 @@ interface UserMenuProps {
   categories: Accessor<Category[] | undefined>;
   masterItems: Accessor<MasterItem[] | undefined>;
   onBackupRestored: () => void;
+  onShowOnboarding: () => void;
 }
 
 export function UserMenu(props: UserMenuProps) {
@@ -338,6 +339,15 @@ export function UserMenu(props: UserMenuProps) {
             >
               Subscription & Pricing
             </a>
+            <button
+              onClick={() => {
+                props.onShowOnboarding();
+                setShowMenu(false);
+              }}
+              class="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100"
+            >
+              Show Onboarding Dialog
+            </button>
             <button
               onClick={handleExport}
               class="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100"

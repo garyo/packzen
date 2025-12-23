@@ -81,7 +81,7 @@ export function BagSelectionForm(props: BagSelectionFormProps) {
       {/* Templates Section */}
       <Show when={props.templates.length > 0}>
         <div>
-          <h4 class="mb-3 text-sm font-medium text-gray-700">Your Bags</h4>
+          <h4 class="mb-3 text-sm font-medium text-gray-700">My Bags</h4>
           <div class="grid gap-3 sm:grid-cols-2">
             <For each={props.templates}>
               {(template) => {

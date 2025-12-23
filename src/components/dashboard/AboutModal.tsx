@@ -49,7 +49,16 @@ export function AboutModal(props: AboutModalProps) {
         <div>
           <h3 class="mb-2 font-semibold text-gray-900">Open Source</h3>
           <p class="text-sm leading-relaxed">
-            PackZen is open source software released under the{' '}
+            PackZen is{' '}
+            <a
+              href="https://github.com/garyo/packzen"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="text-blue-600 underline hover:text-blue-800"
+            >
+              open source software
+            </a>{' '}
+            released under the{' '}
             <a
               href="https://opensource.org/licenses/MIT"
               target="_blank"

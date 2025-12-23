@@ -131,8 +131,8 @@ export function AddFromMasterList(props: AddFromMasterListProps) {
             when={(props.masterItems()?.length || 0) > 0}
             fallback={
               <div class="py-8 text-center text-gray-500">
-                <p>No items in all items list</p>
-                <p class="mt-2 text-sm">Add items to your all items list first</p>
+                <p>No items in All Items list</p>
+                <p class="mt-2 text-sm">Add items to your All Items list first</p>
               </div>
             }
           >

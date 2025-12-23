@@ -174,7 +174,7 @@ export function AllItemsPageHeader(props: AllItemsPageHeaderProps) {
             </a>
             <div class="min-w-0 flex-1">
               <h1 class="truncate text-xl font-bold text-gray-900 md:text-lg">My Items</h1>
-              <p class="text-xs text-gray-600">Your reusable packing essentials, for all trips</p>
+              <p class="text-xs text-gray-600">My reusable packing essentials, for all trips</p>
             </div>
           </div>
 

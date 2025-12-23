@@ -182,7 +182,7 @@ export function BagTemplateManagerContent(props: BagTemplateManagerContentProps)
 
       {/* Existing Templates */}
       <div>
-        <h3 class="mb-3 font-semibold text-gray-900">Your Bags</h3>
+        <h3 class="mb-3 font-semibold text-gray-900">My Bags</h3>
         <Show
           when={props.templates.length > 0}
           fallback={
