@@ -131,7 +131,7 @@ export function CategoryManagerContent(props: CategoryManagerContentProps) {
 
       {/* Existing Categories */}
       <div>
-        <h3 class="mb-3 text-sm font-medium text-gray-700">Your Categories</h3>
+        <h3 class="mb-3 text-sm font-medium text-gray-700">My Categories</h3>
         <div class="grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-3">
           <For
             each={sortedCategories()}

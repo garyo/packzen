@@ -8,6 +8,7 @@ import clerk from '@clerk/astro';
 
 // https://astro.build/config
 export default defineConfig({
+  site: 'https://packzen.org',
   integrations: [solidJs(), clerk()],
 
   vite: {
