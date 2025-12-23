@@ -8,6 +8,7 @@ export interface CustomBagData {
   name: string;
   type: 'carry_on' | 'checked' | 'personal' | 'custom';
   color: string;
+  saveToMyBags: boolean;
 }
 
 interface BagSelectionFormProps {
@@ -39,6 +40,7 @@ export function BagSelectionForm(props: BagSelectionFormProps) {
     'carry_on'
   );
   const [newBagColor, setNewBagColor] = createSignal('blue');
+  const [saveToMyBags, setSaveToMyBags] = createSignal(true);
 
   const handleAddCustomBag = (e: Event) => {
     e.preventDefault();
@@ -51,12 +53,14 @@ export function BagSelectionForm(props: BagSelectionFormProps) {
       name: newBagName().trim(),
       type: newBagType(),
       color: newBagColor(),
+      saveToMyBags: saveToMyBags(),
     });
 
     // Reset form
     setNewBagName('');
     setNewBagType('carry_on');
     setNewBagColor('blue');
+    setSaveToMyBags(true);
     setShowAddForm(false);
   };
 
@@ -126,10 +130,10 @@ export function BagSelectionForm(props: BagSelectionFormProps) {
         </div>
       </Show>
 
-      {/* Custom Bags Section */}
+      {/* New Bag Section */}
       <div>
         <div class="mb-3 flex items-center justify-between">
-          <h4 class="text-sm font-medium text-gray-700">Custom Bags</h4>
+          <h4 class="text-sm font-medium text-gray-700">New Bag</h4>
           <Show when={!showAddForm()}>
             <Button
               type="button"
@@ -137,7 +141,7 @@ export function BagSelectionForm(props: BagSelectionFormProps) {
               size="sm"
               onClick={() => setShowAddForm(true)}
             >
-              + Add Custom Bag
+              + Add New Bag
             </Button>
           </Show>
         </div>
@@ -149,19 +153,6 @@ export function BagSelectionForm(props: BagSelectionFormProps) {
             class="mb-3 space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-3"
           >
             <div>
-              <label class="mb-1 block text-sm font-medium text-gray-700">Bag Type</label>
-              <select
-                value={newBagType()}
-                onChange={(e) => setNewBagType(e.target.value as any)}
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
-              >
-                <For each={BAG_TYPES}>
-                  {(type) => <option value={type.type}>{type.label}</option>}
-                </For>
-              </select>
-            </div>
-
-            <div>
               <label class="mb-1 block text-sm font-medium text-gray-700">Bag Name</label>
               <Input
                 type="text"
@@ -171,19 +162,53 @@ export function BagSelectionForm(props: BagSelectionFormProps) {
               />
             </div>
 
+            <div class="flex items-end gap-3">
+              <div class="flex-1">
+                <label class="mb-1 block text-sm font-medium text-gray-700">Bag Type</label>
+                <select
+                  value={newBagType()}
+                  onChange={(e) => setNewBagType(e.target.value as any)}
+                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                >
+                  <For each={BAG_TYPES}>
+                    {(type) => <option value={type.type}>{type.label}</option>}
+                  </For>
+                </select>
+              </div>
+
+              <div class="flex items-center gap-1.5 pb-2">
+                <input
+                  type="checkbox"
+                  id="save-to-my-bags"
+                  checked={saveToMyBags()}
+                  onChange={(e) => setSaveToMyBags(e.currentTarget.checked)}
+                  class="h-3.5 w-3.5 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
+                  style="min-height: 25px; min-width: 25px"
+                />
+                <label
+                  for="save-to-my-bags"
+                  class="text-sm font-medium whitespace-nowrap text-gray-700"
+                  title="Un-check to use this bag only on this trip"
+                >
+                  Save to My Bags
+                </label>
+              </div>
+            </div>
+
             <div>
               <label class="mb-1 block text-sm font-medium text-gray-700">Color</label>
-              <div class="flex gap-2">
+              <div class="flex gap-1.5">
                 <For each={BAG_COLORS}>
                   {(color) => (
                     <button
                       type="button"
                       onClick={() => setNewBagColor(color.value)}
-                      class={`h-6 w-6 rounded-full border border-gray-300 ${color.class} ${
+                      class={`h-4 w-4 rounded-full border border-gray-300 ${color.class} ${
                         newBagColor() === color.value
                           ? 'ring-2 ring-blue-500 ring-offset-2'
                           : 'hover:scale-110'
                       } transition-transform`}
+                      style="min-height: 40px; min-width: 40px"
                       title={color.label}
                     />
                   )}
@@ -226,6 +251,11 @@ export function BagSelectionForm(props: BagSelectionFormProps) {
                       <p class="font-medium text-gray-900">{bag.name}</p>
                       <p class="text-xs text-gray-500">
                         {BAG_TYPES.find((t) => t.type === bag.type)?.label || bag.type}
+                        {bag.saveToMyBags && (
+                          <span class="ml-1 text-blue-600" title="Will be saved to My Bags">
+                            • Saved
+                          </span>
+                        )}
                       </p>
                     </div>
                   </div>
@@ -244,7 +274,7 @@ export function BagSelectionForm(props: BagSelectionFormProps) {
 
         <Show when={props.customBags.length === 0 && !showAddForm()}>
           <div class="py-4 text-center text-sm text-gray-500">
-            No custom bags added. Click "Add Custom Bag" to create one.
+            No new bags added. Click "Add New Bag" to create one.
           </div>
         </Show>
       </div>

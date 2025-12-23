@@ -84,8 +84,18 @@ export function TripFormWithBags(props: TripFormWithBagsProps) {
         });
       }
 
-      // Step 3: Create custom bags
+      // Step 3: Create custom bags (and optionally save to My Bags)
       for (const bag of customBags()) {
+        // Save to bag templates if requested
+        if (bag.saveToMyBags) {
+          await api.post(endpoints.bagTemplates, {
+            name: bag.name,
+            type: bag.type,
+            color: bag.color,
+          });
+        }
+
+        // Always add to this trip
         await api.post(endpoints.tripBags(newTripId), {
           name: bag.name,
           type: bag.type,
