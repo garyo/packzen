@@ -5,6 +5,7 @@ import { DateInput } from '../ui/DateInput';
 import { Button } from '../ui/Button';
 import { showToast } from '../ui/Toast';
 import { api, endpoints } from '../../lib/api';
+import { normalizeTripDates } from '../../lib/utils';
 import type { Trip } from '../../lib/types';
 
 interface TripFormProps {
@@ -31,11 +32,13 @@ export function TripForm(props: TripFormProps) {
 
     setSaving(true);
 
+    const normalizedDates = normalizeTripDates(startDate() || null, endDate() || null);
+
     const data = {
       name: name().trim(),
       destination: destination().trim() || null,
-      start_date: startDate() || null,
-      end_date: endDate() || null,
+      start_date: normalizedDates.startDate,
+      end_date: normalizedDates.endDate,
       notes: notes().trim() || null,
     };
 

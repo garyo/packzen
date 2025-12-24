@@ -703,6 +703,66 @@ test('Trip API enforces trip limits and returns stats', async () => {
   assert.ok(tripsData[0].bag_count !== undefined);
 });
 
+test('Trip creation normalizes reversed date ranges', async () => {
+  const d1 = await createTestDatabase();
+  const userId = 'normalize_create_user';
+
+  const request = new Request('http://localhost/api/trips', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: 'Out of Order',
+      destination: 'Somewhere',
+      start_date: '2026-05-10',
+      end_date: '2026-05-01',
+    }),
+  });
+
+  const ctx = buildApiContext({ db: d1, userId, request });
+  const response = await tripsApiIndex.POST!(ctx);
+  assert.equal(response.status, 201);
+  const createdTrip = await response.json();
+  assert.equal(createdTrip.start_date, '2026-05-01');
+  assert.equal(createdTrip.end_date, '2026-05-10');
+});
+
+test('Trip updates reorder dates when only one boundary is provided', async () => {
+  const d1 = await createTestDatabase();
+  const db = drizzle(d1);
+  const userId = 'normalize_patch_user';
+
+  const trip = await db
+    .insert(trips)
+    .values({
+      clerk_user_id: userId,
+      name: 'Reorder Trip',
+      start_date: '2026-06-01',
+      end_date: '2026-06-05',
+    })
+    .returning()
+    .get();
+
+  const patchRequest = new Request(`http://localhost/api/trips/${trip.id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ start_date: '2026-07-10' }),
+  });
+
+  const patchCtx = buildApiContext({
+    db: d1,
+    userId,
+    request: patchRequest,
+    params: { tripId: trip.id },
+  });
+
+  const { PATCH } = await import('../src/pages/api/trips/[tripId]/index');
+  const patchResponse = await PATCH!(patchCtx);
+  assert.equal(patchResponse.status, 200);
+  const updated = await patchResponse.json();
+  assert.equal(updated.start_date, '2026-06-05');
+  assert.equal(updated.end_date, '2026-07-10');
+});
+
 test('Trip items API merges duplicates by default but can be overridden', async () => {
   const d1 = await createTestDatabase();
   const db = drizzle(d1);

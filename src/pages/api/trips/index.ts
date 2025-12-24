@@ -16,6 +16,7 @@ import {
   handleApiError,
 } from '../../../lib/api-helpers';
 import { checkTripLimit } from '../../../lib/resource-limits';
+import { normalizeTripDates } from '../../../lib/utils';
 
 export const GET: APIRoute = createGetHandler(async ({ db, userId }) => {
   // Get all trips with bag and item statistics
@@ -67,6 +68,7 @@ export const POST: APIRoute = async (context) => {
     }
 
     const { name, destination, start_date, end_date, notes } = validation.data;
+    const normalizedDates = normalizeTripDates(start_date || null, end_date || null);
 
     const newTrip = await db
       .insert(trips)
@@ -74,8 +76,8 @@ export const POST: APIRoute = async (context) => {
         clerk_user_id: userId,
         name,
         destination: destination || null,
-        start_date: start_date || null,
-        end_date: end_date || null,
+        start_date: normalizedDates.startDate,
+        end_date: normalizedDates.endDate,
         notes: notes || null,
       })
       .returning()

@@ -3,6 +3,7 @@ import { Input } from '../ui/Input';
 import { DateInput } from '../ui/DateInput';
 import { Button } from '../ui/Button';
 import { showToast } from '../ui/Toast';
+import { normalizeTripDates } from '../../lib/utils';
 
 export interface TripDetailsData {
   name: string;
@@ -34,11 +35,13 @@ export function TripDetailsForm(props: TripDetailsFormProps) {
       return;
     }
 
+    const normalizedDates = normalizeTripDates(startDate() || null, endDate() || null);
+
     const data: TripDetailsData = {
       name: name().trim(),
       destination: destination().trim() || null,
-      start_date: startDate() || null,
-      end_date: endDate() || null,
+      start_date: normalizedDates.startDate,
+      end_date: normalizedDates.endDate,
       notes: notes().trim() || null,
     };
 

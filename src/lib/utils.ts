@@ -138,3 +138,23 @@ export function debounce<T extends (...args: any[]) => any>(
 export function cn(...classes: (string | undefined | null | false)[]): string {
   return classes.filter(Boolean).join(' ');
 }
+
+export function normalizeTripDates(
+  startDate: string | null | undefined,
+  endDate: string | null | undefined
+): { startDate: string | null; endDate: string | null } {
+  const normalizedStart = startDate?.trim() ? startDate.trim() : null;
+  const normalizedEnd = endDate?.trim() ? endDate.trim() : null;
+
+  if (normalizedStart && normalizedEnd && normalizedStart > normalizedEnd) {
+    return {
+      startDate: normalizedEnd,
+      endDate: normalizedStart,
+    };
+  }
+
+  return {
+    startDate: normalizedStart,
+    endDate: normalizedEnd,
+  };
+}
