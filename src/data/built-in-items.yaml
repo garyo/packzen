@@ -52,6 +52,9 @@ trip_types:
   - id: 'business'
     name: 'Business'
     description: 'Work travel'
+  - id: 'international'
+    name: 'International'
+    description: 'Cross-border travel'
   - id: 'hiking'
     name: 'Hiking/Camping'
     description: 'Outdoor adventure'
@@ -439,7 +442,19 @@ items:
     description: 'Universal power adapter for international travel'
     category: 'Electronics'
     default_quantity: 1
-    trip_types: ['week', 'business']
+    trip_types: ['week', 'business', 'international']
+
+  - name: 'Voltage converter'
+    description: 'Converter for high-wattage devices when abroad'
+    category: 'Electronics'
+    default_quantity: 1
+    trip_types: ['international']
+
+  - name: 'International SIM/eSIM kit'
+    description: 'Travel SIM card or eSIM QR code with instructions'
+    category: 'Electronics'
+    default_quantity: 1
+    trip_types: ['international']
 
   - name: 'E-reader'
     description: 'Kindle or similar e-reader'
@@ -494,49 +509,61 @@ items:
     description: 'Valid passport for international travel'
     category: 'Documents'
     default_quantity: 1
-    trip_types: ['week', 'business']
+    trip_types: ['week', 'business', 'international']
+
+  - name: 'Visa documents'
+    description: 'Entry visas, ESTA approvals, or invitation letters'
+    category: 'Documents'
+    default_quantity: 1
+    trip_types: ['international']
+
+  - name: 'Passport photocopies'
+    description: 'Printed copies stored separately from originals'
+    category: 'Documents'
+    default_quantity: 2
+    trip_types: ['international']
 
   - name: "Driver's license/ID"
     description: 'Government-issued identification'
     category: 'Documents'
     default_quantity: 1
-    trip_types: ['overnight', 'weekend', 'week', 'business']
+    trip_types: ['overnight', 'weekend', 'week', 'business', 'international']
 
   - name: 'Travel tickets'
     description: 'Flight, train, or bus tickets'
     category: 'Documents'
     default_quantity: 1
-    trip_types: ['weekend', 'week', 'business']
+    trip_types: ['weekend', 'week', 'business', 'international']
 
   - name: 'Hotel confirmation'
     description: 'Printed or digital hotel reservation'
     category: 'Documents'
     default_quantity: 1
-    trip_types: ['overnight', 'weekend', 'week', 'business']
+    trip_types: ['overnight', 'weekend', 'week', 'business', 'international']
 
   - name: 'Insurance card'
     description: 'Health or travel insurance card'
     category: 'Documents'
     default_quantity: 1
-    trip_types: ['overnight', 'weekend', 'week', 'business', 'hiking']
+    trip_types: ['overnight', 'weekend', 'week', 'business', 'hiking', 'international']
 
   - name: 'Credit cards'
     description: 'Payment cards'
     category: 'Documents'
     default_quantity: 2
-    trip_types: ['overnight', 'weekend', 'week', 'business', 'beach']
+    trip_types: ['overnight', 'weekend', 'week', 'business', 'beach', 'international']
 
   - name: 'Cash'
     description: 'Local currency'
     category: 'Documents'
     default_quantity: 1
-    trip_types: ['overnight', 'weekend', 'week', 'business', 'beach']
+    trip_types: ['overnight', 'weekend', 'week', 'business', 'beach', 'international']
 
   - name: 'Emergency contacts'
     description: 'List of emergency phone numbers'
     category: 'Documents'
     default_quantity: 1
-    trip_types: ['overnight', 'weekend', 'week', 'business', 'hiking']
+    trip_types: ['overnight', 'weekend', 'week', 'business', 'hiking', 'international']
 
   - name: 'Travel itinerary'
     description: 'Printed trip schedule and plans'
@@ -967,7 +994,7 @@ items:
     description: 'Hidden travel wallet or money belt'
     category: 'Miscellaneous'
     default_quantity: 1
-    trip_types: ['week', 'business']
+    trip_types: ['week', 'business', 'international']
 
   - name: 'Shoe bags'
     description: 'Bags to keep shoes separate from clothes'
