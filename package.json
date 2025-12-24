@@ -7,6 +7,7 @@
     "dev": "npm run version:generate:dev && npm run sw:generate && astro dev",
     "build": "npm run validate:data && npm run version:generate && npm run sw:generate && astro build",
     "preview": "astro preview",
+    "test": "node --import tsx --test tests/d1-api.test.ts",
     "astro": "astro",
     "version:generate": "node scripts/generate-version.js",
     "version:generate:dev": "NODE_ENV=development node scripts/generate-version.js",
@@ -38,12 +39,15 @@
     "zod": "^4.1.13"
   },
   "devDependencies": {
+    "@miniflare/d1": "^2.14.4",
     "@types/js-yaml": "^4.0.9",
     "@types/papaparse": "^5.5.2",
+    "better-sqlite3": "^12.5.0",
     "drizzle-kit": "^0.31.8",
     "prettier": "^3.7.4",
     "prettier-plugin-astro": "^0.14.1",
     "prettier-plugin-tailwindcss": "^0.7.2",
+    "tsx": "^4.21.0",
     "wrangler": "^4.54.0"
   }
 }

@@ -69,10 +69,14 @@ export const POST: APIRoute = createPostHandler<Record<string, never>, typeof tr
         .where(eq(tripItems.trip_id, tripId))
         .all();
 
-      // Copy items with updated bag IDs
+      // Copy items with updated relationships
+      const itemIdMap = new Map<string, string>();
+      const pendingContainerUpdates: Array<{ newId: string; parentOldId: string }> = [];
+
       for (const item of originalItems) {
         const newBagId = item.bag_id ? bagIdMap.get(item.bag_id) || null : null;
-        await db
+
+        const newItem = await db
           .insert(tripItems)
           .values({
             trip_id: newTrip.id,
@@ -81,10 +85,28 @@ export const POST: APIRoute = createPostHandler<Record<string, never>, typeof tr
             quantity: item.quantity,
             bag_id: newBagId,
             master_item_id: item.master_item_id,
+            notes: item.notes,
+            is_container: item.is_container,
             is_packed: false, // Reset packed status for new trip
           })
           .returning()
           .get();
+
+        itemIdMap.set(item.id, newItem.id);
+
+        if (item.container_item_id) {
+          pendingContainerUpdates.push({ newId: newItem.id, parentOldId: item.container_item_id });
+        }
+      }
+
+      for (const update of pendingContainerUpdates) {
+        const parentNewId = itemIdMap.get(update.parentOldId);
+        if (!parentNewId) continue;
+        await db
+          .update(tripItems)
+          .set({ container_item_id: parentNewId, updated_at: new Date() })
+          .where(eq(tripItems.id, update.newId))
+          .run();
       }
 
       return newTrip;

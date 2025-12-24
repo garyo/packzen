@@ -6,10 +6,10 @@
 
 import { createSignal, onMount, onCleanup, Show, type Accessor } from 'solid-js';
 import { authStore } from '../../stores/auth';
-import { api, endpoints } from '../../lib/api';
-import type { Trip, MasterItem, Category, Bag, TripItem, BagTemplate } from '../../lib/types';
+import type { MasterItem, Category } from '../../lib/types';
 import { showToast } from '../ui/Toast';
-import { fullBackupToYAML, yamlToFullBackup, downloadYAML } from '../../lib/yaml';
+import { downloadYAML } from '../../lib/yaml';
+import { exportBackupData, restoreBackupData } from '../../lib/backup';
 
 interface UserMenuProps {
   categories: Accessor<Category[] | undefined>;
@@ -48,35 +48,11 @@ export function UserMenu(props: UserMenuProps) {
 
   const handleExport = async () => {
     try {
-      const categoriesList = props.categories() || [];
-      const itemsList = props.masterItems() || [];
-
-      const bagTemplatesResponse = await api.get<BagTemplate[]>(endpoints.bagTemplates);
-      const bagTemplatesList = bagTemplatesResponse.data || [];
-
-      const tripsResponse = await api.get<Trip[]>(endpoints.trips);
-      const tripsList = tripsResponse.data || [];
-
-      const tripsWithData = await Promise.all(
-        tripsList.map(async (trip) => {
-          const bagsResponse = await api.get<Bag[]>(endpoints.tripBags(trip.id));
-          const itemsResponse = await api.get<TripItem[]>(endpoints.tripItems(trip.id));
-          return {
-            trip,
-            bags: bagsResponse.data || [],
-            items: itemsResponse.data || [],
-          };
-        })
+      const { yaml, filename } = await exportBackupData(
+        props.categories() || [],
+        props.masterItems() || []
       );
-
-      const yamlContent = fullBackupToYAML(
-        categoriesList,
-        itemsList,
-        bagTemplatesList,
-        tripsWithData
-      );
-      const filename = `packzen-backup-${new Date().toISOString().split('T')[0]}.yaml`;
-      downloadYAML(yamlContent, filename);
+      downloadYAML(yaml, filename);
       showToast('success', 'Full backup exported successfully');
       setShowMenu(false);
     } catch (error) {
@@ -101,175 +77,7 @@ export function UserMenu(props: UserMenuProps) {
 
     try {
       const text = await file.text();
-      const backup = yamlToFullBackup(text);
-
-      const categoryNameToId = new Map<string, string>();
-
-      // Import categories
-      for (const cat of backup.categories) {
-        const existing = props.categories()?.find((c) => c.name === cat.name);
-        if (existing) {
-          await api.patch(endpoints.category(existing.id), {
-            name: cat.name,
-            icon: cat.icon,
-            sort_order: cat.sort_order,
-          });
-          categoryNameToId.set(cat.name, existing.id);
-        } else {
-          const response = await api.post(endpoints.categories, {
-            name: cat.name,
-            icon: cat.icon,
-            sort_order: cat.sort_order,
-          });
-          if (response.data) {
-            categoryNameToId.set(cat.name, response.data.id);
-          }
-        }
-      }
-
-      // Import master items
-      for (const item of backup.masterItems) {
-        const categoryId = item.category_name
-          ? categoryNameToId.get(item.category_name) || null
-          : null;
-
-        const existing = props
-          .masterItems()
-          ?.find((i) => i.name.toLowerCase() === item.name.toLowerCase());
-
-        if (existing) {
-          await api.patch(endpoints.masterItem(existing.id), {
-            name: item.name,
-            description: item.description,
-            category_id: categoryId,
-            default_quantity: item.default_quantity,
-          });
-        } else {
-          await api.post(endpoints.masterItems, {
-            name: item.name,
-            description: item.description,
-            category_id: categoryId,
-            default_quantity: item.default_quantity,
-          });
-        }
-      }
-
-      // Import bag templates
-      const bagTemplatesResponse = await api.get<BagTemplate[]>(endpoints.bagTemplates);
-      const existingBagTemplates = bagTemplatesResponse.data || [];
-
-      for (const template of backup.bagTemplates) {
-        const existingTemplate = existingBagTemplates.find(
-          (t) => t.name.toLowerCase() === template.name.toLowerCase()
-        );
-
-        if (existingTemplate) {
-          await api.patch(endpoints.bagTemplate(existingTemplate.id), {
-            name: template.name,
-            type: template.type,
-            color: template.color,
-            sort_order: template.sort_order,
-          });
-        } else {
-          await api.post(endpoints.bagTemplates, {
-            name: template.name,
-            type: template.type,
-            color: template.color,
-            sort_order: template.sort_order,
-          });
-        }
-      }
-
-      // Import trips
-      const tripsResponse = await api.get<Trip[]>(endpoints.trips);
-      const existingTrips = tripsResponse.data || [];
-
-      for (const tripData of backup.trips) {
-        const existingTrip = existingTrips.find(
-          (t) => t.name.toLowerCase() === tripData.name.toLowerCase()
-        );
-
-        let tripId: string;
-
-        if (existingTrip) {
-          await api.patch(endpoints.trip(existingTrip.id), {
-            name: tripData.name,
-            destination: tripData.destination,
-            start_date: tripData.start_date,
-            end_date: tripData.end_date,
-            notes: tripData.notes,
-          });
-          tripId = existingTrip.id;
-        } else {
-          const tripResponse = await api.post(endpoints.trips, {
-            name: tripData.name,
-            destination: tripData.destination,
-            start_date: tripData.start_date,
-            end_date: tripData.end_date,
-            notes: tripData.notes,
-          });
-          if (!tripResponse.data) continue;
-          tripId = tripResponse.data.id;
-        }
-
-        // Import bags
-        const bagsResponse = await api.get<Bag[]>(endpoints.tripBags(tripId));
-        const existingBags = bagsResponse.data || [];
-        const bagNameToId = new Map<string, string>();
-
-        for (const bagData of tripData.bags) {
-          const existingBag = existingBags.find((b) => b.name === bagData.name);
-          if (existingBag) {
-            await api.patch(endpoints.tripBags(tripId), {
-              bag_id: existingBag.id,
-              name: bagData.name,
-              type: bagData.type,
-              color: bagData.color,
-            });
-            bagNameToId.set(bagData.name, existingBag.id);
-          } else {
-            const bagResponse = await api.post(endpoints.tripBags(tripId), {
-              name: bagData.name,
-              type: bagData.type,
-              color: bagData.color,
-              sort_order: bagData.sort_order,
-            });
-            if (bagResponse.data) {
-              bagNameToId.set(bagData.name, bagResponse.data.id);
-            }
-          }
-        }
-
-        // Import items
-        const itemsResponse = await api.get<TripItem[]>(endpoints.tripItems(tripId));
-        const existingItems = itemsResponse.data || [];
-
-        for (const itemData of tripData.items) {
-          const bagId = itemData.bag_name ? bagNameToId.get(itemData.bag_name) || null : null;
-          const existingItem = existingItems.find(
-            (i) => i.name.toLowerCase() === itemData.name.toLowerCase()
-          );
-
-          if (existingItem) {
-            await api.patch(endpoints.tripItems(tripId), {
-              id: existingItem.id,
-              name: itemData.name,
-              category_name: itemData.category_name,
-              quantity: itemData.quantity,
-              bag_id: bagId,
-            });
-          } else {
-            await api.post(endpoints.tripItems(tripId), {
-              name: itemData.name,
-              category_name: itemData.category_name,
-              quantity: itemData.quantity,
-              bag_id: bagId,
-              master_item_id: null,
-            });
-          }
-        }
-      }
-
+      await restoreBackupData(text, props.categories() || [], props.masterItems() || []);
       showToast('success', 'Backup restored successfully!');
       props.onBackupRestored();
       setShowMenu(false);

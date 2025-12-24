@@ -4,6 +4,7 @@ import { yamlTripExportSchema, yamlFullBackupSchema, validateRequestSafe } from 
 
 export interface TripExport {
   trip: {
+    source_id?: string;
     name: string;
     destination: string;
     start_date: string;
@@ -11,12 +12,16 @@ export interface TripExport {
     notes: string | null;
   };
   bags: Array<{
+    source_id?: string;
     name: string;
     type: string;
     color: string | null;
     sort_order: number;
   }>;
   items: Array<{
+    source_id?: string;
+    bag_source_id?: string | null;
+    container_source_id?: string | null;
     name: string;
     category_name: string | null;
     quantity: number;
@@ -25,6 +30,7 @@ export interface TripExport {
     notes: string | null;
     is_container?: boolean;
     container_name?: string | null; // Name of parent container for items inside containers
+    master_item_id?: string | null;
   }>;
 }
 
@@ -44,24 +50,30 @@ export interface FullBackup {
     is_container?: boolean;
   }>;
   bagTemplates: Array<{
+    source_id?: string;
     name: string;
     type: string;
     color: string | null;
     sort_order: number;
   }>;
   trips: Array<{
+    source_id?: string;
     name: string;
     destination: string;
     start_date: string;
     end_date: string;
     notes: string | null;
     bags: Array<{
+      source_id?: string;
       name: string;
       type: string;
       color: string | null;
       sort_order: number;
     }>;
     items: Array<{
+      source_id?: string;
+      bag_source_id?: string | null;
+      container_source_id?: string | null;
       name: string;
       category_name: string | null;
       quantity: number;
@@ -70,6 +82,7 @@ export interface FullBackup {
       notes: string | null;
       is_container?: boolean;
       container_name?: string | null;
+      master_item_id?: string | null;
     }>;
   }>;
 }
@@ -80,6 +93,7 @@ export interface FullBackup {
 export function tripToYAML(trip: Trip, bags: Bag[], items: TripItem[]): string {
   const exportData: TripExport = {
     trip: {
+      source_id: trip.id,
       name: trip.name,
       destination: trip.destination || '',
       start_date: trip.start_date || '',
@@ -87,6 +101,7 @@ export function tripToYAML(trip: Trip, bags: Bag[], items: TripItem[]): string {
       notes: trip.notes,
     },
     bags: bags.map((bag) => ({
+      source_id: bag.id,
       name: bag.name,
       type: bag.type,
       color: bag.color,
@@ -98,6 +113,9 @@ export function tripToYAML(trip: Trip, bags: Bag[], items: TripItem[]): string {
         ? items.find((i) => i.id === item.container_item_id)
         : null;
       return {
+        source_id: item.id,
+        bag_source_id: item.bag_id || null,
+        container_source_id: item.container_item_id || null,
         name: item.name,
         category_name: item.category_name,
         quantity: item.quantity,
@@ -106,6 +124,7 @@ export function tripToYAML(trip: Trip, bags: Bag[], items: TripItem[]): string {
         notes: item.notes,
         is_container: item.is_container || undefined,
         container_name: container?.name || undefined,
+        master_item_id: item.master_item_id || null,
       };
     }),
   };
@@ -136,6 +155,7 @@ export function yamlToTrip(yamlString: string): TripExport {
     // Return validated and sanitized data
     return {
       trip: {
+        source_id: validation.data.trip.source_id,
         name: validation.data.trip.name,
         destination: validation.data.trip.destination || '',
         start_date: validation.data.trip.start_date || '',
@@ -143,12 +163,16 @@ export function yamlToTrip(yamlString: string): TripExport {
         notes: validation.data.trip.notes || null,
       },
       bags: validation.data.bags.map((bag) => ({
+        source_id: bag.source_id,
         name: bag.name,
         type: bag.type,
         color: bag.color || null,
         sort_order: bag.sort_order,
       })),
       items: validation.data.items.map((item) => ({
+        source_id: item.source_id,
+        bag_source_id: item.bag_source_id || null,
+        container_source_id: item.container_source_id || null,
         name: item.name,
         category_name: item.category_name || null,
         quantity: item.quantity,
@@ -157,6 +181,7 @@ export function yamlToTrip(yamlString: string): TripExport {
         notes: item.notes || null,
         is_container: item.is_container || undefined,
         container_name: item.container_name || undefined,
+        master_item_id: item.master_item_id || null,
       })),
     };
   } catch (error) {
@@ -195,18 +220,21 @@ export function fullBackupToYAML(
       is_container: item.is_container || undefined,
     })),
     bagTemplates: bagTemplates.map((template) => ({
+      source_id: template.id,
       name: template.name,
       type: template.type,
       color: template.color,
       sort_order: template.sort_order,
     })),
     trips: trips.map(({ trip, bags, items }) => ({
+      source_id: trip.id,
       name: trip.name,
       destination: trip.destination || '',
       start_date: trip.start_date || '',
       end_date: trip.end_date || '',
       notes: trip.notes,
       bags: bags.map((bag) => ({
+        source_id: bag.id,
         name: bag.name,
         type: bag.type,
         color: bag.color,
@@ -218,6 +246,9 @@ export function fullBackupToYAML(
           ? items.find((i) => i.id === item.container_item_id)
           : null;
         return {
+          source_id: item.id,
+          bag_source_id: item.bag_id || null,
+          container_source_id: item.container_item_id || null,
           name: item.name,
           category_name: item.category_name,
           quantity: item.quantity,
@@ -226,6 +257,7 @@ export function fullBackupToYAML(
           notes: item.notes,
           is_container: item.is_container || undefined,
           container_name: container?.name || undefined,
+          master_item_id: item.master_item_id || null,
         };
       }),
     })),
@@ -271,24 +303,30 @@ export function yamlToFullBackup(yamlString: string): FullBackup {
         is_container: item.is_container || undefined,
       })),
       bagTemplates: validation.data.bagTemplates.map((template) => ({
+        source_id: template.source_id,
         name: template.name,
         type: template.type,
         color: template.color || null,
         sort_order: template.sort_order,
       })),
       trips: validation.data.trips.map((trip) => ({
+        source_id: trip.source_id,
         name: trip.name,
         destination: trip.destination || '',
         start_date: trip.start_date || '',
         end_date: trip.end_date || '',
         notes: trip.notes || null,
         bags: trip.bags.map((bag) => ({
+          source_id: bag.source_id,
           name: bag.name,
           type: bag.type,
           color: bag.color || null,
           sort_order: bag.sort_order,
         })),
         items: trip.items.map((item) => ({
+          source_id: item.source_id,
+          bag_source_id: item.bag_source_id || null,
+          container_source_id: item.container_source_id || null,
           name: item.name,
           category_name: item.category_name || null,
           quantity: item.quantity,
@@ -297,6 +335,7 @@ export function yamlToFullBackup(yamlString: string): FullBackup {
           notes: item.notes || null,
           is_container: item.is_container || undefined,
           container_name: item.container_name || undefined,
+          master_item_id: item.master_item_id || null,
         })),
       })),
     };

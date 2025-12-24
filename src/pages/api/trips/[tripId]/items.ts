@@ -95,7 +95,10 @@ export const POST: APIRoute = async (context) => {
       master_item_id,
       container_item_id,
       is_container,
+      notes,
+      is_packed,
     } = validation.data;
+    const { merge_duplicates } = validation.data;
 
     // Check if an item with the same name and category already exists
     const existingItems = await db
@@ -104,11 +107,17 @@ export const POST: APIRoute = async (context) => {
       .where(eq(tripItems.trip_id, tripId))
       .all();
 
-    const duplicateItem = existingItems.find(
-      (item) =>
-        item.name.toLowerCase() === name.toLowerCase() &&
-        (item.category_name?.toLowerCase() || null) === (category_name?.toLowerCase() || null)
-    );
+    const duplicateItem =
+      merge_duplicates !== false
+        ? existingItems.find(
+            (item) =>
+              item.name.toLowerCase() === name.toLowerCase() &&
+              (item.category_name?.toLowerCase() || null) ===
+                (category_name?.toLowerCase() || null) &&
+              (item.bag_id || null) === (bag_id || null) &&
+              (item.container_item_id || null) === (container_item_id || null)
+          )
+        : null;
 
     // If duplicate exists, increment its quantity instead of creating a new item
     if (duplicateItem) {
@@ -171,7 +180,8 @@ export const POST: APIRoute = async (context) => {
         master_item_id: master_item_id || null,
         container_item_id: container_item_id || null,
         is_container: is_container || false,
-        is_packed: false,
+        is_packed: is_packed ?? false,
+        notes: notes || null,
       })
       .returning()
       .get();
@@ -212,6 +222,7 @@ export const PATCH: APIRoute = createPatchHandler<
       name,
       container_item_id,
       is_container,
+      notes,
     } = validatedData;
 
     // Verify bag ownership if bag_id is being updated
@@ -285,6 +296,7 @@ export const PATCH: APIRoute = createPatchHandler<
         | 'is_packed'
         | 'container_item_id'
         | 'is_container'
+        | 'notes'
       >
     >;
     const updates: TripItemUpdate & { updated_at: Date } = { updated_at: new Date() };
@@ -295,6 +307,7 @@ export const PATCH: APIRoute = createPatchHandler<
     if (name !== undefined) updates.name = name;
     if (container_item_id !== undefined) updates.container_item_id = container_item_id;
     if (is_container !== undefined) updates.is_container = is_container;
+    if (notes !== undefined) updates.notes = notes;
 
     return await db
       .update(tripItems)
