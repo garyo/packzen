@@ -73,11 +73,17 @@ function constantTimeCompare(a: string, b: string): boolean {
 /**
  * Create Set-Cookie header value for CSRF token
  */
-export function createCsrfCookie(token: string, maxAge: number = 86400): string {
+export function createCsrfCookie(
+  token: string,
+  maxAge: number = 86400,
+  secure: boolean = false
+): string {
   // Set cookie for 24 hours by default
-  // Use SameSite=Strict for maximum protection
+  // Use SameSite=Lax so normal navigations still work while protecting against CSRF
   // Secure flag will be set in production (HTTPS)
-  return `${CSRF_COOKIE_NAME}=${token}; Path=/; Max-Age=${maxAge}; SameSite=Strict; HttpOnly`;
+  return `${CSRF_COOKIE_NAME}=${token}; Path=/; Max-Age=${maxAge}; SameSite=Lax; HttpOnly${
+    secure ? '; Secure' : ''
+  }`;
 }
 
 /**

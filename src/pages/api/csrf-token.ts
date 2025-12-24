@@ -25,6 +25,9 @@ export const GET: APIRoute = async ({ request }) => {
     existingToken = cookies[getCsrfCookieName()] || null;
   }
 
+  const url = new URL(request.url);
+  const isSecure = url.protocol === 'https:';
+
   // Generate new token or use existing one
   const token = existingToken || generateCsrfToken();
 
@@ -32,7 +35,7 @@ export const GET: APIRoute = async ({ request }) => {
     status: 200,
     headers: {
       'Content-Type': 'application/json',
-      'Set-Cookie': createCsrfCookie(token),
+      'Set-Cookie': createCsrfCookie(token, 86400, isSecure),
     },
   });
 };
