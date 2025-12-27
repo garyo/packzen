@@ -705,6 +705,15 @@ export function PackingListBagView(props: PackingListBagViewProps) {
                                       <div class="absolute top-full right-0 z-20 mt-1 w-48 rounded-lg border border-gray-200 bg-white shadow-lg">
                                         <button
                                           onClick={() => {
+                                            props.onAddToContainer?.(container.id);
+                                            setOpenContainerMenu(null);
+                                          }}
+                                          class="w-full px-4 py-2 text-left text-sm font-bold hover:bg-gray-100"
+                                        >
+                                          ✏️ New Item
+                                        </button>
+                                        <button
+                                          onClick={() => {
                                             props.onAddFromMasterToContainer?.(container.id);
                                             setOpenContainerMenu(null);
                                           }}
@@ -720,15 +729,6 @@ export function PackingListBagView(props: PackingListBagViewProps) {
                                           class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
                                         >
                                           📚 From Templates
-                                        </button>
-                                        <button
-                                          onClick={() => {
-                                            props.onAddToContainer?.(container.id);
-                                            setOpenContainerMenu(null);
-                                          }}
-                                          class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
-                                        >
-                                          ✏️ New Item
                                         </button>
                                       </div>
                                     </Show>

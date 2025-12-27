@@ -21,27 +21,31 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
   const [name, setName] = createSignal('');
   const [quantity, setQuantity] = createSignal(1);
   const [categoryId, setCategoryId] = createSignal<string | null>(null);
-  const [bagId, setBagId] = createSignal<string | null>(null);
-  const [containerItemId, setContainerItemId] = createSignal<string | null>(null);
+  const [location, setLocation] = createSignal<string>('');
   const [keepOpen, setKeepOpen] = createSignal(false);
   const [isNewCategory, setIsNewCategory] = createSignal(false);
   const [newCategoryName, setNewCategoryName] = createSignal('');
   const [isContainer, setIsContainer] = createSignal(false);
 
+  // Track the select element for manual DOM sync as workaround for SolidJS select reactivity
+  let locationSelectRef: HTMLSelectElement | undefined;
+
   // Set pre-selected values from props using createEffect for proper reactivity
   // Wait for resources to load before setting to ensure dropdown options exist
   createEffect(() => {
     const currentBags = bags();
+    const currentLocation = location();
+
     if (currentBags) {
       if (props.preSelectedBagId) {
-        setBagId(props.preSelectedBagId);
-      } else if (currentBags.length === 1 && bagId() === null) {
+        setLocation(`bag:${props.preSelectedBagId}`);
+      } else if (currentBags.length === 1 && !currentLocation) {
         // Auto-select if there's only one bag
-        setBagId(currentBags[0].id);
+        setLocation(`bag:${currentBags[0].id}`);
       }
     }
     if (tripItems() && props.preSelectedContainerId) {
-      setContainerItemId(props.preSelectedContainerId);
+      setLocation(`container:${props.preSelectedContainerId}`);
     }
   });
 
@@ -312,8 +316,19 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
       categoryName = existingMasterItem.category_name;
     }
 
+    // Parse location to determine bag_id and container_item_id
+    const loc = location();
+    let bagId: string | null = null;
+    let containerItemId: string | null = null;
+
+    if (loc.startsWith('bag:')) {
+      bagId = loc.substring(4);
+    } else if (loc.startsWith('container:')) {
+      containerItemId = loc.substring(10);
+    }
+
     // Validate: containers cannot be inside other containers
-    if (isContainer() && containerItemId()) {
+    if (isContainer() && containerItemId) {
       showToast('error', 'Containers cannot be placed inside other containers');
       return;
     }
@@ -323,10 +338,10 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
       name: itemName,
       category_name: categoryName,
       quantity: quantity(),
-      bag_id: bagId(), // Always use the selected bag
+      bag_id: bagId,
       master_item_id: masterItemId,
       is_container: isContainer(),
-      container_item_id: containerItemId(),
+      container_item_id: containerItemId,
     });
 
     if (response.success) {
@@ -335,15 +350,16 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
       if (keepOpen()) {
         // Smart reuse logic for Add Another
         const wasContainer = isContainer();
-        const lastBagId = bagId();
+        const lastLocation = location();
         const lastCategoryId = categoryId();
 
-        // Reset name and new category fields (but NOT category/bag/container)
+        // Reset fields (including location to trigger reactivity on restore)
         setName('');
         setIsNewCategory(false);
         setNewCategoryName('');
         setKeepOpen(false);
-        setIsContainer(false); // Always uncheck container for next item
+        setIsContainer(false);
+        setLocation(''); // Clear location so restoration triggers a signal change
 
         // Call onSaved to trigger refetch (important for containers to appear in list)
         props.onSaved();
@@ -351,15 +367,22 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
 
         if (wasContainer && response.data) {
           // If we just created a container, pre-select it as the container for the next item
-          // Refetch trip items so the new container appears in the dropdown
-          // Wait for the UI to update with new container
           const newContainerId = (response.data as { id: string }).id;
           setTimeout(() => {
-            setContainerItemId(newContainerId);
-            // Category and bag should already be set from before, but restore them explicitly
-            // to ensure they're not lost during refetch
+            setLocation(`container:${newContainerId}`);
             setCategoryId(lastCategoryId);
-            setBagId(lastBagId);
+          }, 250);
+        } else {
+          // For regular items, restore location and category after refetch
+          setTimeout(() => {
+            setLocation(lastLocation);
+            setCategoryId(lastCategoryId);
+            // Workaround: Force DOM update after render completes
+            requestAnimationFrame(() => {
+              if (locationSelectRef) {
+                locationSelectRef.value = lastLocation;
+              }
+            });
           }, 250);
         }
         // Focus back on name input
@@ -456,42 +479,27 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
           />
         </div>
 
-        {/* Container assignment (only show if not a container itself and there are containers) */}
-        <Show when={!isContainer() && availableContainers().length > 0}>
+        {/* Combined Bag/Container location (only show if not a container itself) */}
+        <Show when={!isContainer()}>
           <div>
-            <label class="mb-1 block text-sm font-medium text-gray-700">Inside Container</label>
+            <label class="mb-1 block text-sm font-medium text-gray-700">Inside Bag/Container</label>
             <select
-              value={containerItemId() || ''}
-              onChange={(e) => {
-                setContainerItemId(e.target.value || null);
-                if (e.target.value) {
-                  setBagId(null); // Clear bag if assigning to container
-                }
-              }}
-              class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">Not in a container</option>
-              <For each={availableContainers()}>
-                {(container) => <option value={container.id}>📦 {container.name}</option>}
-              </For>
-            </select>
-            <p class="mt-1 text-xs text-gray-500">
-              Place this item inside a container like a toilet kit
-            </p>
-          </div>
-        </Show>
-
-        {/* Bag selector - hidden when item is in a container (bag is inherited) */}
-        <Show when={!containerItemId()}>
-          <div>
-            <label class="mb-1 block text-sm font-medium text-gray-700">Bag</label>
-            <select
-              value={bagId() || ''}
-              onChange={(e) => setBagId(e.target.value || null)}
+              ref={locationSelectRef}
+              value={location()}
+              onChange={(e) => setLocation(e.target.value)}
               class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
             >
               <option value="">No bag</option>
-              <For each={bags()}>{(bag) => <option value={bag.id}>{bag.name}</option>}</For>
+              <For each={bags()}>
+                {(bag) => <option value={`bag:${bag.id}`}>{bag.name}</option>}
+              </For>
+              <Show when={availableContainers().length > 0}>
+                <For each={availableContainers()}>
+                  {(container) => (
+                    <option value={`container:${container.id}`}>📦 {container.name}</option>
+                  )}
+                </For>
+              </Show>
             </select>
           </div>
         </Show>
@@ -504,8 +512,8 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
             checked={isContainer()}
             onChange={(e) => {
               setIsContainer(e.currentTarget.checked);
-              if (e.currentTarget.checked) {
-                setContainerItemId(null); // Containers can't be inside containers
+              if (e.currentTarget.checked && location().startsWith('container:')) {
+                setLocation(''); // Containers can't be inside containers
               }
             }}
             class="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
