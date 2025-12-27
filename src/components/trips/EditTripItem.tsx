@@ -17,13 +17,18 @@ interface EditTripItemProps {
 export function EditTripItem(props: EditTripItemProps) {
   const [name, setName] = createSignal(props.item.name);
   const [quantity, setQuantity] = createSignal(props.item.quantity);
-  const [bagId, setBagId] = createSignal<string | null>(null);
+  const [notes, setNotes] = createSignal(props.item.notes || '');
   const [categoryId, setCategoryId] = createSignal<string | null>(null);
   const [isNewCategory, setIsNewCategory] = createSignal(false);
   const [newCategoryName, setNewCategoryName] = createSignal('');
   const [isContainer, setIsContainer] = createSignal(props.item.is_container || false);
-  const [containerItemId, setContainerItemId] = createSignal<string | null>(
-    props.item.container_item_id || null
+  // Combined location - stores either "bag:id" or "container:id"
+  const [location, setLocation] = createSignal<string>(
+    props.item.container_item_id
+      ? `container:${props.item.container_item_id}`
+      : props.item.bag_id
+        ? `bag:${props.item.bag_id}`
+        : ''
   );
   const [showDeleteConfirm, setShowDeleteConfirm] = createSignal(false);
   const [containedItemsCount, setContainedItemsCount] = createSignal(0);
@@ -62,13 +67,7 @@ export function EditTripItem(props: EditTripItemProps) {
     return [...cats].sort((a, b) => a.name.localeCompare(b.name));
   });
 
-  // Initialize bag and category after resources load
-  createEffect(() => {
-    if (bags() && props.item.bag_id && bagId() === null) {
-      setBagId(props.item.bag_id);
-    }
-  });
-
+  // Initialize category after resources load
   createEffect(() => {
     // Only initialize category once when categories load
     if (categories() && props.item.category_name && !categoryInitialized()) {
@@ -110,8 +109,19 @@ export function EditTripItem(props: EditTripItemProps) {
       finalCategoryName = cat?.name || '';
     }
 
+    // Parse location to determine bag_id and container_item_id
+    const loc = location();
+    let bagId: string | null = null;
+    let containerItemId: string | null = null;
+
+    if (loc.startsWith('bag:')) {
+      bagId = loc.substring(4);
+    } else if (loc.startsWith('container:')) {
+      containerItemId = loc.substring(10);
+    }
+
     // Validate container constraints
-    if (isContainer() && containerItemId()) {
+    if (isContainer() && containerItemId) {
       showToast('error', 'A container cannot be placed inside another container');
       return;
     }
@@ -120,10 +130,11 @@ export function EditTripItem(props: EditTripItemProps) {
       id: props.item.id,
       name: name().trim(),
       quantity: quantity(),
-      bag_id: containerItemId() ? null : bagId(), // If inside a container, clear bag_id
+      notes: notes().trim() || null,
+      bag_id: containerItemId ? null : bagId, // If inside a container, clear bag_id
       category_name: finalCategoryName || null,
       is_container: isContainer(),
-      container_item_id: isContainer() ? null : containerItemId(), // Containers can't be in containers
+      container_item_id: isContainer() ? null : containerItemId, // Containers can't be in containers
     };
 
     const response = await api.patch(endpoints.tripItems(props.tripId), patchData);
@@ -156,8 +167,10 @@ export function EditTripItem(props: EditTripItemProps) {
   };
 
   const getContainerDestination = () => {
-    if (props.item.bag_id) {
-      const bag = bags()?.find((b) => b.id === props.item.bag_id);
+    const loc = location();
+    if (loc.startsWith('bag:')) {
+      const bagId = loc.substring(4);
+      const bag = bags()?.find((b) => b.id === bagId);
       return bag ? `to ${bag.name}` : 'to trip';
     }
     return 'to trip';
@@ -278,8 +291,8 @@ export function EditTripItem(props: EditTripItemProps) {
             checked={isContainer()}
             onChange={(e) => {
               setIsContainer(e.currentTarget.checked);
-              if (e.currentTarget.checked) {
-                setContainerItemId(null); // Containers can't be inside containers
+              if (e.currentTarget.checked && location().startsWith('container:')) {
+                setLocation(''); // Containers can't be inside containers
               }
             }}
             class="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
@@ -289,45 +302,41 @@ export function EditTripItem(props: EditTripItemProps) {
           </label>
         </div>
 
-        {/* Container assignment (only show if not a container itself) */}
-        <Show when={!isContainer() && availableContainers().length > 0}>
+        {/* Combined Bag/Container location (only show if not a container itself) */}
+        <Show when={!isContainer()}>
           <div>
-            <label class="mb-1 block text-sm font-medium text-gray-700">Inside Container</label>
+            <label class="mb-1 block text-sm font-medium text-gray-700">Inside Bag/Container</label>
             <select
-              value={containerItemId() || ''}
-              onChange={(e) => {
-                setContainerItemId(e.target.value || null);
-                if (e.target.value) {
-                  setBagId(null); // Clear bag if assigning to container
-                }
-              }}
-              class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">Not in a container</option>
-              <For each={availableContainers()}>
-                {(container) => <option value={container.id}>📦 {container.name}</option>}
-              </For>
-            </select>
-            <p class="mt-1 text-xs text-gray-500">
-              Place this item inside a container like a toilet kit
-            </p>
-          </div>
-        </Show>
-
-        {/* Bag assignment (only show if not inside a container) */}
-        <Show when={!containerItemId()}>
-          <div>
-            <label class="mb-1 block text-sm font-medium text-gray-700">Bag</label>
-            <select
-              value={bagId() || ''}
-              onChange={(e) => setBagId(e.target.value || null)}
+              value={location()}
+              onChange={(e) => setLocation(e.target.value)}
               class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
             >
               <option value="">No bag</option>
-              <For each={bags()}>{(bag) => <option value={bag.id}>{bag.name}</option>}</For>
+              <For each={bags()}>
+                {(bag) => <option value={`bag:${bag.id}`}>{bag.name}</option>}
+              </For>
+              <Show when={availableContainers().length > 0}>
+                <For each={availableContainers()}>
+                  {(container) => (
+                    <option value={`container:${container.id}`}>📦 {container.name}</option>
+                  )}
+                </For>
+              </Show>
             </select>
           </div>
         </Show>
+
+        {/* Notes field */}
+        <div>
+          <label class="mb-1 block text-sm font-medium text-gray-700">Notes</label>
+          <textarea
+            value={notes()}
+            onInput={(e) => setNotes(e.currentTarget.value)}
+            placeholder="Optional notes about this item"
+            rows="2"
+            class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
 
         <div class="flex gap-2 pt-4">
           <Button onClick={handleSave} class="flex-1">

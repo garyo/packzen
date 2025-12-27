@@ -71,20 +71,23 @@ export function PackingItemCard(props: PackingItemCardProps) {
         />
       </Show>
       <div
-        class={`flex-1 ${hasContents() && props.onContainerClick ? 'cursor-pointer' : ''}`}
+        class={`min-w-0 flex-1 ${hasContents() && props.onContainerClick ? 'cursor-pointer' : ''}`}
         onClick={() => hasContents() && props.onContainerClick?.()}
       >
-        <div class="flex items-center gap-2">
+        <div class="flex min-w-0 items-center gap-2">
           <Show when={isContainer()}>
-            <span class="text-lg md:text-base" title="Container (sub-bag)">
+            <span class="flex-shrink-0 text-lg md:text-base" title="Container (sub-bag)">
               {props.categoryIcon || '📦'}
             </span>
           </Show>
-          <p
-            class={`text-lg font-medium md:text-base ${props.item.is_packed ? 'text-gray-500 line-through' : 'text-gray-900'}`}
+          <div
+            class={`min-w-0 flex-1 overflow-hidden text-lg font-medium text-ellipsis whitespace-nowrap md:text-base ${props.item.is_packed ? 'text-gray-500 line-through' : 'text-gray-900'}`}
           >
             {props.item.name}
-          </p>
+            <Show when={props.item.notes}>
+              <span class="ml-2 text-xs font-normal text-gray-500">{props.item.notes}</span>
+            </Show>
+          </div>
           <Show when={hasContents()}>
             <span
               class={`rounded-full px-2 py-0.5 text-xs font-medium ${
