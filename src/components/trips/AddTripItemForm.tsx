@@ -80,19 +80,118 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
     return items.filter((item) => item.is_container);
   };
 
-  // Search results for autocomplete
+  const existingItemsByName = createMemo(() => {
+    const items = tripItems() || [];
+    const bagLookup = new Map((bags() || []).map((bag) => [bag.id, bag.name]));
+    const containerLookup = new Map(items.map((item) => [item.id, item]));
+
+    const resolveLocation = (item: TripItem, visited = new Set<string>()): string => {
+      // Cycle detection: if we've seen this item before, stop recursion
+      if (visited.has(item.id)) {
+        return 'No Bag';
+      }
+      visited.add(item.id);
+
+      if (item.container_item_id) {
+        const container = containerLookup.get(item.container_item_id);
+        if (container) {
+          const containerName = container.name?.trim();
+          if (containerName) return containerName;
+          return resolveLocation(container, visited);
+        }
+      }
+
+      if (item.bag_id && bagLookup.has(item.bag_id)) {
+        return bagLookup.get(item.bag_id)!;
+      }
+
+      return 'No Bag';
+    };
+
+    // Store multiple locations for items with same name
+    const map = new Map<string, string[]>();
+    items.forEach((item) => {
+      if (!item.name) return;
+      const key = item.name.toLowerCase().trim();
+      const location = resolveLocation(item);
+
+      if (!map.has(key)) {
+        map.set(key, [location]);
+      } else {
+        const locations = map.get(key)!;
+        if (!locations.includes(location)) {
+          locations.push(location);
+        }
+      }
+    });
+
+    // Convert to single string per item (join multiple locations)
+    const result = new Map<string, string>();
+    map.forEach((locations, key) => {
+      if (locations.length > 1) {
+        result.set(key, `${locations.length} locations`);
+      } else {
+        result.set(key, locations[0]);
+      }
+    });
+    return result;
+  });
+
+  // Warning banner for items already in trip
+  const tripItemsWarning = createMemo(() => {
+    const query = name().trim();
+    if (query.length < 2) return null;
+
+    const tripItemsList = tripItems() || [];
+    const tripMatchesRaw = searchItems(query, tripItemsList);
+
+    if (tripMatchesRaw.length === 0) return null;
+
+    // Single match - try to show with location if it fits
+    if (tripMatchesRaw.length === 1) {
+      const item = tripMatchesRaw[0];
+      const location = existingItemsByName().get(item.name.toLowerCase().trim());
+      const message = `${item.name} already in ${location}`;
+
+      // If the message is compact enough (< 50 chars), show it
+      if (message.length <= 50) {
+        return message;
+      }
+      // Otherwise fall back to compact format
+      return `1 already in trip: ${item.name}`;
+    }
+
+    // Multiple matches - show count and names
+    const names = tripMatchesRaw
+      .slice(0, 3)
+      .map((item) => item.name)
+      .join(', ');
+    const suffix = tripMatchesRaw.length > 3 ? '...' : '';
+    return `${tripMatchesRaw.length} already in trip: ${names}${suffix}`;
+  });
+
+  // Search results for autocomplete (excluding trip items)
   const searchResults = createMemo(() => {
     const query = name().trim();
     if (query.length < 2) return [];
 
-    // Search master items
-    const masterResults = searchItems(query, masterItems() || []);
+    const maxResults = 8;
 
-    // Search built-in items
-    const builtInResults = searchItems(query, builtInItems.items);
+    const tripItemsList = tripItems() || [];
+    const tripMatchesRaw = searchItems(query, tripItemsList);
+    const tripNameSet = new Set(tripMatchesRaw.map((item) => item.name.toLowerCase().trim()));
 
-    // Prioritize: show top 5 master, fill remaining with built-in (max 8 total)
-    const master = masterResults.slice(0, 5).map((item) => ({
+    // Search master items (exclude items already in trip)
+    const masterResults = searchItems(query, masterItems() || []).filter(
+      (item) => !tripNameSet.has(item.name.toLowerCase().trim())
+    );
+
+    // Search built-in items (exclude items already in trip)
+    const builtInResults = searchItems(query, builtInItems.items).filter(
+      (item) => !tripNameSet.has(item.name.toLowerCase().trim())
+    );
+
+    const master = masterResults.slice(0, Math.min(5, maxResults)).map((item) => ({
       id: item.id,
       name: item.name,
       description: item.description,
@@ -101,6 +200,7 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
       categoryName: item.category_name,
       defaultQuantity: item.default_quantity,
       isContainer: item.is_container,
+      existingLocation: existingItemsByName().get(item.name.toLowerCase().trim()),
     }));
 
     // Filter out built-in items that have the same name as master items (case-insensitive)
@@ -109,7 +209,9 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
       (item) => !masterItemNames.has(item.name.toLowerCase().trim())
     );
 
-    const builtin = filteredBuiltIn.slice(0, 8 - master.length).map((item, idx) => ({
+    const remainingSlots = Math.max(maxResults - master.length, 0);
+
+    const builtin = filteredBuiltIn.slice(0, remainingSlots).map((item, idx) => ({
       id: `builtin-${idx}`,
       name: item.name,
       description: item.description,
@@ -117,6 +219,7 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
       categoryName: item.category,
       defaultQuantity: item.default_quantity,
       isContainer: false,
+      existingLocation: existingItemsByName().get(item.name.toLowerCase().trim()),
     }));
 
     return [...master, ...builtin];
@@ -244,12 +347,11 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
 
         // Call onSaved to trigger refetch (important for containers to appear in list)
         props.onSaved();
+        await refetchTripItems();
 
         if (wasContainer && response.data) {
           // If we just created a container, pre-select it as the container for the next item
           // Refetch trip items so the new container appears in the dropdown
-          await refetchTripItems();
-
           // Wait for the UI to update with new container
           const newContainerId = (response.data as { id: string }).id;
           setTimeout(() => {
@@ -288,6 +390,7 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
             onInput={setName}
             onSelect={handleItemSelect}
             items={searchResults()}
+            tripItemsWarning={tripItemsWarning()}
             placeholder="e.g., Toothbrush"
             autofocus
             minChars={2}

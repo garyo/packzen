@@ -31,6 +31,7 @@ interface PackingPageHeaderProps {
   onEditTrip: () => void;
   searchQuery: Accessor<string>;
   onSearchChange: (value: string) => void;
+  onScrollToItemRequest?: (itemId: string) => void;
 }
 
 export function PackingPageHeader(props: PackingPageHeaderProps) {
@@ -40,6 +41,7 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
   let menuRef: HTMLDivElement | undefined;
   let addMenuRef: HTMLDivElement | undefined;
   let searchContainerRef: HTMLDivElement | undefined;
+  let searchOverlayRef: HTMLDivElement | undefined;
   let searchInputRef: HTMLInputElement | undefined;
 
   const isSearchActive = () => props.searchQuery().trim().length > 0;
@@ -54,6 +56,16 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
 
   // Handle clicks outside menu and ESC key
   onMount(() => {
+    const findTripItemId = (node: HTMLElement | null): string | null => {
+      while (node) {
+        if (node.dataset && node.dataset.tripItemId) {
+          return node.dataset.tripItemId;
+        }
+        node = node.parentElement;
+      }
+      return null;
+    };
+
     const handleClickOutside = (e: MouseEvent) => {
       if (showMenu() && menuRef && !menuRef.contains(e.target as Node)) {
         setShowMenu(false);
@@ -61,8 +73,18 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
       if (showAddMenu() && addMenuRef && !addMenuRef.contains(e.target as Node)) {
         setShowAddMenu(false);
       }
-      if (isSearchOpen() && searchContainerRef && !searchContainerRef.contains(e.target as Node)) {
+      const target = e.target as HTMLElement | null;
+      const clickedInsideSearchTrigger =
+        searchContainerRef && target ? searchContainerRef.contains(target) : false;
+      const clickedInsideOverlay =
+        searchOverlayRef && target ? searchOverlayRef.contains(target) : false;
+
+      if (isSearchOpen() && !clickedInsideSearchTrigger && !clickedInsideOverlay) {
+        const tripItemId = findTripItemId(target);
         closeSearch();
+        if (tripItemId) {
+          props.onScrollToItemRequest?.(tripItemId);
+        }
       }
     };
 
@@ -195,7 +217,10 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
                       </svg>
                     </button>
                     <Show when={isSearchOpen()}>
-                      <div class="fixed top-2 left-1/2 z-40 w-[min(90%,320px)] -translate-x-1/2 rounded-lg border border-gray-200 bg-white p-2 shadow-lg md:w-[min(70%,360px)]">
+                      <div
+                        ref={searchOverlayRef}
+                        class="fixed top-2 left-1/2 z-40 w-[min(90%,320px)] -translate-x-1/2 rounded-lg border border-gray-200 bg-white p-2 shadow-lg md:w-[min(70%,360px)]"
+                      >
                         <div class="relative">
                           <input
                             ref={searchInputRef}

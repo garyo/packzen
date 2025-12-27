@@ -10,6 +10,7 @@ export interface ComboboxItem {
   categoryName?: string | null;
   defaultQuantity?: number;
   isContainer?: boolean;
+  existingLocation?: string;
 }
 
 interface ComboboxProps {
@@ -17,6 +18,7 @@ interface ComboboxProps {
   onInput: (value: string) => void;
   onSelect: (item: ComboboxItem) => void;
   items: ComboboxItem[];
+  tripItemsWarning?: string | null;
   placeholder?: string;
   autofocus?: boolean;
   minChars?: number;
@@ -37,9 +39,13 @@ export function Combobox(props: ComboboxProps) {
   const masterItems = () => props.items.filter((item) => item.group === 'master');
   const builtinItems = () => props.items.filter((item) => item.group === 'builtin');
 
-  // Show dropdown if we have results and input meets minimum length
+  // Show dropdown if we have results (or trip items warning) and input meets minimum length
   const shouldShowDropdown = () => {
-    return isOpen() && props.value.length >= minChars() && props.items.length > 0;
+    return (
+      isOpen() &&
+      props.value.length >= minChars() &&
+      (props.items.length > 0 || props.tripItemsWarning)
+    );
   };
 
   // Adjust highlighted index when items change
@@ -205,6 +211,14 @@ export function Combobox(props: ComboboxProps) {
           role="listbox"
           class="absolute top-full right-0 left-0 z-10 mt-1 max-h-60 overflow-y-auto rounded-lg border border-gray-300 bg-white shadow-lg"
         >
+          {/* Trip items warning banner */}
+          <Show when={props.tripItemsWarning}>
+            <div class="border-b border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-700">
+              <span class="mr-1">ℹ️</span>
+              {props.tripItemsWarning}
+            </div>
+          </Show>
+
           {/* Master items section */}
           <Show when={masterItems().length > 0}>
             <div class="border-b border-gray-100 px-3 py-2 text-xs font-semibold text-gray-500 uppercase">
@@ -231,10 +245,18 @@ export function Combobox(props: ComboboxProps) {
                   >
                     <span class="text-blue-600">✓</span>
                     <div class="flex-1">
-                      <div class="font-medium text-gray-900">{item.name}</div>
-                      <Show when={item.description}>
-                        <div class="text-xs text-gray-500">{item.description}</div>
-                      </Show>
+                      <div class="font-medium text-gray-900">
+                        {item.name}
+                        <Show when={item.existingLocation}>
+                          <span class="ml-2 text-xs text-blue-600">
+                            (
+                            {item.existingLocation === 'No Bag'
+                              ? 'no bag'
+                              : `in ${item.existingLocation}`}
+                            )
+                          </span>
+                        </Show>
+                      </div>
                     </div>
                   </div>
                 );
@@ -268,7 +290,18 @@ export function Combobox(props: ComboboxProps) {
                   >
                     <span class="text-gray-400">○</span>
                     <div class="flex-1">
-                      <div class="font-medium text-gray-900">{item.name}</div>
+                      <div class="font-medium text-gray-900">
+                        {item.name}
+                        <Show when={item.existingLocation}>
+                          <span class="ml-2 text-xs text-blue-600">
+                            (
+                            {item.existingLocation === 'No Bag'
+                              ? 'no bag'
+                              : `in ${item.existingLocation}`}
+                            )
+                          </span>
+                        </Show>
+                      </div>
                       <Show when={item.description}>
                         <div class="text-xs text-gray-500">{item.description}</div>
                       </Show>
@@ -282,10 +315,22 @@ export function Combobox(props: ComboboxProps) {
           {/* No results message */}
           <Show when={props.value.length >= minChars() && props.items.length === 0}>
             <div class="px-3 py-6 text-center">
-              <p class="text-sm font-medium text-gray-900">No items found</p>
-              <p class="mt-1 text-xs text-gray-500">
-                Type to search or just add a new item to your list
-              </p>
+              <Show
+                when={props.tripItemsWarning}
+                fallback={
+                  <>
+                    <p class="text-sm font-medium text-gray-900">No items found</p>
+                    <p class="mt-1 text-xs text-gray-500">
+                      Type to search or just add a new item to your list
+                    </p>
+                  </>
+                }
+              >
+                <p class="text-sm font-medium text-gray-900">All matches already in trip</p>
+                <p class="mt-1 text-xs text-gray-500">
+                  You can still add it again if you need duplicates
+                </p>
+              </Show>
             </div>
           </Show>
         </div>

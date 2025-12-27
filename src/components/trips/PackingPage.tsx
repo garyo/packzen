@@ -1,4 +1,12 @@
-import { createSignal, createResource, Show, onMount, createMemo } from 'solid-js';
+import {
+  createSignal,
+  createResource,
+  Show,
+  onMount,
+  createMemo,
+  createEffect,
+  onCleanup,
+} from 'solid-js';
 import { authStore } from '../../stores/auth';
 import { api, endpoints } from '../../lib/api';
 import type {
@@ -46,7 +54,19 @@ export function PackingPage(props: PackingPageProps) {
   const [showEditTrip, setShowEditTrip] = createSignal(false);
   const [sortBy, setSortBy] = createSignal<'bag' | 'category'>('bag');
   const [searchQuery, setSearchQuery] = createSignal('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = createSignal('');
   const [lastScrollPosition, setLastScrollPosition] = createSignal<number | null>(null);
+  const [pendingScrollItemId, setPendingScrollItemId] = createSignal<string | null>(null);
+
+  // Debounce search query to avoid filtering on every keystroke
+  createEffect(() => {
+    const query = searchQuery();
+    const timeoutId = setTimeout(() => {
+      setDebouncedSearchQuery(query);
+    }, 200); // 200ms delay
+
+    onCleanup(() => clearTimeout(timeoutId));
+  });
 
   const getScrollContainer = () => {
     if (typeof document === 'undefined') return null;
@@ -113,12 +133,13 @@ export function PackingPage(props: PackingPageProps) {
   const filteredItems = createMemo(() => {
     const allItems = items();
     if (!allItems) return undefined;
-    const query = searchQuery().trim().toLowerCase();
+    const query = debouncedSearchQuery().trim().toLowerCase();
     if (!query) return allItems;
 
     const containerNames = new Map(
       allItems.filter((item) => item.is_container).map((item) => [item.id, item.name])
     );
+    const bagNames = new Map((bags() || []).map((bag) => [bag.id, bag.name]));
 
     const matches = new Set<string>();
     const includesQuery = (value?: string | null) =>
@@ -128,7 +149,8 @@ export function PackingPage(props: PackingPageProps) {
       const containerName = item.container_item_id
         ? containerNames.get(item.container_item_id) || ''
         : '';
-      const fields = [item.name, item.category_name, containerName, item.notes];
+      const bagName = item.bag_id ? bagNames.get(item.bag_id) || '' : '';
+      const fields = [item.name, item.category_name, containerName, bagName, item.notes];
 
       if (fields.some((field) => includesQuery(field))) {
         matches.add(item.id);
@@ -147,6 +169,20 @@ export function PackingPage(props: PackingPageProps) {
   const hasSearchResults = createMemo(() => (visibleItems()?.length || 0) > 0);
   const noSearchResults = createMemo(() => isSearching() && !hasSearchResults());
   const visibleItemsCount = () => visibleItems()?.length || 0;
+
+  createEffect(() => {
+    const targetId = pendingScrollItemId();
+    if (!targetId) return;
+    if (isSearching()) return;
+
+    requestAnimationFrame(() => {
+      const element = document.getElementById(`trip-item-${targetId}`);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      setPendingScrollItemId(null);
+    });
+  });
 
   onMount(async () => {
     await authStore.initAuth();
@@ -693,6 +729,7 @@ export function PackingPage(props: PackingPageProps) {
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         visibleItemCount={visibleItemsCount}
+        onScrollToItemRequest={(itemId) => setPendingScrollItemId(itemId)}
       />
 
       {/* Packing List - scrollable area */}

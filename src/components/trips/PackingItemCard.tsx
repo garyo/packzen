@@ -38,6 +38,8 @@ export function PackingItemCard(props: PackingItemCardProps) {
 
   return (
     <div
+      id={`trip-item-${props.item.id}`}
+      data-trip-item-id={props.item.id}
       class={`flex items-center gap-4 rounded-lg p-4 shadow-sm md:gap-2 md:p-2 ${
         isContainer() ? 'border border-blue-200 bg-blue-50' : 'bg-white'
       } ${props.item.is_packed ? 'opacity-60' : ''} ${props.selectMode && props.isSelected ? 'ring-2 ring-blue-500' : ''} ${props.isDragging ? 'opacity-50' : ''}`}
