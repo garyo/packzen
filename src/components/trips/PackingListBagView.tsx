@@ -288,6 +288,25 @@ export function PackingListBagView(props: PackingListBagViewProps) {
     }
   };
 
+  // Scroll to a container's card in its bag
+  const scrollToContainerCard = (containerId: string) => {
+    const element = document.getElementById(`trip-item-${containerId}`);
+    const scrollContainer = document.querySelector('main.overflow-y-auto');
+    if (element && scrollContainer) {
+      const containerRect = scrollContainer.getBoundingClientRect();
+      const elementRect = element.getBoundingClientRect();
+      const offset = elementRect.top - containerRect.top + scrollContainer.scrollTop - 28;
+      scrollContainer.scrollTo({ top: offset, behavior: 'smooth' });
+    }
+  };
+
+  // Get bag name by ID
+  const getBagName = (bagId: string | null) => {
+    if (!bagId) return 'Wearing / No Bag';
+    const bag = props.bags()?.find((b) => b.id === bagId);
+    return bag?.name || 'Unknown Bag';
+  };
+
   const itemsByBag = createMemo(() => {
     const allItems = props.items() || [];
     const allBags = props.bags() || [];
@@ -662,6 +681,12 @@ export function PackingListBagView(props: PackingListBagViewProps) {
                                   <span class="text-base md:text-sm">{containerIcon()}</span>
                                   <h3 class="flex-1 font-semibold text-gray-800">
                                     {container.name}
+                                    <button
+                                      onClick={() => scrollToContainerCard(container.id)}
+                                      class="ml-2 text-xs font-normal text-blue-600 hover:underline"
+                                    >
+                                      view in {getBagName(container.bag_id)} ↑
+                                    </button>
                                   </h3>
                                   <Show
                                     when={contents().length > 0}
@@ -677,6 +702,28 @@ export function PackingListBagView(props: PackingListBagViewProps) {
                                       {packedCount()}/{contents().length}
                                     </span>
                                   </Show>
+                                  {/* Edit container button */}
+                                  <button
+                                    onClick={() => props.onEditItem(container)}
+                                    class="p-1.5 text-gray-400 transition-colors hover:text-blue-600"
+                                    title="Edit container"
+                                    aria-label="Edit container"
+                                  >
+                                    <svg
+                                      class="h-4 w-4"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      stroke="currentColor"
+                                    >
+                                      <path
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        stroke-width="2"
+                                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                                      />
+                                    </svg>
+                                  </button>
+                                  {/* Add items button */}
                                   <div class="relative">
                                     <button
                                       onClick={() =>

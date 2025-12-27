@@ -107,7 +107,7 @@ export function PackingItemCard(props: PackingItemCardProps) {
           )}
           {props.item.quantity > 1 && <span>×{props.item.quantity}</span>}
           <Show when={hasContents() && props.onContainerClick}>
-            <span class="text-blue-600">tap to view contents →</span>
+            <span class="text-blue-600">view contents →</span>
           </Show>
         </div>
       </div>

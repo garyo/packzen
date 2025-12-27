@@ -13,6 +13,7 @@ interface AddTripItemFormProps {
   tripId: string;
   preSelectedBagId?: string | null;
   preSelectedContainerId?: string | null;
+  bags?: Bag[]; // Pre-loaded bags (avoids async fetch)
   onClose: () => void;
   onSaved: () => void;
 }
@@ -27,11 +28,20 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
   const [newCategoryName, setNewCategoryName] = createSignal('');
   const [isContainer, setIsContainer] = createSignal(false);
 
-  // Track the select element for manual DOM sync as workaround for SolidJS select reactivity
-  let locationSelectRef: HTMLSelectElement | undefined;
+  // Use pre-loaded bags if available, otherwise fetch
+  const [bags] = createResource<Bag[]>(
+    () => (props.bags ? null : props.tripId), // Only fetch if bags not provided
+    async () => {
+      const response = await api.get<Bag[]>(endpoints.tripBags(props.tripId));
+      if (response.success && response.data) {
+        return response.data;
+      }
+      return [];
+    },
+    { initialValue: props.bags || [] } // Use provided bags as initial value
+  );
 
   // Set pre-selected values from props using createEffect for proper reactivity
-  // Wait for resources to load before setting to ensure dropdown options exist
   createEffect(() => {
     const currentBags = bags();
     const currentLocation = location();
@@ -47,14 +57,6 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
     if (tripItems() && props.preSelectedContainerId) {
       setLocation(`container:${props.preSelectedContainerId}`);
     }
-  });
-
-  const [bags] = createResource<Bag[]>(async () => {
-    const response = await api.get<Bag[]>(endpoints.tripBags(props.tripId));
-    if (response.success && response.data) {
-      return response.data;
-    }
-    return [];
   });
 
   const [categories, { refetch: refetchCategories }] = createResource<Category[]>(async () => {
@@ -377,12 +379,6 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
           setTimeout(() => {
             setLocation(lastLocation);
             setCategoryId(lastCategoryId);
-            // Workaround: Force DOM update after render completes
-            requestAnimationFrame(() => {
-              if (locationSelectRef) {
-                locationSelectRef.value = lastLocation;
-              }
-            });
           }, 250);
         }
         // Focus back on name input
@@ -484,7 +480,6 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
           <div>
             <label class="mb-1 block text-sm font-medium text-gray-700">Inside Bag/Container</label>
             <select
-              ref={locationSelectRef}
               value={location()}
               onChange={(e) => setLocation(e.target.value)}
               class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"

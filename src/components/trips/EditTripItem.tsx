@@ -10,6 +10,7 @@ interface EditTripItemProps {
   tripId: string;
   item: TripItem;
   allItems?: TripItem[]; // All trip items for container selection
+  bags?: Bag[]; // Pre-loaded bags (avoids async fetch)
   onClose: () => void;
   onSaved: () => void;
 }
@@ -34,13 +35,8 @@ export function EditTripItem(props: EditTripItemProps) {
   const [containedItemsCount, setContainedItemsCount] = createSignal(0);
   const [categoryInitialized, setCategoryInitialized] = createSignal(false);
 
-  const [bags] = createResource<Bag[]>(async () => {
-    const response = await api.get<Bag[]>(endpoints.tripBags(props.tripId));
-    if (response.success && response.data) {
-      return response.data;
-    }
-    return [];
-  });
+  // Use pre-loaded bags if available, otherwise fetch
+  const bags = () => props.bags || [];
 
   const [categories, { refetch: refetchCategories }] = createResource<Category[]>(async () => {
     const response = await api.get<Category[]>(endpoints.categories);

@@ -832,6 +832,7 @@ export function PackingPage(props: PackingPageProps) {
           tripId={props.tripId}
           preSelectedBagId={preSelectedBagId()}
           preSelectedContainerId={preSelectedContainerId()}
+          bags={bags()}
           onClose={closeAddForm}
           onSaved={() => refetch()}
         />
@@ -843,6 +844,7 @@ export function PackingPage(props: PackingPageProps) {
           tripId={props.tripId}
           item={editingItem()!}
           allItems={items()}
+          bags={bags()}
           onClose={() => {
             setEditingItem(null);
             setLastScrollPosition(null);
