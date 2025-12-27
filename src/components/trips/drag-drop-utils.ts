@@ -13,6 +13,9 @@ import {
 /**
  * Custom collision detector that uses live getBoundingClientRect() values
  * instead of cached layouts. This handles scrolling correctly without drift.
+ *
+ * Prioritizes nested zones: if the drag point is inside multiple droppables,
+ * picks the smallest one (most specific/nested zone).
  */
 export const liveRectCollision = (
   draggable: DraggableType,
@@ -25,6 +28,32 @@ export const liveRectCollision = (
     y: draggableRect.top + draggableRect.height / 2,
   };
 
+  // First pass: find all droppables that actually contain the drag point
+  const containingDroppables: Array<{ droppable: DroppableType; area: number }> = [];
+
+  for (const droppable of droppables) {
+    const rect = droppable.node.getBoundingClientRect();
+
+    // Check if drag center is inside this droppable
+    if (
+      draggableCenter.x >= rect.left &&
+      draggableCenter.x <= rect.right &&
+      draggableCenter.y >= rect.top &&
+      draggableCenter.y <= rect.bottom
+    ) {
+      // Calculate area (prefer smaller/more specific zones)
+      const area = rect.width * rect.height;
+      containingDroppables.push({ droppable, area });
+    }
+  }
+
+  // If any droppables contain the point, pick the smallest one (most nested)
+  if (containingDroppables.length > 0) {
+    containingDroppables.sort((a, b) => a.area - b.area);
+    return containingDroppables[0].droppable;
+  }
+
+  // Fallback: if no droppables contain the point, use center-to-center distance
   let closestDroppable: DroppableType | null = null;
   let closestDistance = Infinity;
 
