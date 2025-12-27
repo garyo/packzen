@@ -76,11 +76,11 @@ export function PackingPage(props: PackingPageProps) {
   const captureScrollPosition = () => {
     const container = getScrollContainer();
     if (container) return container.scrollTop;
-    return typeof window !== 'undefined' ? window.scrollY : 0;
+    return typeof window !== 'undefined' ? window.scrollY : null;
   };
 
-  const restoreScrollPosition = (position: number) => {
-    if (typeof window === 'undefined') return;
+  const restoreScrollPosition = (position: number | null) => {
+    if (typeof window === 'undefined' || position === null) return;
     const container = getScrollContainer();
     requestAnimationFrame(() => {
       if (container) {
