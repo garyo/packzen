@@ -288,14 +288,6 @@ export function PackingListBagView(props: PackingListBagViewProps) {
     }
   };
 
-  // Scroll to a bag section
-  const scrollToBag = (bagId: string) => {
-    const element = document.getElementById(`bag-section-${bagId}`);
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  };
-
   const itemsByBag = createMemo(() => {
     const allItems = props.items() || [];
     const allBags = props.bags() || [];
@@ -338,12 +330,6 @@ export function PackingListBagView(props: PackingListBagViewProps) {
     return { grouped, allBags: bagsWithWearing };
   });
 
-  // Create lookup maps for O(1) access
-  const bagLookup = createMemo(() => {
-    const bags = props.bags() || [];
-    return new Map(bags.map((b) => [b.id, b]));
-  });
-
   const categoryLookup = createMemo(() => {
     const categories = props.categories() || [];
     return new Map(categories.map((c) => [c.name, c]));
@@ -364,11 +350,17 @@ export function PackingListBagView(props: PackingListBagViewProps) {
     return containerData().containers.sort((a, b) => a.name.localeCompare(b.name));
   };
 
-  // Find the bag for a container (for display purposes) - using lookup map for O(1) access
-  const getBagForItem = (item: TripItem) => {
-    if (!item.bag_id) return undefined;
-    return bagLookup().get(item.bag_id);
-  };
+  const containersByBag = createMemo(() => {
+    const map = new Map<string | null, TripItem[]>();
+    containerData().containers.forEach((container) => {
+      const key = container.bag_id || null;
+      if (!map.has(key)) {
+        map.set(key, []);
+      }
+      map.get(key)!.push(container);
+    });
+    return map;
+  });
 
   // Track current visible section for wayfinding nav bar
   const [currentSection, setCurrentSection] = createSignal<string | null>(null);
@@ -499,6 +491,10 @@ export function PackingListBagView(props: PackingListBagViewProps) {
                       TripItem[],
                     ]
                 );
+            };
+            const bagContainers = () => {
+              const containers = containersByBag().get(bag.id) || [];
+              return [...containers].sort((a, b) => a.name.localeCompare(b.name));
             };
             // Check if dragging is enabled (not in select mode)
             const isDragEnabled = () => !props.selectMode();
@@ -643,182 +639,148 @@ export function PackingListBagView(props: PackingListBagViewProps) {
                       );
                     }}
                   </For>
+                  <Show when={bagContainers().length > 0}>
+                    <div class="mt-4 space-y-4 border-l-2 border-blue-100 pl-4 md:mt-2 md:space-y-2 md:pl-3">
+                      <For each={bagContainers()}>
+                        {(container) => {
+                          const contents = () => getContainerContents(container.id);
+                          const packedCount = () =>
+                            contents().filter((item) => item.is_packed).length;
+                          const sortedContents = () =>
+                            [...contents()].sort((a, b) => a.name.localeCompare(b.name));
+                          const containerIcon = () =>
+                            container.category_name
+                              ? getCategoryIcon(container.category_name)
+                              : '📦';
+                          return (
+                            <DroppableContainerSection containerId={container.id}>
+                              <div
+                                id={`container-section-${container.id}`}
+                                class="rounded-lg border border-blue-100 bg-blue-50/40 p-3 shadow-sm md:p-2"
+                              >
+                                <div class="mb-2 flex items-center gap-2">
+                                  <span class="text-base md:text-sm">{containerIcon()}</span>
+                                  <h3 class="flex-1 font-semibold text-gray-800">
+                                    {container.name}
+                                  </h3>
+                                  <Show
+                                    when={contents().length > 0}
+                                    fallback={<span class="text-xs text-gray-500">(empty)</span>}
+                                  >
+                                    <span
+                                      class={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                                        packedCount() === contents().length
+                                          ? 'bg-green-100 text-green-700'
+                                          : 'bg-blue-100 text-blue-700'
+                                      }`}
+                                    >
+                                      {packedCount()}/{contents().length}
+                                    </span>
+                                  </Show>
+                                  <div class="relative">
+                                    <button
+                                      onClick={() =>
+                                        setOpenContainerMenu(
+                                          openContainerMenu() === container.id ? null : container.id
+                                        )
+                                      }
+                                      class="flex h-6 w-6 items-center justify-center rounded-full bg-blue-500 text-white hover:bg-blue-600"
+                                      title="Add items to this container"
+                                    >
+                                      <svg
+                                        class="h-3.5 w-3.5"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        stroke="currentColor"
+                                      >
+                                        <path
+                                          stroke-linecap="round"
+                                          stroke-linejoin="round"
+                                          stroke-width="2"
+                                          d="M12 4v16m8-8H4"
+                                        />
+                                      </svg>
+                                    </button>
+                                    <Show when={openContainerMenu() === container.id}>
+                                      <div class="absolute top-full right-0 z-20 mt-1 w-48 rounded-lg border border-gray-200 bg-white shadow-lg">
+                                        <button
+                                          onClick={() => {
+                                            props.onAddFromMasterToContainer?.(container.id);
+                                            setOpenContainerMenu(null);
+                                          }}
+                                          class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
+                                        >
+                                          📋 From My Items
+                                        </button>
+                                        <button
+                                          onClick={() => {
+                                            props.onBrowseTemplatesToContainer?.(container.id);
+                                            setOpenContainerMenu(null);
+                                          }}
+                                          class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
+                                        >
+                                          📚 From Templates
+                                        </button>
+                                        <button
+                                          onClick={() => {
+                                            props.onAddToContainer?.(container.id);
+                                            setOpenContainerMenu(null);
+                                          }}
+                                          class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
+                                        >
+                                          ✏️ New Item
+                                        </button>
+                                      </div>
+                                    </Show>
+                                  </div>
+                                </div>
+                                <Show
+                                  when={contents().length > 0}
+                                  fallback={
+                                    <p class="text-sm text-gray-500">
+                                      No items yet. Drag items here or use the + button.
+                                    </p>
+                                  }
+                                >
+                                  <div
+                                    class="grid gap-2 md:gap-1.5"
+                                    style="grid-template-columns: repeat(auto-fill, minmax(320px, 400px))"
+                                  >
+                                    <For each={sortedContents()}>
+                                      {(item) => (
+                                        <DraggableItem item={item} enabled={isDragEnabled()}>
+                                          {(dragProps) => (
+                                            <PackingItemCard
+                                              item={item}
+                                              selectMode={props.selectMode()}
+                                              isSelected={props.selectedItems().has(item.id)}
+                                              showCategoryInfo={true}
+                                              onTogglePacked={() => props.onTogglePacked(item)}
+                                              onEdit={() => props.onEditItem(item)}
+                                              onToggleSelection={() =>
+                                                props.onToggleItemSelection(item.id)
+                                              }
+                                              dragActivators={dragProps.dragActivators}
+                                              isDragging={dragProps.isDragging}
+                                            />
+                                          )}
+                                        </DraggableItem>
+                                      )}
+                                    </For>
+                                  </div>
+                                </Show>
+                              </div>
+                            </DroppableContainerSection>
+                          );
+                        }}
+                      </For>
+                    </div>
+                  </Show>
                 </div>
               </DroppableBagSection>
             );
           }}
         </For>
-
-        {/* Container Sections (sub-bags with their contents) */}
-        <Show when={allContainers().length > 0}>
-          <div class="border-t border-gray-200 pt-6 md:pt-3">
-            <h2 class="mb-4 text-lg font-semibold text-gray-700 md:mb-2 md:text-base">
-              📦 Container Contents
-            </h2>
-            <For each={allContainers()}>
-              {(container) => {
-                const contents = () => getContainerContents(container.id);
-                const packedCount = () => contents().filter((item) => item.is_packed).length;
-                const containerBag = () => getBagForItem(container);
-                const containerIcon = () =>
-                  container.category_name ? getCategoryIcon(container.category_name) : '📦';
-                // Sort contents alphabetically
-                const sortedContents = () =>
-                  [...contents()].sort((a, b) => a.name.localeCompare(b.name));
-
-                const isDragEnabled = () => !props.selectMode();
-                return (
-                  <DroppableContainerSection containerId={container.id}>
-                    <div
-                      id={`container-section-${container.id}`}
-                      class="mb-6 rounded-lg border border-blue-200 bg-blue-50/50 p-4 md:mb-3 md:p-2"
-                    >
-                      <div class="mb-3 flex items-center gap-2 md:mb-1.5">
-                        <span class="text-lg md:text-base">{containerIcon()}</span>
-                        <h3 class="flex-1 text-lg font-semibold text-gray-900 md:text-base">
-                          {container.name}
-                        </h3>
-
-                        {/* Container Edit button */}
-                        <button
-                          class="text-sm text-gray-500"
-                          onClick={() => props.onEditItem(container)}
-                        >
-                          <svg
-                            class="h-4 w-4"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                          >
-                            <path
-                              stroke-linecap="round"
-                              stroke-linejoin="round"
-                              stroke-width="2"
-                              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                            />
-                          </svg>
-                        </button>
-                        <Show
-                          when={contents().length > 0}
-                          fallback={<span class="text-xs text-gray-500">(empty)</span>}
-                        >
-                          <span
-                            class={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                              packedCount() === contents().length
-                                ? 'bg-green-100 text-green-700'
-                                : 'bg-blue-100 text-blue-700'
-                            }`}
-                          >
-                            {packedCount()}/{contents().length}
-                          </span>
-                        </Show>
-                        <Show when={containerBag()}>
-                          <button
-                            onClick={() => scrollToBag(containerBag()!.id)}
-                            class="text-sm text-blue-600 hover:text-blue-800 hover:underline md:text-xs"
-                            title="Scroll to bag"
-                          >
-                            in {containerBag()!.name}
-                          </button>
-                        </Show>
-                        {/* Add items button */}
-                        <div class="relative">
-                          <button
-                            onClick={() =>
-                              setOpenContainerMenu(
-                                openContainerMenu() === container.id ? null : container.id
-                              )
-                            }
-                            class="flex h-7 w-7 items-center justify-center rounded-full bg-blue-500 text-white hover:bg-blue-600"
-                            title="Add items to this container"
-                          >
-                            <svg
-                              class="h-4 w-4"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                            >
-                              <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M12 4v16m8-8H4"
-                              />
-                            </svg>
-                          </button>
-                          <Show when={openContainerMenu() === container.id}>
-                            <div class="absolute top-full right-0 z-20 mt-1 w-48 rounded-lg border border-gray-200 bg-white shadow-lg">
-                              <button
-                                onClick={() => {
-                                  props.onAddFromMasterToContainer?.(container.id);
-                                  setOpenContainerMenu(null);
-                                }}
-                                class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
-                              >
-                                📋 From My Items
-                              </button>
-                              <button
-                                onClick={() => {
-                                  props.onBrowseTemplatesToContainer?.(container.id);
-                                  setOpenContainerMenu(null);
-                                }}
-                                class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
-                              >
-                                📚 From Templates
-                              </button>
-                              <button
-                                onClick={() => {
-                                  props.onAddToContainer?.(container.id);
-                                  setOpenContainerMenu(null);
-                                }}
-                                class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
-                              >
-                                ✏️ New Item
-                              </button>
-                            </div>
-                          </Show>
-                        </div>
-                      </div>
-                      <Show
-                        when={contents().length > 0}
-                        fallback={
-                          <p class="text-sm text-gray-500">
-                            No items yet. Drag items here or use the + button.
-                          </p>
-                        }
-                      >
-                        <div
-                          class="grid gap-2 md:gap-1.5"
-                          style="grid-template-columns: repeat(auto-fill, minmax(320px, 400px))"
-                        >
-                          <For each={sortedContents()}>
-                            {(item) => (
-                              <DraggableItem item={item} enabled={isDragEnabled()}>
-                                {(dragProps) => (
-                                  <PackingItemCard
-                                    item={item}
-                                    selectMode={props.selectMode()}
-                                    isSelected={props.selectedItems().has(item.id)}
-                                    showCategoryInfo={true}
-                                    onTogglePacked={() => props.onTogglePacked(item)}
-                                    onEdit={() => props.onEditItem(item)}
-                                    onToggleSelection={() => props.onToggleItemSelection(item.id)}
-                                    dragActivators={dragProps.dragActivators}
-                                    isDragging={dragProps.isDragging}
-                                  />
-                                )}
-                              </DraggableItem>
-                            )}
-                          </For>
-                        </div>
-                      </Show>
-                    </div>
-                  </DroppableContainerSection>
-                );
-              }}
-            </For>
-          </div>
-        </Show>
       </div>
 
       {/* Drag Overlay - shows preview of item being dragged */}

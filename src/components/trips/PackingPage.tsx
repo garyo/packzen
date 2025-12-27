@@ -1,4 +1,4 @@
-import { createSignal, createResource, Show, onMount } from 'solid-js';
+import { createSignal, createResource, Show, onMount, createMemo } from 'solid-js';
 import { authStore } from '../../stores/auth';
 import { api, endpoints } from '../../lib/api';
 import type {
@@ -45,6 +45,31 @@ export function PackingPage(props: PackingPageProps) {
   const [showBuiltInItems, setShowBuiltInItems] = createSignal(false);
   const [showEditTrip, setShowEditTrip] = createSignal(false);
   const [sortBy, setSortBy] = createSignal<'bag' | 'category'>('bag');
+  const [searchQuery, setSearchQuery] = createSignal('');
+  const [lastScrollPosition, setLastScrollPosition] = createSignal<number | null>(null);
+
+  const getScrollContainer = () => {
+    if (typeof document === 'undefined') return null;
+    return document.querySelector('main.overflow-y-auto') as HTMLElement | null;
+  };
+
+  const captureScrollPosition = () => {
+    const container = getScrollContainer();
+    if (container) return container.scrollTop;
+    return typeof window !== 'undefined' ? window.scrollY : 0;
+  };
+
+  const restoreScrollPosition = (position: number) => {
+    if (typeof window === 'undefined') return;
+    const container = getScrollContainer();
+    requestAnimationFrame(() => {
+      if (container) {
+        container.scrollTo({ top: position, behavior: 'auto' });
+      } else {
+        window.scrollTo({ top: position, behavior: 'auto' });
+      }
+    });
+  };
 
   // Pre-selection for add modals
   const [preSelectedBagId, setPreSelectedBagId] = createSignal<string | null>(null);
@@ -85,6 +110,44 @@ export function PackingPage(props: PackingPageProps) {
     );
   });
 
+  const filteredItems = createMemo(() => {
+    const allItems = items();
+    if (!allItems) return undefined;
+    const query = searchQuery().trim().toLowerCase();
+    if (!query) return allItems;
+
+    const containerNames = new Map(
+      allItems.filter((item) => item.is_container).map((item) => [item.id, item.name])
+    );
+
+    const matches = new Set<string>();
+    const includesQuery = (value?: string | null) =>
+      value ? value.toLowerCase().includes(query) : false;
+
+    allItems.forEach((item) => {
+      const containerName = item.container_item_id
+        ? containerNames.get(item.container_item_id) || ''
+        : '';
+      const fields = [item.name, item.category_name, containerName, item.notes];
+
+      if (fields.some((field) => includesQuery(field))) {
+        matches.add(item.id);
+        if (item.container_item_id) {
+          matches.add(item.container_item_id);
+        }
+      }
+    });
+
+    if (matches.size === 0) return [];
+    return allItems.filter((item) => matches.has(item.id));
+  });
+
+  const visibleItems = () => filteredItems();
+  const isSearching = createMemo(() => searchQuery().trim().length > 0);
+  const hasSearchResults = createMemo(() => (visibleItems()?.length || 0) > 0);
+  const noSearchResults = createMemo(() => isSearching() && !hasSearchResults());
+  const visibleItemsCount = () => visibleItems()?.length || 0;
+
   onMount(async () => {
     await authStore.initAuth();
   });
@@ -106,6 +169,21 @@ export function PackingPage(props: PackingPageProps) {
 
   const handleAddItem = () => {
     setShowAddForm(true);
+  };
+
+  const openEditItem = (item: TripItem) => {
+    setLastScrollPosition(captureScrollPosition());
+    setEditingItem(item);
+  };
+
+  const handleEditItemSaved = async () => {
+    const previousScroll = lastScrollPosition();
+    await refetch();
+    await refetchBags();
+    if (previousScroll !== null) {
+      restoreScrollPosition(previousScroll);
+      setLastScrollPosition(null);
+    }
   };
 
   // Open add modals with pre-selected bag or container
@@ -168,7 +246,7 @@ export function PackingPage(props: PackingPageProps) {
     if (itemsToUpdate.length === 0) return;
 
     // Capture scroll position before update
-    const scrollY = window.scrollY;
+    const scrollY = captureScrollPosition();
 
     try {
       await Promise.all(
@@ -187,9 +265,7 @@ export function PackingPage(props: PackingPageProps) {
       setSelectedItems(new Set<string>());
 
       // Restore scroll position after refetch and re-render
-      requestAnimationFrame(() => {
-        window.scrollTo({ top: scrollY, behavior: 'instant' });
-      });
+      restoreScrollPosition(scrollY);
     } catch (error) {
       showToast('error', 'Failed to assign items');
     }
@@ -210,7 +286,7 @@ export function PackingPage(props: PackingPageProps) {
     }
 
     // Capture scroll position before update
-    const scrollY = window.scrollY;
+    const scrollY = captureScrollPosition();
 
     try {
       await Promise.all(
@@ -232,9 +308,7 @@ export function PackingPage(props: PackingPageProps) {
       setSelectedItems(new Set<string>());
 
       // Restore scroll position after refetch and re-render
-      requestAnimationFrame(() => {
-        window.scrollTo({ top: scrollY, behavior: 'instant' });
-      });
+      restoreScrollPosition(scrollY);
     } catch (error) {
       showToast('error', 'Failed to assign items to container');
     }
@@ -249,7 +323,7 @@ export function PackingPage(props: PackingPageProps) {
       : null;
 
     // Capture scroll position before update
-    const scrollY = window.scrollY;
+    const scrollY = captureScrollPosition();
 
     try {
       await Promise.all(
@@ -270,9 +344,7 @@ export function PackingPage(props: PackingPageProps) {
       setSelectedItems(new Set<string>());
 
       // Restore scroll position after refetch and re-render
-      requestAnimationFrame(() => {
-        window.scrollTo({ top: scrollY, behavior: 'instant' });
-      });
+      restoreScrollPosition(scrollY);
     } catch (error) {
       showToast('error', 'Failed to assign items to category');
     }
@@ -283,7 +355,7 @@ export function PackingPage(props: PackingPageProps) {
     if (itemsToDelete.length === 0) return;
 
     // Capture scroll position before update
-    const scrollY = window.scrollY;
+    const scrollY = captureScrollPosition();
 
     try {
       await Promise.all(
@@ -300,9 +372,7 @@ export function PackingPage(props: PackingPageProps) {
       setSelectedItems(new Set<string>());
 
       // Restore scroll position after refetch and re-render
-      requestAnimationFrame(() => {
-        window.scrollTo({ top: scrollY, behavior: 'instant' });
-      });
+      restoreScrollPosition(scrollY);
     } catch (error) {
       showToast('error', 'Failed to delete items');
     }
@@ -620,6 +690,9 @@ export function PackingPage(props: PackingPageProps) {
         onClearAll={handleClearAll}
         onDeleteTrip={handleDeleteTrip}
         onEditTrip={() => setShowEditTrip(true)}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        visibleItemCount={visibleItemsCount}
       />
 
       {/* Packing List - scrollable area */}
@@ -648,44 +721,53 @@ export function PackingPage(props: PackingPageProps) {
                 }
               >
                 <Show
-                  when={sortBy() === 'bag'}
+                  when={!noSearchResults()}
                   fallback={
-                    <PackingListCategoryView
-                      items={items}
+                    <div class="py-16 text-center text-gray-500">
+                      No items match "{searchQuery().trim()}". Try adjusting your search.
+                    </div>
+                  }
+                >
+                  <Show
+                    when={sortBy() === 'bag'}
+                    fallback={
+                      <PackingListCategoryView
+                        items={visibleItems}
+                        bags={bags}
+                        categories={categories}
+                        selectMode={selectMode}
+                        selectedItems={selectedItems}
+                        onTogglePacked={handleTogglePacked}
+                        onEditItem={openEditItem}
+                        onToggleItemSelection={toggleItemSelection}
+                        onMoveItemToBag={handleMoveItemToBag}
+                        onMoveItemToContainer={handleMoveItemToContainer}
+                      />
+                    }
+                  >
+                    <PackingListBagView
+                      items={visibleItems}
                       bags={bags}
                       categories={categories}
                       selectMode={selectMode}
                       selectedItems={selectedItems}
                       onTogglePacked={handleTogglePacked}
-                      onEditItem={setEditingItem}
+                      onEditItem={openEditItem}
                       onToggleItemSelection={toggleItemSelection}
+                      onAddToBag={(bagId) => openAddForm(bagId)}
+                      onAddToContainer={(containerId) => openAddForm(undefined, containerId)}
+                      onAddFromMasterToBag={(bagId) => openAddFromMaster(bagId)}
+                      onAddFromMasterToContainer={(containerId) =>
+                        openAddFromMaster(undefined, containerId)
+                      }
+                      onBrowseTemplatesToBag={(bagId) => openBrowseTemplates(bagId)}
+                      onBrowseTemplatesToContainer={(containerId) =>
+                        openBrowseTemplates(undefined, containerId)
+                      }
                       onMoveItemToBag={handleMoveItemToBag}
                       onMoveItemToContainer={handleMoveItemToContainer}
                     />
-                  }
-                >
-                  <PackingListBagView
-                    items={items}
-                    bags={bags}
-                    categories={categories}
-                    selectMode={selectMode}
-                    selectedItems={selectedItems}
-                    onTogglePacked={handleTogglePacked}
-                    onEditItem={setEditingItem}
-                    onToggleItemSelection={toggleItemSelection}
-                    onAddToBag={(bagId) => openAddForm(bagId)}
-                    onAddToContainer={(containerId) => openAddForm(undefined, containerId)}
-                    onAddFromMasterToBag={(bagId) => openAddFromMaster(bagId)}
-                    onAddFromMasterToContainer={(containerId) =>
-                      openAddFromMaster(undefined, containerId)
-                    }
-                    onBrowseTemplatesToBag={(bagId) => openBrowseTemplates(bagId)}
-                    onBrowseTemplatesToContainer={(containerId) =>
-                      openBrowseTemplates(undefined, containerId)
-                    }
-                    onMoveItemToBag={handleMoveItemToBag}
-                    onMoveItemToContainer={handleMoveItemToContainer}
-                  />
+                  </Show>
                 </Show>
               </Show>
 
@@ -724,11 +806,11 @@ export function PackingPage(props: PackingPageProps) {
           tripId={props.tripId}
           item={editingItem()!}
           allItems={items()}
-          onClose={() => setEditingItem(null)}
-          onSaved={() => {
-            refetch();
-            refetchBags();
+          onClose={() => {
+            setEditingItem(null);
+            setLastScrollPosition(null);
           }}
+          onSaved={handleEditItemSaved}
         />
       </Show>
 

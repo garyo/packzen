@@ -5,16 +5,16 @@
  * Extracted from PackingPage for better separation of concerns
  */
 
-import { Show, type Accessor, onMount, onCleanup } from 'solid-js';
+import { Show, type Accessor, onMount, onCleanup, createEffect, createSignal } from 'solid-js';
 import type { Trip } from '../../lib/types';
 import { Button } from '../ui/Button';
-import { createSignal } from 'solid-js';
 import { formatDateRange } from '../../lib/utils';
 
 interface PackingPageHeaderProps {
   trip: Accessor<Trip | null | undefined>;
   packedCount: Accessor<number>;
   totalCount: Accessor<number>;
+  visibleItemCount: Accessor<number>;
   progress: Accessor<number>;
   selectMode: Accessor<boolean>;
   sortBy: Accessor<'bag' | 'category'>;
@@ -29,13 +29,28 @@ interface PackingPageHeaderProps {
   onClearAll: () => void;
   onDeleteTrip: () => void;
   onEditTrip: () => void;
+  searchQuery: Accessor<string>;
+  onSearchChange: (value: string) => void;
 }
 
 export function PackingPageHeader(props: PackingPageHeaderProps) {
   const [showMenu, setShowMenu] = createSignal(false);
   const [showAddMenu, setShowAddMenu] = createSignal(false);
+  const [isSearchOpen, setIsSearchOpen] = createSignal(false);
   let menuRef: HTMLDivElement | undefined;
   let addMenuRef: HTMLDivElement | undefined;
+  let searchContainerRef: HTMLDivElement | undefined;
+  let searchInputRef: HTMLInputElement | undefined;
+
+  const isSearchActive = () => props.searchQuery().trim().length > 0;
+  const openSearch = () => setIsSearchOpen(true);
+  const closeSearch = () => {
+    if (!isSearchOpen()) return;
+    setIsSearchOpen(false);
+    if (isSearchActive()) {
+      props.onSearchChange('');
+    }
+  };
 
   // Handle clicks outside menu and ESC key
   onMount(() => {
@@ -46,12 +61,16 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
       if (showAddMenu() && addMenuRef && !addMenuRef.contains(e.target as Node)) {
         setShowAddMenu(false);
       }
+      if (isSearchOpen() && searchContainerRef && !searchContainerRef.contains(e.target as Node)) {
+        closeSearch();
+      }
     };
 
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         if (showMenu()) setShowMenu(false);
         if (showAddMenu()) setShowAddMenu(false);
+        if (isSearchOpen()) closeSearch();
       }
     };
 
@@ -64,8 +83,16 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
     });
   });
 
+  createEffect(() => {
+    if (isSearchOpen()) {
+      requestAnimationFrame(() => {
+        searchInputRef?.focus();
+      });
+    }
+  });
+
   return (
-    <header class="flex-shrink-0 border-b border-gray-200 bg-white">
+    <header class="relative flex-shrink-0 border-b border-gray-200 bg-white">
       <div class="container mx-auto px-4 py-4 md:py-2">
         {/* Two-row layout on mobile, single row on desktop */}
         <div class="mb-3 flex flex-col gap-2 md:mb-2 md:flex-row md:items-center md:justify-between">
@@ -147,6 +174,62 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
               when={props.selectMode()}
               fallback={
                 <>
+                  <div class="relative" ref={searchContainerRef}>
+                    <button
+                      type="button"
+                      onClick={() => (isSearchOpen() ? closeSearch() : openSearch())}
+                      class={`relative inline-flex h-9 w-9 items-center justify-center rounded-lg border text-gray-600 transition hover:bg-gray-100 md:h-8 md:w-8 ${
+                        isSearchActive() || isSearchOpen()
+                          ? 'border-blue-200 bg-blue-50 text-blue-600'
+                          : 'border-transparent'
+                      }`}
+                      title="Search items"
+                    >
+                      <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 100-15 7.5 7.5 0 000 15z"
+                        />
+                      </svg>
+                    </button>
+                    <Show when={isSearchOpen()}>
+                      <div class="fixed top-2 left-1/2 z-40 w-[min(90%,320px)] -translate-x-1/2 rounded-lg border border-gray-200 bg-white p-2 shadow-lg md:w-[min(70%,360px)]">
+                        <div class="relative">
+                          <input
+                            ref={searchInputRef}
+                            type="text"
+                            inputmode="search"
+                            value={props.searchQuery()}
+                            onInput={(e) => props.onSearchChange(e.currentTarget.value)}
+                            placeholder="Search items..."
+                            class="w-full appearance-none rounded-md border border-gray-200 py-1.5 pr-8 pl-2 text-sm focus:border-blue-400 focus:ring-1 focus:ring-blue-400 focus:outline-none"
+                          />
+                          <Show when={props.searchQuery().trim().length > 0}>
+                            <button
+                              type="button"
+                              onClick={() => props.onSearchChange('')}
+                              class="absolute top-1/2 right-1 -translate-y-1/2 rounded-md px-1 py-0.5 text-xs font-semibold text-gray-500 transition hover:text-gray-900"
+                              aria-label="Clear search"
+                            >
+                              ×
+                            </button>
+                          </Show>
+                          <Show when={!props.searchQuery().trim()}>
+                            <span class="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 text-gray-300">
+                              /
+                            </span>
+                          </Show>
+                        </div>
+                        <p class="mt-1 min-h-[1rem] text-[11px] text-gray-500">
+                          {props.searchQuery().trim().length > 0
+                            ? `${props.visibleItemCount()} of ${props.totalCount()}`
+                            : '\u00A0'}
+                        </p>
+                      </div>
+                    </Show>
+                  </div>
                   <Button variant="secondary" size="sm" onClick={props.onManageBags}>
                     Bags
                   </Button>
