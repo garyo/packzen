@@ -283,8 +283,7 @@ export function TripPrintView(props: TripPrintViewProps) {
 
         .item-wrapper {
           border-bottom: 1px dotted #ddd;
-          padding-bottom: 6px;
-          margin-bottom: 2px;
+          padding-bottom: 2px;
           break-inside: avoid;
         }
 
