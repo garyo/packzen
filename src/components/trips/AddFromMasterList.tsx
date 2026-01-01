@@ -1,4 +1,4 @@
-import { createEffect, For, Show, createSignal, type Accessor } from 'solid-js';
+import { createEffect, For, Show, createSignal, createMemo, type Accessor } from 'solid-js';
 import { api, endpoints } from '../../lib/api';
 import type { MasterItemWithCategory, Bag, TripItem } from '../../lib/types';
 import { Modal } from '../ui/Modal';
@@ -18,9 +18,104 @@ interface AddFromMasterListProps {
 }
 
 export function AddFromMasterList(props: AddFromMasterListProps) {
-  const [addingItems, setAddingItems] = createSignal<Set<string>>(new Set());
+  const [pendingItems, setPendingItems] = createSignal<Set<string>>(new Set());
   const [selectedBag, setSelectedBag] = createSignal<string | null>(null);
   const [selectedContainer, setSelectedContainer] = createSignal<string | null>(null);
+  const [tripItemOverrides, setTripItemOverrides] = createSignal<Map<string, Partial<TripItem>>>(
+    new Map()
+  );
+  const [removedTripItemIds, setRemovedTripItemIds] = createSignal<Set<string>>(new Set());
+
+  const effectiveTripItems = createMemo(() => {
+    const overrides = tripItemOverrides();
+    const removed = removedTripItemIds();
+    const base = props.tripItems() || [];
+    return base
+      .filter((item) => !removed.has(item.id))
+      .map((item) => (overrides.has(item.id) ? { ...item, ...overrides.get(item.id)! } : item));
+  });
+
+  createEffect(() => {
+    props.tripItems();
+    setTripItemOverrides(new Map());
+    setRemovedTripItemIds(new Set());
+  });
+
+  const bagLookup = createMemo(() => {
+    const map = new Map<string, string>();
+    (props.bags() || []).forEach((bag) => {
+      map.set(bag.id, bag.name);
+    });
+    return map;
+  });
+
+  const tripItemsByMaster = createMemo(() => {
+    const map = new Map<string, TripItem[]>();
+    (effectiveTripItems() || []).forEach((item) => {
+      if (!item.master_item_id) return;
+      if (!map.has(item.master_item_id)) {
+        map.set(item.master_item_id, []);
+      }
+      map.get(item.master_item_id)!.push(item);
+    });
+    return map;
+  });
+
+  const tripItemLookup = createMemo(() => {
+    const map = new Map<string, TripItem>();
+    (effectiveTripItems() || []).forEach((item) => map.set(item.id, item));
+    return map;
+  });
+
+  const resolveBagName = (item: TripItem, visited = new Set<string>()): string => {
+    if (visited.has(item.id)) return 'No bag';
+    visited.add(item.id);
+
+    if (item.bag_id) {
+      return bagLookup().get(item.bag_id) || 'Unknown bag';
+    }
+
+    if (item.container_item_id) {
+      const container = tripItemLookup().get(item.container_item_id);
+      if (container) {
+        return resolveBagName(container, visited);
+      }
+    }
+
+    return 'No bag';
+  };
+
+  const getExistingItemsForMaster = (masterId: string) => {
+    return tripItemsByMaster().get(masterId) || [];
+  };
+
+  const summarizeBagLocations = (items: TripItem[]) => {
+    if (items.length === 0) return null;
+    const bagNames = Array.from(new Set(items.map((item) => resolveBagName(item))));
+    if (bagNames.length === 1) {
+      return bagNames[0];
+    }
+    return `${bagNames[0]} +${bagNames.length - 1} more`;
+  };
+
+  const getTargetExistingItem = (masterId: string) => {
+    const existing = getExistingItemsForMaster(masterId);
+    if (existing.length === 0) return null;
+
+    const containerId = selectedContainer();
+    if (containerId) {
+      const containerMatch = existing.find((item) => item.container_item_id === containerId);
+      if (containerMatch) return containerMatch;
+    }
+
+    const bagId = selectedBag();
+    if (bagId) {
+      const bagMatch = existing.find((item) => !item.container_item_id && item.bag_id === bagId);
+      if (bagMatch) return bagMatch;
+    }
+
+    return existing[0] || null;
+  };
 
   // Set pre-selected values from props using createEffect for proper reactivity
   // Wait for resources to load before setting to ensure dropdown options exist
@@ -35,31 +130,93 @@ export function AddFromMasterList(props: AddFromMasterListProps) {
 
   // Get available containers
   const availableContainers = () => {
-    const items = props.tripItems() || [];
+    const items = effectiveTripItems() || [];
     return items.filter((item) => item.is_container);
   };
 
   const handleAddItem = async (item: MasterItemWithCategory) => {
-    // Optimistically mark as adding
-    setAddingItems((prev) => new Set(prev).add(item.id));
+    setPendingItems((prev) => new Set(prev).add(item.id));
+    const existingMatch = getTargetExistingItem(item.id);
+    const defaultQuantity = item.default_quantity || 1;
 
-    const response = await api.post(endpoints.tripItems(props.tripId), {
-      name: item.name,
-      category_name: item.category_name,
-      quantity: item.default_quantity,
-      master_item_id: item.id,
-      bag_id: selectedContainer() ? null : selectedBag() || null, // Clear bag if using container
-      container_item_id: selectedContainer() || null,
-      is_container: item.is_container || false,
-    });
+    try {
+      if (existingMatch) {
+        const newQuantity = (existingMatch.quantity || 0) + 1;
+        const response = await api.patch(endpoints.tripItems(props.tripId), {
+          id: existingMatch.id,
+          quantity: newQuantity,
+        });
 
-    if (response.success) {
-      showToast('success', `Added ${item.name}`);
-      props.onAdded();
-    } else {
-      showToast('error', response.error || 'Failed to add item');
-      // Remove from adding set on error
-      setAddingItems((prev) => {
+        if (response.success) {
+          showToast('success', `Updated ${item.name} count`);
+          setTripItemOverrides((prev) => {
+            const next = new Map(prev);
+            next.set(existingMatch.id, { quantity: newQuantity });
+            return next;
+          });
+          props.onAdded();
+        } else {
+          showToast('error', response.error || 'Failed to update item');
+        }
+        return;
+      }
+
+      const containerId = selectedContainer();
+      const bagId = containerId ? null : selectedBag() || null;
+
+      const response = await api.post(endpoints.tripItems(props.tripId), {
+        name: item.name,
+        category_name: item.category_name,
+        quantity: defaultQuantity,
+        master_item_id: item.id,
+        bag_id: bagId,
+        container_item_id: containerId || null,
+        is_container: item.is_container || false,
+      });
+
+      if (response.success) {
+        showToast('success', `Added ${item.name}`);
+        props.onAdded();
+      } else {
+        showToast('error', response.error || 'Failed to add item');
+      }
+    } finally {
+      setPendingItems((prev) => {
+        const next = new Set(prev);
+        next.delete(item.id);
+        return next;
+      });
+    }
+  };
+
+  const handleRemoveItem = async (item: MasterItemWithCategory) => {
+    const existingMatch = getTargetExistingItem(item.id);
+    if (!existingMatch) return;
+
+    setPendingItems((prev) => new Set(prev).add(item.id));
+    try {
+      const response = await api.delete(endpoints.tripItems(props.tripId), {
+        body: JSON.stringify({ id: existingMatch.id }),
+      });
+
+      if (response.success) {
+        showToast('success', `Removed ${item.name}`);
+        setRemovedTripItemIds((prev) => {
+          const next = new Set(prev);
+          next.add(existingMatch.id);
+          return next;
+        });
+        setTripItemOverrides((prev) => {
+          const next = new Map(prev);
+          next.delete(existingMatch.id);
+          return next;
+        });
+        props.onAdded();
+      } else {
+        showToast('error', response.error || 'Failed to remove item');
+      }
+    } finally {
+      setPendingItems((prev) => {
         const next = new Set(prev);
         next.delete(item.id);
         return next;
@@ -143,11 +300,30 @@ export function AddFromMasterList(props: AddFromMasterListProps) {
                   <div class="space-y-2">
                     <For each={items}>
                       {(item) => {
-                        const isAdding = () => addingItems().has(item.id);
+                        const isAdding = () => pendingItems().has(item.id);
+                        const existingItems = () => getExistingItemsForMaster(item.id);
+                        const targetExisting = () => getTargetExistingItem(item.id);
+                        const bagSummary = () => summarizeBagLocations(existingItems());
+                        const alreadyPacked = () => existingItems().length > 0;
+                        const totalExistingQuantity = () =>
+                          existingItems().reduce(
+                            (sum, tripItem) => sum + (tripItem.quantity || 0),
+                            0
+                          );
+                        const displayedQuantity = () =>
+                          totalExistingQuantity() > 0
+                            ? totalExistingQuantity()
+                            : item.default_quantity;
                         return (
                           <div class="flex items-center justify-between rounded p-2 hover:bg-gray-50">
                             <div class="flex-1">
-                              <p class="flex items-center gap-2 font-medium text-gray-900">
+                              <p
+                                class="flex items-center gap-2 font-medium"
+                                classList={{
+                                  'text-gray-500': alreadyPacked(),
+                                  'text-gray-900': !alreadyPacked(),
+                                }}
+                              >
                                 <Show when={item.is_container}>
                                   <span title="Container (sub-bag)">📦</span>
                                 </Show>
@@ -156,15 +332,50 @@ export function AddFromMasterList(props: AddFromMasterListProps) {
                               {item.description && (
                                 <p class="text-sm text-gray-600">{item.description}</p>
                               )}
-                              <p class="text-xs text-gray-500">Qty: {item.default_quantity}</p>
+                              <p class="text-xs text-gray-500">Qty: {displayedQuantity()}</p>
+                              <Show when={bagSummary()}>
+                                {(summary) => <p class="text-xs text-gray-500">In {summary}</p>}
+                              </Show>
                             </div>
-                            <Button
-                              size="sm"
-                              onClick={() => handleAddItem(item)}
-                              disabled={isAdding()}
-                            >
-                              {isAdding() ? 'Added' : '+ Add'}
-                            </Button>
+                            <div class="flex items-center gap-2">
+                              <Show when={alreadyPacked()}>
+                                <button
+                                  type="button"
+                                  class="rounded-full p-2 text-gray-400 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+                                  title="Remove from trip"
+                                  onClick={() => handleRemoveItem(item)}
+                                  disabled={isAdding()}
+                                >
+                                  <svg
+                                    class="h-4 w-4"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                  >
+                                    <path
+                                      stroke-linecap="round"
+                                      stroke-linejoin="round"
+                                      stroke-width="2"
+                                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                    />
+                                  </svg>
+                                </button>
+                              </Show>
+                              <Button
+                                size="sm"
+                                variant={alreadyPacked() ? 'secondary' : 'primary'}
+                                onClick={() => handleAddItem(item)}
+                                disabled={isAdding()}
+                              >
+                                {isAdding()
+                                  ? alreadyPacked()
+                                    ? 'Updating...'
+                                    : 'Adding...'
+                                  : alreadyPacked()
+                                    ? '+'
+                                    : '+ Add'}
+                              </Button>
+                            </div>
                           </div>
                         );
                       }}
