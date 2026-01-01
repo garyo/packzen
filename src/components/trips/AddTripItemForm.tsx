@@ -27,6 +27,7 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
   const [isNewCategory, setIsNewCategory] = createSignal(false);
   const [newCategoryName, setNewCategoryName] = createSignal('');
   const [isContainer, setIsContainer] = createSignal(false);
+  const [skipMasterAddition, setSkipMasterAddition] = createSignal(false);
 
   // Use pre-loaded bags if available, otherwise fetch
   const [bags] = createResource<Bag[]>(
@@ -273,8 +274,10 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
 
     // Create new category if needed
     let finalCategoryId = categoryId();
+    const newCatNameInput = newCategoryName().trim();
+
     if (isNewCategory()) {
-      const newCatName = newCategoryName().trim();
+      const newCatName = newCatNameInput;
       if (!newCatName) {
         showToast('error', 'Category name is required');
         return;
@@ -299,10 +302,13 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
     );
 
     let masterItemId = existingMasterItem?.id;
-    let categoryName: string | null | undefined;
+    const categoriesList = categories() || [];
+    let categoryName: string | null | undefined = finalCategoryId
+      ? categoriesList.find((cat) => cat.id === finalCategoryId)?.name || newCatNameInput || null
+      : null;
 
-    // If not in master list, add it
-    if (!existingMasterItem) {
+    // If not in master list, add it (unless explicitly disabled)
+    if (!existingMasterItem && !skipMasterAddition()) {
       const createMasterResponse = await api.post<MasterItemWithCategory>(endpoints.masterItems, {
         name: itemName,
         category_id: finalCategoryId,
@@ -314,7 +320,7 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
         categoryName = createMasterResponse.data.category_name;
         showToast('success', `Added "${itemName}" to all items`);
       }
-    } else {
+    } else if (existingMasterItem) {
       categoryName = existingMasterItem.category_name;
     }
 
@@ -361,6 +367,7 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
         setNewCategoryName('');
         setKeepOpen(false);
         setIsContainer(false);
+        setSkipMasterAddition(false);
         setLocation(''); // Clear location so restoration triggers a signal change
 
         // Call onSaved to trigger refetch (important for containers to appear in list)
@@ -515,6 +522,18 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
           />
           <label for="is-container-add" class="text-sm font-medium text-gray-700">
             This is a container (sub-bag like a toilet kit)
+          </label>
+        </div>
+        <div class="flex items-center gap-2">
+          <input
+            type="checkbox"
+            id="skip-master-add"
+            checked={skipMasterAddition()}
+            onChange={(e) => setSkipMasterAddition(e.currentTarget.checked)}
+            class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
+          />
+          <label for="skip-master-add" class="text-sm text-gray-600">
+            Don't add to All Items (master list)
           </label>
         </div>
 
