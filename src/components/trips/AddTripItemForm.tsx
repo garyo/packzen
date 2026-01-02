@@ -15,7 +15,7 @@ interface AddTripItemFormProps {
   preSelectedContainerId?: string | null;
   bags?: Bag[]; // Pre-loaded bags (avoids async fetch)
   onClose: () => void;
-  onSaved: () => void;
+  onSaved: (createdItem?: TripItem) => void;
 }
 
 export function AddTripItemForm(props: AddTripItemFormProps) {
@@ -355,6 +355,9 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
     if (response.success) {
       showToast('success', 'Item added to trip');
 
+      // Get the created item from the response
+      const createdItem = response.data as TripItem | undefined;
+
       if (keepOpen()) {
         // Smart reuse logic for Add Another
         const wasContainer = isContainer();
@@ -370,13 +373,13 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
         setSkipMasterAddition(false);
         setLocation(''); // Clear location so restoration triggers a signal change
 
-        // Call onSaved to trigger refetch (important for containers to appear in list)
-        props.onSaved();
+        // Call onSaved with created item to update store (important for containers to appear in list)
+        props.onSaved(createdItem);
         await refetchTripItems();
 
-        if (wasContainer && response.data) {
+        if (wasContainer && createdItem) {
           // If we just created a container, pre-select it as the container for the next item
-          const newContainerId = (response.data as { id: string }).id;
+          const newContainerId = createdItem.id;
           setTimeout(() => {
             setLocation(`container:${newContainerId}`);
             setCategoryId(lastCategoryId);
@@ -393,8 +396,8 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
           document.querySelector<HTMLInputElement>('input[type="text"]')?.focus();
         }, 0);
       } else {
+        props.onSaved(createdItem);
         props.onClose();
-        props.onSaved();
       }
     } else {
       showToast('error', response.error || 'Failed to add item');

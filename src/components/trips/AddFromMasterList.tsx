@@ -14,7 +14,10 @@ interface AddFromMasterListProps {
   tripItems: Accessor<TripItem[] | undefined>;
   masterItems: Accessor<MasterItemWithCategory[] | undefined>;
   onClose: () => void;
-  onAdded: () => void;
+  onAdded: () => void; // Legacy fallback
+  onItemAdded?: (item: TripItem) => void;
+  onItemUpdated?: (itemId: string, updates: Partial<TripItem>) => void;
+  onItemRemoved?: (itemId: string) => void;
 }
 
 export function AddFromMasterList(props: AddFromMasterListProps) {
@@ -154,7 +157,12 @@ export function AddFromMasterList(props: AddFromMasterListProps) {
             next.set(existingMatch.id, { quantity: newQuantity });
             return next;
           });
-          props.onAdded();
+          // Use specific callback if available, otherwise fallback
+          if (props.onItemUpdated) {
+            props.onItemUpdated(existingMatch.id, { quantity: newQuantity });
+          } else {
+            props.onAdded();
+          }
         } else {
           showToast('error', response.error || 'Failed to update item');
         }
@@ -176,7 +184,13 @@ export function AddFromMasterList(props: AddFromMasterListProps) {
 
       if (response.success) {
         showToast('success', `Added ${item.name}`);
-        props.onAdded();
+        // Use specific callback if available, otherwise fallback
+        const createdItem = response.data as TripItem | undefined;
+        if (props.onItemAdded && createdItem) {
+          props.onItemAdded(createdItem);
+        } else {
+          props.onAdded();
+        }
       } else {
         showToast('error', response.error || 'Failed to add item');
       }
@@ -211,7 +225,12 @@ export function AddFromMasterList(props: AddFromMasterListProps) {
           next.delete(existingMatch.id);
           return next;
         });
-        props.onAdded();
+        // Use specific callback if available, otherwise fallback
+        if (props.onItemRemoved) {
+          props.onItemRemoved(existingMatch.id);
+        } else {
+          props.onAdded();
+        }
       } else {
         showToast('error', response.error || 'Failed to remove item');
       }

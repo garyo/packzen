@@ -130,12 +130,20 @@ export function PackingPage(props: PackingPageProps) {
   // Delete items from store
   const deleteItemsFromStore = (itemIds: string[]) => {
     const idSet = new Set(itemIds);
-    setItemsState('data', (data) => data.filter((item) => !idSet.has(item.id)));
+    setItemsState(
+      produce((state) => {
+        state.data = state.data.filter((item) => !idSet.has(item.id));
+      })
+    );
   };
 
   // Add item to store
   const addItemToStore = (item: TripItem) => {
-    setItemsState('data', (data) => [...data, item]);
+    setItemsState(
+      produce((state) => {
+        state.data.push(item);
+      })
+    );
   };
 
   // Initial fetch on mount (auth init happens later in another onMount)
@@ -489,6 +497,11 @@ export function PackingPage(props: PackingPageProps) {
       return;
     }
 
+    const packedItemIds = packedItems.map((item) => item.id);
+
+    // Optimistic update using store
+    updateItemsInStore(packedItemIds, { is_packed: false });
+
     try {
       await Promise.all(
         packedItems.map((item) =>
@@ -500,9 +513,9 @@ export function PackingPage(props: PackingPageProps) {
       );
 
       showToast('success', `Unpacked ${packedItems.length} items`);
-      await refetch();
     } catch (error) {
       showToast('error', 'Failed to unpack items');
+      refetch(); // Revert on error
     }
   };
 
@@ -867,7 +880,13 @@ export function PackingPage(props: PackingPageProps) {
           preSelectedContainerId={preSelectedContainerId()}
           bags={bags()}
           onClose={closeAddForm}
-          onSaved={() => refetch()}
+          onSaved={(createdItem) => {
+            if (createdItem) {
+              addItemToStore(createdItem);
+            } else {
+              refetch();
+            }
+          }}
         />
       </Show>
 
@@ -909,6 +928,9 @@ export function PackingPage(props: PackingPageProps) {
           masterItems={masterItems}
           onClose={closeAddFromMaster}
           onAdded={() => refetch()}
+          onItemAdded={(item) => addItemToStore(item)}
+          onItemUpdated={(itemId, updates) => updateItemInStore(itemId, updates)}
+          onItemRemoved={(itemId) => deleteItemsFromStore([itemId])}
         />
       </Show>
 
