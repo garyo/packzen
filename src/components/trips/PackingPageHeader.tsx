@@ -18,8 +18,10 @@ interface PackingPageHeaderProps {
   progress: Accessor<number>;
   selectMode: Accessor<boolean>;
   sortBy: Accessor<'bag' | 'category'>;
+  viewMode: Accessor<'pack' | 'add'>;
   onToggleSelectMode: () => void;
   onToggleSortBy: () => void;
+  onToggleViewMode: () => void;
   onAddItem: () => void;
   onManageBags: () => void;
   onAddFromMaster: () => void;
@@ -255,61 +257,74 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
                       </div>
                     </Show>
                   </div>
-                  <Button variant="secondary" size="sm" onClick={props.onManageBags}>
-                    Bags
+                  {/* Mode toggle button - primary CTA */}
+                  <Button variant="primary" size="sm" onClick={props.onToggleViewMode}>
+                    {props.viewMode() === 'add' ? 'Start Packing' : 'Add More Items'}
                   </Button>
-                  <div class="relative" ref={addMenuRef}>
-                    <Button size="sm" onClick={() => setShowAddMenu(!showAddMenu())}>
-                      Add Items...
+                  {/* Only show these in Pack mode */}
+                  <Show when={props.viewMode() === 'pack'}>
+                    <Button variant="secondary" size="sm" onClick={props.onManageBags}>
+                      Bags
                     </Button>
-                    <Show when={showAddMenu()}>
-                      <div class="absolute top-full left-0 z-20 mt-1 w-56 rounded-lg border border-gray-200 bg-white shadow-lg">
-                        <button
-                          onClick={() => {
-                            props.onAddItem();
-                            setShowAddMenu(false);
-                          }}
-                          class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
-                        >
-                          ✏️ Add Items
-                        </button>
-                        <button
-                          onClick={() => {
-                            props.onAddFromMaster();
-                            setShowAddMenu(false);
-                          }}
-                          class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
-                        >
-                          📋 Add from My Items
-                        </button>
-                        <button
-                          onClick={() => {
-                            props.onBrowseTemplates();
-                            setShowAddMenu(false);
-                          }}
-                          class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
-                        >
-                          📚 Browse Templates
-                        </button>
-                      </div>
-                    </Show>
-                  </div>
-                  <Button variant="secondary" size="sm" onClick={props.onToggleSelectMode}>
-                    Select Batch
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={props.onToggleSortBy}
-                    title={`Currently sorting by ${props.sortBy()}. Click to switch.`}
-                  >
-                    <div class="text-center text-xs leading-tight">
-                      <div class="text-[10px] text-gray-500">Sorting:</div>
-                      <div class="font-medium">
-                        {props.sortBy() === 'bag' ? 'Bag→Category' : 'Category→Bag'}
-                      </div>
+                    <div class="relative" ref={addMenuRef}>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => setShowAddMenu(!showAddMenu())}
+                      >
+                        Add Items...
+                      </Button>
+                      <Show when={showAddMenu()}>
+                        <div class="absolute top-full left-0 z-20 mt-1 w-56 rounded-lg border border-gray-200 bg-white shadow-lg">
+                          <button
+                            onClick={() => {
+                              props.onAddItem();
+                              setShowAddMenu(false);
+                            }}
+                            class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
+                          >
+                            ✏️ Add Items
+                          </button>
+                          <button
+                            onClick={() => {
+                              props.onAddFromMaster();
+                              setShowAddMenu(false);
+                            }}
+                            class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
+                          >
+                            📋 Add from My Items
+                          </button>
+                          <button
+                            onClick={() => {
+                              props.onBrowseTemplates();
+                              setShowAddMenu(false);
+                            }}
+                            class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
+                          >
+                            📚 Browse Templates
+                          </button>
+                        </div>
+                      </Show>
                     </div>
-                  </Button>
+                    <Button variant="secondary" size="sm" onClick={props.onToggleSelectMode}>
+                      Select Batch
+                    </Button>
+                  </Show>
+                  <Show when={props.viewMode() === 'pack'}>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={props.onToggleSortBy}
+                      title={`Currently sorting by ${props.sortBy()}. Click to switch.`}
+                    >
+                      <div class="text-center text-xs leading-tight">
+                        <div class="text-[10px] text-gray-500">Sorting:</div>
+                        <div class="font-medium">
+                          {props.sortBy() === 'bag' ? 'Bag→Category' : 'Category→Bag'}
+                        </div>
+                      </div>
+                    </Button>
+                  </Show>
                   <div class="relative" ref={menuRef}>
                     <Button variant="secondary" size="sm" onClick={() => setShowMenu(!showMenu())}>
                       <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">

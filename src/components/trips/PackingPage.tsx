@@ -31,6 +31,7 @@ import { TripImportModal } from './TripImportModal';
 import { PackingPageHeader } from './PackingPageHeader';
 import { PackingListBagView } from './PackingListBagView';
 import { PackingListCategoryView } from './PackingListCategoryView';
+import { AddModeView } from './AddModeView';
 import { SelectModeActionBar } from './SelectModeActionBar';
 import { BuiltInItemsBrowser } from '../built-in-items/BuiltInItemsBrowser';
 import { builtInItems } from '../../lib/built-in-items';
@@ -54,6 +55,7 @@ export function PackingPage(props: PackingPageProps) {
   const [showBuiltInItems, setShowBuiltInItems] = createSignal(false);
   const [showEditTrip, setShowEditTrip] = createSignal(false);
   const [sortBy, setSortBy] = createSignal<'bag' | 'category'>('bag');
+  const [viewMode, setViewMode] = createSignal<'pack' | 'add'>('pack');
   const [searchQuery, setSearchQuery] = createSignal('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = createSignal('');
   const [pendingScrollItemId, setPendingScrollItemId] = createSignal<string | null>(null);
@@ -233,6 +235,19 @@ export function PackingPage(props: PackingPageProps) {
   onMount(async () => {
     await authStore.initAuth();
     fetchItems();
+  });
+
+  // Start in Add Mode if nothing is packed (first time load only)
+  let hasSetInitialMode = false;
+  createEffect(() => {
+    const loadedItems = items();
+    if (!hasSetInitialMode && loadedItems !== undefined) {
+      hasSetInitialMode = true;
+      const anyPacked = loadedItems.some((i) => i.is_packed);
+      if (!anyPacked && loadedItems.length > 0) {
+        setViewMode('add');
+      }
+    }
   });
 
   const handleTogglePacked = async (item: TripItem) => {
@@ -740,6 +755,137 @@ export function PackingPage(props: PackingPageProps) {
     }
   };
 
+  // Handler for adding master items from Add mode drag-drop
+  const handleAddMasterItemFromAddMode = async (
+    masterItem: MasterItemWithCategory,
+    bagId: string | null,
+    containerId: string | null
+  ) => {
+    try {
+      const response = await api.post(endpoints.tripItems(props.tripId), {
+        name: masterItem.name,
+        category_name: masterItem.category_name,
+        quantity: masterItem.default_quantity || 1,
+        master_item_id: masterItem.id,
+        bag_id: containerId ? null : bagId,
+        container_item_id: containerId,
+        is_container: masterItem.is_container || false,
+      });
+
+      if (response.success && response.data) {
+        addItemToStore(response.data as TripItem);
+        showToast('success', `Added ${masterItem.name}`);
+      } else {
+        showToast('error', (response as any).error || 'Failed to add item');
+      }
+    } catch (error) {
+      showToast('error', 'Failed to add item');
+      console.error('Error adding master item from Add mode:', error);
+    }
+  };
+
+  // Handler for adding built-in items from Add mode drag-drop
+  const handleAddBuiltInItemFromAddMode = async (
+    item: { name: string; description: string | null; category: string; quantity: number },
+    bagId: string | null,
+    containerId: string | null
+  ) => {
+    try {
+      // Fetch current master items and categories
+      const [masterItemsResponse, categoriesResponse] = await Promise.all([
+        api.get(endpoints.masterItems),
+        api.get(endpoints.categories),
+      ]);
+
+      if (!masterItemsResponse.success || !categoriesResponse.success) {
+        throw new Error('Failed to fetch master items or categories');
+      }
+
+      const currentMasterItems = masterItemsResponse.data as any[];
+      const existingCategories = categoriesResponse.data as any[];
+
+      // Get or create category
+      let category = existingCategories.find(
+        (c: any) => c.name.toLowerCase() === item.category.toLowerCase()
+      );
+
+      if (!category) {
+        const builtInCategory = builtInItems.categories.find(
+          (c) => c.name.toLowerCase() === item.category.toLowerCase()
+        );
+        const response = await api.post(endpoints.categories, {
+          name: item.category,
+          icon: builtInCategory?.icon || null,
+        });
+        if (response.success && response.data) {
+          category = response.data;
+        }
+      }
+
+      // Get or create master item
+      let masterItem = currentMasterItems.find(
+        (m: any) => m.name.toLowerCase() === item.name.toLowerCase()
+      );
+
+      if (!masterItem) {
+        const response = await api.post(endpoints.masterItems, {
+          name: item.name,
+          description: item.description,
+          category_id: category?.id || null,
+          default_quantity: item.quantity,
+        });
+
+        if (response.success && response.data) {
+          masterItem = response.data;
+        }
+      }
+
+      // Create trip item
+      const tripItemResponse = await api.post(endpoints.tripItems(props.tripId), {
+        name: item.name,
+        category_name: item.category,
+        quantity: item.quantity,
+        notes: item.description,
+        bag_id: containerId ? null : bagId,
+        container_item_id: containerId,
+        master_item_id: masterItem?.id || null,
+      });
+
+      if (tripItemResponse.success && tripItemResponse.data) {
+        addItemToStore(tripItemResponse.data as TripItem);
+        showToast('success', `Added ${item.name}`);
+      } else {
+        showToast('error', (tripItemResponse as any).error || 'Failed to add item');
+      }
+    } catch (error) {
+      showToast('error', 'Failed to add item');
+      console.error('Error adding built-in item from Add mode:', error);
+    }
+  };
+
+  // Handler for removing items from trip in Add mode
+  const handleRemoveFromTrip = async (tripItemId: string) => {
+    const item = items()?.find((i) => i.id === tripItemId);
+    if (!item) return;
+
+    // Optimistic delete
+    deleteItemsFromStore([tripItemId]);
+
+    try {
+      const response = await api.delete(endpoints.tripItems(props.tripId), {
+        body: JSON.stringify({ id: tripItemId }),
+      });
+
+      if (!response.success) {
+        showToast('error', 'Failed to remove item');
+        refetch(); // Revert on error
+      }
+    } catch (error) {
+      showToast('error', 'Failed to remove item');
+      refetch(); // Revert on error
+    }
+  };
+
   const packedCount = () => items()?.filter((i) => i.is_packed).length || 0;
   const totalCount = () => items()?.length || 0;
   const progress = () => getPackingProgress(packedCount(), totalCount());
@@ -776,45 +922,81 @@ export function PackingPage(props: PackingPageProps) {
         onSearchChange={setSearchQuery}
         visibleItemCount={visibleItemsCount}
         onScrollToItemRequest={(itemId) => setPendingScrollItemId(itemId)}
+        viewMode={viewMode}
+        onToggleViewMode={() => setViewMode(viewMode() === 'pack' ? 'add' : 'pack')}
       />
 
-      {/* Packing List - scrollable area */}
+      {/* Main content - scrollable area */}
       <main class="flex-1 overflow-y-auto">
-        <div class="container mx-auto px-4 py-6 pb-20 md:px-3 md:py-3 md:pb-16">
-          <Show when={!itemsState.loading} fallback={<LoadingSpinner text="Loading items..." />}>
-            <Show
-              when={!itemsState.error}
-              fallback={
-                <EmptyState
-                  icon="⚠️"
-                  title="Unable to connect"
-                  description="Cannot reach the server. Please check your connection and try again."
-                  action={<Button onClick={() => refetch()}>Retry</Button>}
-                />
-              }
-            >
+        {/* Add Mode View */}
+        <Show when={viewMode() === 'add'}>
+          <Show when={!itemsState.loading} fallback={<LoadingSpinner text="Loading..." />}>
+            <AddModeView
+              tripId={props.tripId}
+              items={items}
+              bags={bags}
+              categories={categories}
+              masterItems={masterItems}
+              onAddMasterItem={handleAddMasterItemFromAddMode}
+              onAddBuiltInItem={handleAddBuiltInItemFromAddMode}
+              onRemoveFromTrip={handleRemoveFromTrip}
+              onAddNewItem={() => setShowAddForm(true)}
+              onManageBags={() => setShowBagManager(true)}
+            />
+          </Show>
+        </Show>
+
+        {/* Pack Mode View */}
+        <Show when={viewMode() === 'pack'}>
+          <div class="container mx-auto px-4 py-6 pb-20 md:px-3 md:py-3 md:pb-16">
+            <Show when={!itemsState.loading} fallback={<LoadingSpinner text="Loading items..." />}>
               <Show
-                when={totalCount() > 0}
+                when={!itemsState.error}
                 fallback={
                   <EmptyState
-                    icon="📦"
-                    title="No items yet"
-                    description="Add items to your packing list to get started"
+                    icon="⚠️"
+                    title="Unable to connect"
+                    description="Cannot reach the server. Please check your connection and try again."
+                    action={<Button onClick={() => refetch()}>Retry</Button>}
                   />
                 }
               >
                 <Show
-                  when={!noSearchResults()}
+                  when={totalCount() > 0}
                   fallback={
-                    <div class="py-16 text-center text-gray-500">
-                      No items match "{searchQuery().trim()}". Try adjusting your search.
-                    </div>
+                    <EmptyState
+                      icon="📦"
+                      title="No items yet"
+                      description="Add items to your packing list to get started"
+                    />
                   }
                 >
                   <Show
-                    when={sortBy() === 'bag'}
+                    when={!noSearchResults()}
                     fallback={
-                      <PackingListCategoryView
+                      <div class="py-16 text-center text-gray-500">
+                        No items match "{searchQuery().trim()}". Try adjusting your search.
+                      </div>
+                    }
+                  >
+                    <Show
+                      when={sortBy() === 'bag'}
+                      fallback={
+                        <PackingListCategoryView
+                          items={visibleItems}
+                          bags={bags}
+                          categories={categories}
+                          selectMode={selectMode}
+                          selectedItems={selectedItems}
+                          onTogglePacked={handleTogglePacked}
+                          onEditItem={openEditItem}
+                          onToggleItemSelection={toggleItemSelection}
+                          onMoveItemToBag={handleMoveItemToBag}
+                          onMoveItemToContainer={handleMoveItemToContainer}
+                        />
+                      }
+                    >
+                      <PackingListBagView
                         items={visibleItems}
                         bags={bags}
                         categories={categories}
@@ -823,53 +1005,40 @@ export function PackingPage(props: PackingPageProps) {
                         onTogglePacked={handleTogglePacked}
                         onEditItem={openEditItem}
                         onToggleItemSelection={toggleItemSelection}
+                        onAddToBag={(bagId) => openAddForm(bagId)}
+                        onAddToContainer={(containerId) => openAddForm(undefined, containerId)}
+                        onAddFromMasterToBag={(bagId) => openAddFromMaster(bagId)}
+                        onAddFromMasterToContainer={(containerId) =>
+                          openAddFromMaster(undefined, containerId)
+                        }
+                        onBrowseTemplatesToBag={(bagId) => openBrowseTemplates(bagId)}
+                        onBrowseTemplatesToContainer={(containerId) =>
+                          openBrowseTemplates(undefined, containerId)
+                        }
                         onMoveItemToBag={handleMoveItemToBag}
                         onMoveItemToContainer={handleMoveItemToContainer}
                       />
-                    }
-                  >
-                    <PackingListBagView
-                      items={visibleItems}
-                      bags={bags}
-                      categories={categories}
-                      selectMode={selectMode}
-                      selectedItems={selectedItems}
-                      onTogglePacked={handleTogglePacked}
-                      onEditItem={openEditItem}
-                      onToggleItemSelection={toggleItemSelection}
-                      onAddToBag={(bagId) => openAddForm(bagId)}
-                      onAddToContainer={(containerId) => openAddForm(undefined, containerId)}
-                      onAddFromMasterToBag={(bagId) => openAddFromMaster(bagId)}
-                      onAddFromMasterToContainer={(containerId) =>
-                        openAddFromMaster(undefined, containerId)
-                      }
-                      onBrowseTemplatesToBag={(bagId) => openBrowseTemplates(bagId)}
-                      onBrowseTemplatesToContainer={(containerId) =>
-                        openBrowseTemplates(undefined, containerId)
-                      }
-                      onMoveItemToBag={handleMoveItemToBag}
-                      onMoveItemToContainer={handleMoveItemToContainer}
-                    />
+                    </Show>
                   </Show>
                 </Show>
-              </Show>
 
-              {/* Add Items Buttons - shown for both empty and non-empty states */}
-              <div class="mt-6 flex flex-col items-center gap-3">
-                <Button onClick={() => setShowBagManager(true)}>Add Bags</Button>
-                <div class="flex flex-wrap justify-center gap-2">
-                  <Button onClick={() => openAddForm()}>Add Items</Button>
-                  <Button variant="secondary" onClick={() => openAddFromMaster()}>
-                    Add from My Items
-                  </Button>
-                  <Button variant="secondary" onClick={() => openBrowseTemplates()}>
-                    Add from Templates
-                  </Button>
+                {/* Add Items Buttons - shown for both empty and non-empty states */}
+                <div class="mt-6 flex flex-col items-center gap-3">
+                  <Button onClick={() => setShowBagManager(true)}>Add Bags</Button>
+                  <div class="flex flex-wrap justify-center gap-2">
+                    <Button onClick={() => openAddForm()}>Add Items</Button>
+                    <Button variant="secondary" onClick={() => openAddFromMaster()}>
+                      Add from My Items
+                    </Button>
+                    <Button variant="secondary" onClick={() => openBrowseTemplates()}>
+                      Add from Templates
+                    </Button>
+                  </div>
                 </div>
-              </div>
+              </Show>
             </Show>
-          </Show>
-        </div>
+          </div>
+        </Show>
       </main>
 
       {/* Add Item Form Modal */}

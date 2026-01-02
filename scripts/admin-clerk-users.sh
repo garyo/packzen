@@ -2,6 +2,9 @@
 
 set -euo pipefail
 
+# Load secrets into env (exporting)
+set -a; . ./.env.production.local; set +a
+
 API_KEY="${CLERK_SECRET_KEY:-}"
 
 if [[ -z "$API_KEY" ]]; then
