@@ -38,10 +38,8 @@ interface PackingPageHeaderProps {
 
 export function PackingPageHeader(props: PackingPageHeaderProps) {
   const [showMenu, setShowMenu] = createSignal(false);
-  const [showAddMenu, setShowAddMenu] = createSignal(false);
   const [isSearchOpen, setIsSearchOpen] = createSignal(false);
   let menuRef: HTMLDivElement | undefined;
-  let addMenuRef: HTMLDivElement | undefined;
   let searchContainerRef: HTMLDivElement | undefined;
   let searchOverlayRef: HTMLDivElement | undefined;
   let searchInputRef: HTMLInputElement | undefined;
@@ -72,9 +70,6 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
       if (showMenu() && menuRef && !menuRef.contains(e.target as Node)) {
         setShowMenu(false);
       }
-      if (showAddMenu() && addMenuRef && !addMenuRef.contains(e.target as Node)) {
-        setShowAddMenu(false);
-      }
       const target = e.target as HTMLElement | null;
       const clickedInsideSearchTrigger =
         searchContainerRef && target ? searchContainerRef.contains(target) : false;
@@ -93,7 +88,6 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         if (showMenu()) setShowMenu(false);
-        if (showAddMenu()) setShowAddMenu(false);
         if (isSearchOpen()) closeSearch();
       }
     };
@@ -266,46 +260,9 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
                     <Button variant="secondary" size="sm" onClick={props.onManageBags}>
                       Bags
                     </Button>
-                    <div class="relative" ref={addMenuRef}>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => setShowAddMenu(!showAddMenu())}
-                      >
-                        Add Items...
-                      </Button>
-                      <Show when={showAddMenu()}>
-                        <div class="absolute top-full left-0 z-20 mt-1 w-56 rounded-lg border border-gray-200 bg-white shadow-lg">
-                          <button
-                            onClick={() => {
-                              props.onAddItem();
-                              setShowAddMenu(false);
-                            }}
-                            class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
-                          >
-                            ✏️ Add Items
-                          </button>
-                          <button
-                            onClick={() => {
-                              props.onAddFromMaster();
-                              setShowAddMenu(false);
-                            }}
-                            class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
-                          >
-                            📋 Add from My Items
-                          </button>
-                          <button
-                            onClick={() => {
-                              props.onBrowseTemplates();
-                              setShowAddMenu(false);
-                            }}
-                            class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
-                          >
-                            📚 Browse Templates
-                          </button>
-                        </div>
-                      </Show>
-                    </div>
+                    <Button variant="secondary" size="sm" onClick={props.onAddItem}>
+                      Quick Add
+                    </Button>
                     <Button variant="secondary" size="sm" onClick={props.onToggleSelectMode}>
                       Select Batch
                     </Button>

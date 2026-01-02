@@ -237,14 +237,13 @@ export function PackingPage(props: PackingPageProps) {
     fetchItems();
   });
 
-  // Start in Add Mode if nothing is packed (first time load only)
+  // Start in Add Mode if trip has no items (first time load only)
   let hasSetInitialMode = false;
   createEffect(() => {
     const loadedItems = items();
     if (!hasSetInitialMode && loadedItems !== undefined) {
       hasSetInitialMode = true;
-      const anyPacked = loadedItems.some((i) => i.is_packed);
-      if (!anyPacked && loadedItems.length > 0) {
+      if (loadedItems.length === 0) {
         setViewMode('add');
       }
     }
@@ -1021,20 +1020,6 @@ export function PackingPage(props: PackingPageProps) {
                     </Show>
                   </Show>
                 </Show>
-
-                {/* Add Items Buttons - shown for both empty and non-empty states */}
-                <div class="mt-6 flex flex-col items-center gap-3">
-                  <Button onClick={() => setShowBagManager(true)}>Add Bags</Button>
-                  <div class="flex flex-wrap justify-center gap-2">
-                    <Button onClick={() => openAddForm()}>Add Items</Button>
-                    <Button variant="secondary" onClick={() => openAddFromMaster()}>
-                      Add from My Items
-                    </Button>
-                    <Button variant="secondary" onClick={() => openBrowseTemplates()}>
-                      Add from Templates
-                    </Button>
-                  </div>
-                </div>
               </Show>
             </Show>
           </div>
