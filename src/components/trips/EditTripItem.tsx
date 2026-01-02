@@ -12,7 +12,8 @@ interface EditTripItemProps {
   allItems?: TripItem[]; // All trip items for container selection
   bags?: Bag[]; // Pre-loaded bags (avoids async fetch)
   onClose: () => void;
-  onSaved: () => void;
+  onSaved: (updatedItem?: TripItem) => void;
+  onDeleted?: (deletedItemId: string, movedItemIds?: string[]) => void;
 }
 
 export function EditTripItem(props: EditTripItemProps) {
@@ -137,7 +138,12 @@ export function EditTripItem(props: EditTripItemProps) {
 
     if (response.success) {
       showToast('success', 'Item updated');
-      props.onSaved();
+      // Construct updated item by merging original with changes
+      const updatedItem: TripItem = {
+        ...props.item,
+        ...patchData,
+      };
+      props.onSaved(updatedItem);
       props.onClose();
     } else {
       showToast('error', response.error || 'Failed to update item');
@@ -173,6 +179,8 @@ export function EditTripItem(props: EditTripItemProps) {
   };
 
   const performDelete = async (keepItems: boolean) => {
+    const movedItemIds: string[] = [];
+
     if (keepItems) {
       // First, move all contained items - they inherit the container's bag
       const contained =
@@ -184,6 +192,7 @@ export function EditTripItem(props: EditTripItemProps) {
           container_item_id: null,
           bag_id: props.item.bag_id || null, // Inherit bag from container
         });
+        movedItemIds.push(item.id);
       }
     }
 
@@ -201,7 +210,12 @@ export function EditTripItem(props: EditTripItemProps) {
           : 'Item deleted'
       );
       setShowDeleteConfirm(false);
-      props.onSaved();
+      // Call onDeleted if provided, otherwise fall back to onSaved for compatibility
+      if (props.onDeleted) {
+        props.onDeleted(props.item.id, keepItems ? movedItemIds : undefined);
+      } else {
+        props.onSaved();
+      }
       props.onClose();
     } else {
       showToast('error', response.error || 'Failed to delete item');

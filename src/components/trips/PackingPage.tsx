@@ -7,6 +7,7 @@ import {
   createEffect,
   onCleanup,
 } from 'solid-js';
+import { createStore, produce } from 'solid-js/store';
 import { authStore } from '../../stores/auth';
 import { api, endpoints } from '../../lib/api';
 import type {
@@ -55,7 +56,6 @@ export function PackingPage(props: PackingPageProps) {
   const [sortBy, setSortBy] = createSignal<'bag' | 'category'>('bag');
   const [searchQuery, setSearchQuery] = createSignal('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = createSignal('');
-  const [lastScrollPosition, setLastScrollPosition] = createSignal<number | null>(null);
   const [pendingScrollItemId, setPendingScrollItemId] = createSignal<string | null>(null);
 
   // Debounce search query to avoid filtering on every keystroke
@@ -68,39 +68,77 @@ export function PackingPage(props: PackingPageProps) {
     onCleanup(() => clearTimeout(timeoutId));
   });
 
-  const getScrollContainer = () => {
-    if (typeof document === 'undefined') return null;
-    return document.querySelector('main.overflow-y-auto') as HTMLElement | null;
-  };
-
-  const captureScrollPosition = () => {
-    const container = getScrollContainer();
-    if (container) return container.scrollTop;
-    return typeof window !== 'undefined' ? window.scrollY : null;
-  };
-
-  const restoreScrollPosition = (position: number | null) => {
-    if (typeof window === 'undefined' || position === null) return;
-    const container = getScrollContainer();
-    requestAnimationFrame(() => {
-      if (container) {
-        container.scrollTo({ top: position, behavior: 'auto' });
-      } else {
-        window.scrollTo({ top: position, behavior: 'auto' });
-      }
-    });
-  };
-
   // Pre-selection for add modals
   const [preSelectedBagId, setPreSelectedBagId] = createSignal<string | null>(null);
   const [preSelectedContainerId, setPreSelectedContainerId] = createSignal<string | null>(null);
 
-  const [items, { mutate, refetch }] = createResource<TripItem[]>(async () => {
-    return fetchWithErrorHandling(
-      () => api.get<TripItem[]>(endpoints.tripItems(props.tripId)),
-      'Failed to load trip items'
-    );
+  // Items store - fine-grained reactivity for scroll-stable updates
+  const [itemsState, setItemsState] = createStore<{
+    data: TripItem[];
+    loading: boolean;
+    error: string | null;
+  }>({
+    data: [],
+    loading: true,
+    error: null,
   });
+
+  // Accessor for compatibility with existing code that uses items()
+  const items = () => (itemsState.loading ? undefined : itemsState.data);
+
+  // Fetch items from server and populate store
+  const fetchItems = async () => {
+    setItemsState('loading', true);
+    setItemsState('error', null);
+    try {
+      const result = await fetchWithErrorHandling(
+        () => api.get<TripItem[]>(endpoints.tripItems(props.tripId)),
+        'Failed to load trip items'
+      );
+      setItemsState('data', result);
+      setItemsState('loading', false);
+    } catch (e) {
+      setItemsState('error', e instanceof Error ? e.message : 'Failed to load items');
+      setItemsState('loading', false);
+    }
+  };
+
+  // Alias for compatibility with existing refetch() calls
+  const refetch = fetchItems;
+
+  // Store mutation helpers - these provide fine-grained updates without re-rendering entire list
+
+  // Update a single item property (e.g., toggle is_packed)
+  const updateItemInStore = (itemId: string, updates: Partial<TripItem>) => {
+    setItemsState(
+      'data',
+      (item) => item.id === itemId,
+      produce((item) => Object.assign(item, updates))
+    );
+  };
+
+  // Update multiple items at once
+  const updateItemsInStore = (itemIds: string[], updates: Partial<TripItem>) => {
+    const idSet = new Set(itemIds);
+    setItemsState(
+      'data',
+      (item) => idSet.has(item.id),
+      produce((item) => Object.assign(item, updates))
+    );
+  };
+
+  // Delete items from store
+  const deleteItemsFromStore = (itemIds: string[]) => {
+    const idSet = new Set(itemIds);
+    setItemsState('data', (data) => data.filter((item) => !idSet.has(item.id)));
+  };
+
+  // Add item to store
+  const addItemToStore = (item: TripItem) => {
+    setItemsState('data', (data) => [...data, item]);
+  };
+
+  // Initial fetch on mount (auth init happens later in another onMount)
 
   const [trip, { refetch: refetchTrip }] = createResource<Trip | null>(async () => {
     return fetchSingleWithErrorHandling(
@@ -186,11 +224,12 @@ export function PackingPage(props: PackingPageProps) {
 
   onMount(async () => {
     await authStore.initAuth();
+    fetchItems();
   });
 
   const handleTogglePacked = async (item: TripItem) => {
-    // Optimistic update
-    mutate((prev) => prev?.map((i) => (i.id === item.id ? { ...i, is_packed: !i.is_packed } : i)));
+    // Optimistic update using store - fine-grained, no scroll disruption
+    updateItemInStore(item.id, { is_packed: !item.is_packed });
 
     const response = await api.patch(endpoints.tripItems(props.tripId), {
       id: item.id,
@@ -199,7 +238,8 @@ export function PackingPage(props: PackingPageProps) {
 
     if (!response.success) {
       showToast('error', response.error || 'Failed to update item');
-      refetch(); // Revert on error
+      // Revert on error
+      updateItemInStore(item.id, { is_packed: item.is_packed });
     }
   };
 
@@ -208,18 +248,33 @@ export function PackingPage(props: PackingPageProps) {
   };
 
   const openEditItem = (item: TripItem) => {
-    setLastScrollPosition(captureScrollPosition());
     setEditingItem(item);
   };
 
-  const handleEditItemSaved = async () => {
-    const previousScroll = lastScrollPosition();
-    await refetch();
-    await refetchBags();
-    if (previousScroll !== null) {
-      restoreScrollPosition(previousScroll);
-      setLastScrollPosition(null);
+  const handleEditItemSaved = async (updatedItem?: TripItem) => {
+    // If we got the updated item back, update store directly (no refetch needed)
+    if (updatedItem) {
+      updateItemInStore(updatedItem.id, updatedItem);
+    } else {
+      // Fallback: refetch if we don't have the updated data
+      await refetch();
     }
+    await refetchBags();
+  };
+
+  const handleEditItemDeleted = (deletedItemId: string, movedItemIds?: string[]) => {
+    // If items were moved out of a container, update them first (before deleting container)
+    if (movedItemIds && movedItemIds.length > 0) {
+      const deletedItem = items()?.find((i) => i.id === deletedItemId);
+      const inheritedBagId = deletedItem?.bag_id || null;
+      updateItemsInStore(movedItemIds, {
+        container_item_id: null,
+        bag_id: inheritedBagId,
+      });
+    }
+
+    // Remove the deleted item from store
+    deleteItemsFromStore([deletedItemId]);
   };
 
   // Open add modals with pre-selected bag or container
@@ -281,8 +336,8 @@ export function PackingPage(props: PackingPageProps) {
     const itemsToUpdate = Array.from(selectedItems());
     if (itemsToUpdate.length === 0) return;
 
-    // Capture scroll position before update
-    const scrollY = captureScrollPosition();
+    // Optimistic update using store - no scroll disruption
+    updateItemsInStore(itemsToUpdate, { bag_id: bagId, container_item_id: null });
 
     try {
       await Promise.all(
@@ -296,14 +351,11 @@ export function PackingPage(props: PackingPageProps) {
       );
 
       showToast('success', `Assigned ${itemsToUpdate.length} items to bag`);
-      await refetch();
       setSelectMode(false);
       setSelectedItems(new Set<string>());
-
-      // Restore scroll position after refetch and re-render
-      restoreScrollPosition(scrollY);
     } catch (error) {
       showToast('error', 'Failed to assign items');
+      refetch(); // Revert on error
     }
   };
 
@@ -321,8 +373,8 @@ export function PackingPage(props: PackingPageProps) {
       return;
     }
 
-    // Capture scroll position before update
-    const scrollY = captureScrollPosition();
+    // Optimistic update using store - no scroll disruption
+    updateItemsInStore(itemsToUpdate, { container_item_id: containerId, bag_id: null });
 
     try {
       await Promise.all(
@@ -339,14 +391,11 @@ export function PackingPage(props: PackingPageProps) {
         ? currentItems.find((item) => item.id === containerId)?.name || 'container'
         : 'no container';
       showToast('success', `Assigned ${itemsToUpdate.length} items to ${containerName}`);
-      await refetch();
       setSelectMode(false);
       setSelectedItems(new Set<string>());
-
-      // Restore scroll position after refetch and re-render
-      restoreScrollPosition(scrollY);
     } catch (error) {
       showToast('error', 'Failed to assign items to container');
+      refetch(); // Revert on error
     }
   };
 
@@ -358,8 +407,8 @@ export function PackingPage(props: PackingPageProps) {
       ? categories()?.find((cat) => cat.id === categoryId)?.name || null
       : null;
 
-    // Capture scroll position before update
-    const scrollY = captureScrollPosition();
+    // Optimistic update using store - no scroll disruption
+    updateItemsInStore(itemsToUpdate, { category_name: categoryName });
 
     try {
       await Promise.all(
@@ -375,14 +424,11 @@ export function PackingPage(props: PackingPageProps) {
         'success',
         `Assigned ${itemsToUpdate.length} items to ${categoryName || 'no category'}`
       );
-      await refetch();
       setSelectMode(false);
       setSelectedItems(new Set<string>());
-
-      // Restore scroll position after refetch and re-render
-      restoreScrollPosition(scrollY);
     } catch (error) {
       showToast('error', 'Failed to assign items to category');
+      refetch(); // Revert on error
     }
   };
 
@@ -390,8 +436,8 @@ export function PackingPage(props: PackingPageProps) {
     const itemsToDelete = Array.from(selectedItems());
     if (itemsToDelete.length === 0) return;
 
-    // Capture scroll position before update
-    const scrollY = captureScrollPosition();
+    // Optimistic delete using store - no scroll disruption
+    deleteItemsFromStore(itemsToDelete);
 
     try {
       await Promise.all(
@@ -403,14 +449,11 @@ export function PackingPage(props: PackingPageProps) {
       );
 
       showToast('success', `Deleted ${itemsToDelete.length} items`);
-      await refetch();
       setSelectMode(false);
       setSelectedItems(new Set<string>());
-
-      // Restore scroll position after refetch and re-render
-      restoreScrollPosition(scrollY);
     } catch (error) {
       showToast('error', 'Failed to delete items');
+      refetch(); // Revert on error
     }
   };
 
@@ -490,10 +533,8 @@ export function PackingPage(props: PackingPageProps) {
     const previousContainerId = item.container_item_id;
     const itemName = item.name;
 
-    // Optimistic update
-    mutate((prev) =>
-      prev?.map((i) => (i.id === itemId ? { ...i, bag_id: bagId, container_item_id: null } : i))
-    );
+    // Optimistic update using store - no scroll disruption
+    updateItemInStore(itemId, { bag_id: bagId, container_item_id: null });
 
     const response = await api.patch(endpoints.tripItems(props.tripId), {
       id: itemId,
@@ -503,21 +544,19 @@ export function PackingPage(props: PackingPageProps) {
 
     if (!response.success) {
       showToast('error', response.error || 'Failed to move item');
-      refetch();
+      // Revert on error
+      updateItemInStore(itemId, { bag_id: previousBagId, container_item_id: previousContainerId });
     } else {
       // Show undo toast
       showToast('info', `Moved "${itemName}" to ${getBagName(bagId)}`, {
         action: {
           label: 'Undo',
           onClick: async () => {
-            // Optimistic undo
-            mutate((prev) =>
-              prev?.map((i) =>
-                i.id === itemId
-                  ? { ...i, bag_id: previousBagId, container_item_id: previousContainerId }
-                  : i
-              )
-            );
+            // Optimistic undo using store
+            updateItemInStore(itemId, {
+              bag_id: previousBagId,
+              container_item_id: previousContainerId,
+            });
             const undoResponse = await api.patch(endpoints.tripItems(props.tripId), {
               id: itemId,
               bag_id: previousBagId,
@@ -559,12 +598,8 @@ export function PackingPage(props: PackingPageProps) {
     const itemName = item.name;
     const containerName = container.name;
 
-    // Optimistic update - item goes into container, bag_id is cleared
-    mutate((prev) =>
-      prev?.map((i) =>
-        i.id === itemId ? { ...i, container_item_id: containerId, bag_id: null } : i
-      )
-    );
+    // Optimistic update using store - no scroll disruption
+    updateItemInStore(itemId, { container_item_id: containerId, bag_id: null });
 
     const response = await api.patch(endpoints.tripItems(props.tripId), {
       id: itemId,
@@ -574,21 +609,19 @@ export function PackingPage(props: PackingPageProps) {
 
     if (!response.success) {
       showToast('error', response.error || 'Failed to move item');
-      refetch();
+      // Revert on error
+      updateItemInStore(itemId, { container_item_id: previousContainerId, bag_id: previousBagId });
     } else {
       // Show undo toast
       showToast('info', `Moved "${itemName}" to ${containerName}`, {
         action: {
           label: 'Undo',
           onClick: async () => {
-            // Optimistic undo
-            mutate((prev) =>
-              prev?.map((i) =>
-                i.id === itemId
-                  ? { ...i, container_item_id: previousContainerId, bag_id: previousBagId }
-                  : i
-              )
-            );
+            // Optimistic undo using store
+            updateItemInStore(itemId, {
+              container_item_id: previousContainerId,
+              bag_id: previousBagId,
+            });
             const undoResponse = await api.patch(endpoints.tripItems(props.tripId), {
               id: itemId,
               container_item_id: previousContainerId,
@@ -735,9 +768,9 @@ export function PackingPage(props: PackingPageProps) {
       {/* Packing List - scrollable area */}
       <main class="flex-1 overflow-y-auto">
         <div class="container mx-auto px-4 py-6 pb-20 md:px-3 md:py-3 md:pb-16">
-          <Show when={!items.loading} fallback={<LoadingSpinner text="Loading items..." />}>
+          <Show when={!itemsState.loading} fallback={<LoadingSpinner text="Loading items..." />}>
             <Show
-              when={!items.error}
+              when={!itemsState.error}
               fallback={
                 <EmptyState
                   icon="⚠️"
@@ -847,9 +880,9 @@ export function PackingPage(props: PackingPageProps) {
           bags={bags()}
           onClose={() => {
             setEditingItem(null);
-            setLastScrollPosition(null);
           }}
           onSaved={handleEditItemSaved}
+          onDeleted={handleEditItemDeleted}
         />
       </Show>
 
