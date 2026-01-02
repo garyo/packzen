@@ -131,6 +131,7 @@ interface PackingListCategoryViewProps {
   categories: Accessor<Category[] | undefined>;
   selectMode: Accessor<boolean>;
   selectedItems: Accessor<Set<string>>;
+  showUnpackedOnly?: Accessor<boolean>;
   onTogglePacked: (item: TripItem) => void;
   onEditItem: (item: TripItem) => void;
   onToggleItemSelection: (itemId: string) => void;
@@ -291,14 +292,13 @@ export function PackingListCategoryView(props: PackingListCategoryViewProps) {
             const categoryContainers = () =>
               itemsByCategory().containerGrouped.get(category) || new Map();
 
-            const totalBagItems = () =>
-              Array.from(categoryBags().values()).reduce((sum, items) => sum + items.length, 0);
-            const totalContainerItems = () =>
-              Array.from(categoryContainers().values()).reduce(
-                (sum, items) => sum + items.length,
-                0
-              );
-            const totalItems = () => totalBagItems() + totalContainerItems();
+            const allCategoryItems = () => [
+              ...Array.from(categoryBags().values()).flat(),
+              ...Array.from(categoryContainers().values()).flat(),
+            ];
+            const totalItems = () => allCategoryItems().length;
+            const packedItemsCount = () =>
+              allCategoryItems().filter((item) => item.is_packed).length;
 
             // Sort bags alphabetically within category
             const sortedBags = () => {
@@ -336,135 +336,227 @@ export function PackingListCategoryView(props: PackingListCategoryViewProps) {
                     <span class="text-sm text-gray-500 md:text-xs">({totalItems()})</span>
                   </div>
 
-                  {/* Bag sections */}
-                  <For each={sortedBags()}>
-                    {([bagId, bagItems]) => {
-                      const bag = () => itemsByCategory().allBags.find((b) => b.id === bagId);
-                      // Sort items alphabetically by name
-                      const sortedItems = [...bagItems].sort((a, b) =>
-                        a.name.localeCompare(b.name)
-                      );
-                      return (
-                        <DroppableBagSection
-                          bagId={bagId}
-                          categoryName={category}
-                          isValidDrop={() => isValidDropTarget(category)}
-                        >
-                          <h3 class="mb-2 flex items-center gap-1.5 px-1 text-sm font-medium text-gray-600 md:mb-1 md:text-xs">
-                            <Show
-                              when={bag()?.id !== null}
-                              fallback={<span class="text-base md:text-sm">👕</span>}
-                            >
-                              <div
-                                class={`h-2.5 w-2.5 rounded-full border border-gray-300 md:h-2 md:w-2 ${getBagColorClass(bag()?.color)}`}
-                                style={getBagColorStyle(bag()?.color)}
-                              />
-                            </Show>
-                            {bag()?.name || 'No bag'}
-                          </h3>
-                          <div
-                            class="grid gap-2 md:gap-1.5"
-                            style="grid-template-columns: repeat(auto-fill, minmax(320px, 400px))"
-                          >
-                            <For each={sortedItems}>
-                              {(item) => {
-                                // All items are now draggable (including those in containers)
-                                const canDrag = () => isDragEnabled();
-                                return (
-                                  <DraggableItem
-                                    item={item}
-                                    categoryName={category}
-                                    enabled={canDrag()}
-                                  >
-                                    {(dragProps) => (
-                                      <PackingItemCard
-                                        item={item}
-                                        selectMode={props.selectMode()}
-                                        isSelected={props.selectedItems().has(item.id)}
-                                        bag={bag()}
-                                        showBagInfo={true}
-                                        onTogglePacked={() => props.onTogglePacked(item)}
-                                        onEdit={() => props.onEditItem(item)}
-                                        onToggleSelection={() =>
-                                          props.onToggleItemSelection(item.id)
-                                        }
-                                        dragActivators={dragProps.dragActivators}
-                                        isDragging={dragProps.isDragging}
-                                      />
-                                    )}
-                                  </DraggableItem>
-                                );
-                              }}
-                            </For>
-                          </div>
-                        </DroppableBagSection>
-                      );
-                    }}
-                  </For>
+                  {/* Show "All packed" summary if filtering and everything is packed */}
+                  <Show
+                    when={
+                      props.showUnpackedOnly?.() &&
+                      packedItemsCount() === totalItems() &&
+                      totalItems() > 0
+                    }
+                  >
+                    <div class="flex items-center gap-2 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">
+                      <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M5 13l4 4L19 7"
+                        />
+                      </svg>
+                      All {totalItems()} items packed
+                    </div>
+                  </Show>
 
-                  {/* Container sections */}
-                  <For each={sortedContainers()}>
-                    {([containerId, containerItems]) => {
-                      const container = () =>
-                        itemsByCategory().containers.find((c) => c.id === containerId);
-                      const containerBag = () => {
-                        const cont = container();
-                        if (!cont?.bag_id) return null;
-                        return itemsByCategory().allBags.find((b) => b.id === cont.bag_id);
-                      };
-                      const containerIcon = () => {
-                        const cont = container();
-                        return cont?.category_name ? getCategoryIcon(cont.category_name) : '📦';
-                      };
-                      // Sort items alphabetically by name
-                      const sortedItems = [...containerItems].sort((a, b) =>
-                        a.name.localeCompare(b.name)
-                      );
-                      return (
-                        <DroppableContainerSection
-                          containerId={containerId}
-                          categoryName={category}
-                          isValidDrop={() => isValidDropTarget(category)}
-                        >
-                          <h3 class="mb-2 flex items-center gap-1.5 px-1 text-sm font-medium text-blue-700 md:mb-1 md:text-xs">
-                            <span class="text-base md:text-sm">{containerIcon()}</span>
-                            {container()?.name || 'Container'}
-                            <Show when={containerBag()}>
-                              <span class="text-xs text-gray-500">in {containerBag()!.name}</span>
-                            </Show>
-                          </h3>
-                          <div
-                            class="grid gap-2 md:gap-1.5"
-                            style="grid-template-columns: repeat(auto-fill, minmax(320px, 400px))"
+                  {/* Bag and container sections (filtered if showUnpackedOnly) */}
+                  <Show when={!props.showUnpackedOnly?.() || packedItemsCount() < totalItems()}>
+                    {/* Bag sections */}
+                    <For each={sortedBags()}>
+                      {([bagId, bagItems]) => {
+                        const bag = () => itemsByCategory().allBags.find((b) => b.id === bagId);
+                        // Sort items alphabetically by name
+                        const sortedItems = [...bagItems].sort((a, b) =>
+                          a.name.localeCompare(b.name)
+                        );
+                        const unpackedItems = () => sortedItems.filter((item) => !item.is_packed);
+                        const packedCount = () =>
+                          sortedItems.filter((item) => item.is_packed).length;
+                        const itemsToShow = () =>
+                          props.showUnpackedOnly?.() ? unpackedItems() : sortedItems;
+
+                        // Skip bag section if filtering and no unpacked items (will be handled by category-level "all packed")
+                        return (
+                          <Show
+                            when={
+                              itemsToShow().length > 0 ||
+                              (props.showUnpackedOnly?.() && packedCount() > 0)
+                            }
                           >
-                            <For each={sortedItems}>
-                              {(item) => (
-                                <DraggableItem
-                                  item={item}
-                                  categoryName={category}
-                                  enabled={isDragEnabled()}
+                            <DroppableBagSection
+                              bagId={bagId}
+                              categoryName={category}
+                              isValidDrop={() => isValidDropTarget(category)}
+                            >
+                              <h3 class="mb-2 flex items-center gap-1.5 px-1 text-sm font-medium text-gray-600 md:mb-1 md:text-xs">
+                                <Show
+                                  when={bag()?.id !== null}
+                                  fallback={<span class="text-base md:text-sm">👕</span>}
                                 >
-                                  {(dragProps) => (
-                                    <PackingItemCard
+                                  <div
+                                    class={`h-2.5 w-2.5 rounded-full border border-gray-300 md:h-2 md:w-2 ${getBagColorClass(bag()?.color)}`}
+                                    style={getBagColorStyle(bag()?.color)}
+                                  />
+                                </Show>
+                                {bag()?.name || 'No bag'}
+                              </h3>
+                              <div
+                                class="grid gap-2 md:gap-1.5"
+                                style="grid-template-columns: repeat(auto-fill, minmax(320px, 400px))"
+                              >
+                                <For each={itemsToShow()}>
+                                  {(item) => {
+                                    const canDrag = () => isDragEnabled();
+                                    return (
+                                      <DraggableItem
+                                        item={item}
+                                        categoryName={category}
+                                        enabled={canDrag()}
+                                      >
+                                        {(dragProps) => (
+                                          <PackingItemCard
+                                            item={item}
+                                            selectMode={props.selectMode()}
+                                            isSelected={props.selectedItems().has(item.id)}
+                                            bag={bag()}
+                                            showBagInfo={true}
+                                            onTogglePacked={() => props.onTogglePacked(item)}
+                                            onEdit={() => props.onEditItem(item)}
+                                            onToggleSelection={() =>
+                                              props.onToggleItemSelection(item.id)
+                                            }
+                                            dragActivators={dragProps.dragActivators}
+                                            isDragging={dragProps.isDragging}
+                                          />
+                                        )}
+                                      </DraggableItem>
+                                    );
+                                  }}
+                                </For>
+                                {/* Collapsed packed items row */}
+                                <Show when={props.showUnpackedOnly?.() && packedCount() > 0}>
+                                  <div class="flex items-center gap-2 rounded-lg bg-gray-100 px-3 py-2 text-sm text-gray-500">
+                                    <svg
+                                      class="h-4 w-4 text-green-600"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      stroke="currentColor"
+                                    >
+                                      <path
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        stroke-width="2"
+                                        d="M5 13l4 4L19 7"
+                                      />
+                                    </svg>
+                                    {packedCount()} packed
+                                  </div>
+                                </Show>
+                              </div>
+                            </DroppableBagSection>
+                          </Show>
+                        );
+                      }}
+                    </For>
+
+                    {/* Container sections */}
+                    <For each={sortedContainers()}>
+                      {([containerId, containerItems]) => {
+                        const container = () =>
+                          itemsByCategory().containers.find((c) => c.id === containerId);
+                        const containerBag = () => {
+                          const cont = container();
+                          if (!cont?.bag_id) return null;
+                          return itemsByCategory().allBags.find((b) => b.id === cont.bag_id);
+                        };
+                        const containerIcon = () => {
+                          const cont = container();
+                          return cont?.category_name ? getCategoryIcon(cont.category_name) : '📦';
+                        };
+                        // Sort items alphabetically by name
+                        const sortedItems = [...containerItems].sort((a, b) =>
+                          a.name.localeCompare(b.name)
+                        );
+                        const unpackedItems = () => sortedItems.filter((item) => !item.is_packed);
+                        const packedCount = () =>
+                          sortedItems.filter((item) => item.is_packed).length;
+                        const itemsToShow = () =>
+                          props.showUnpackedOnly?.() ? unpackedItems() : sortedItems;
+
+                        return (
+                          <Show
+                            when={
+                              itemsToShow().length > 0 ||
+                              (props.showUnpackedOnly?.() && packedCount() > 0)
+                            }
+                          >
+                            <DroppableContainerSection
+                              containerId={containerId}
+                              categoryName={category}
+                              isValidDrop={() => isValidDropTarget(category)}
+                            >
+                              <h3 class="mb-2 flex items-center gap-1.5 px-1 text-sm font-medium text-blue-700 md:mb-1 md:text-xs">
+                                <span class="text-base md:text-sm">{containerIcon()}</span>
+                                {container()?.name || 'Container'}
+                                <Show when={containerBag()}>
+                                  <span class="text-xs text-gray-500">
+                                    in {containerBag()!.name}
+                                  </span>
+                                </Show>
+                              </h3>
+                              <div
+                                class="grid gap-2 md:gap-1.5"
+                                style="grid-template-columns: repeat(auto-fill, minmax(320px, 400px))"
+                              >
+                                <For each={itemsToShow()}>
+                                  {(item) => (
+                                    <DraggableItem
                                       item={item}
-                                      selectMode={props.selectMode()}
-                                      isSelected={props.selectedItems().has(item.id)}
-                                      showBagInfo={false}
-                                      onTogglePacked={() => props.onTogglePacked(item)}
-                                      onEdit={() => props.onEditItem(item)}
-                                      onToggleSelection={() => props.onToggleItemSelection(item.id)}
-                                      dragActivators={dragProps.dragActivators}
-                                      isDragging={dragProps.isDragging}
-                                    />
+                                      categoryName={category}
+                                      enabled={isDragEnabled()}
+                                    >
+                                      {(dragProps) => (
+                                        <PackingItemCard
+                                          item={item}
+                                          selectMode={props.selectMode()}
+                                          isSelected={props.selectedItems().has(item.id)}
+                                          showBagInfo={false}
+                                          onTogglePacked={() => props.onTogglePacked(item)}
+                                          onEdit={() => props.onEditItem(item)}
+                                          onToggleSelection={() =>
+                                            props.onToggleItemSelection(item.id)
+                                          }
+                                          dragActivators={dragProps.dragActivators}
+                                          isDragging={dragProps.isDragging}
+                                        />
+                                      )}
+                                    </DraggableItem>
                                   )}
-                                </DraggableItem>
-                              )}
-                            </For>
-                          </div>
-                        </DroppableContainerSection>
-                      );
-                    }}
-                  </For>
+                                </For>
+                                {/* Collapsed packed items row */}
+                                <Show when={props.showUnpackedOnly?.() && packedCount() > 0}>
+                                  <div class="flex items-center gap-2 rounded-lg bg-gray-100 px-3 py-2 text-sm text-gray-500">
+                                    <svg
+                                      class="h-4 w-4 text-green-600"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      stroke="currentColor"
+                                    >
+                                      <path
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        stroke-width="2"
+                                        d="M5 13l4 4L19 7"
+                                      />
+                                    </svg>
+                                    {packedCount()} packed
+                                  </div>
+                                </Show>
+                              </div>
+                            </DroppableContainerSection>
+                          </Show>
+                        );
+                      }}
+                    </For>
+                  </Show>
                 </div>
               </Show>
             );

@@ -14,11 +14,14 @@ interface PackingPageHeaderProps {
   trip: Accessor<Trip | null | undefined>;
   packedCount: Accessor<number>;
   totalCount: Accessor<number>;
+  unpackedCount: Accessor<number>;
   visibleItemCount: Accessor<number>;
   progress: Accessor<number>;
   selectMode: Accessor<boolean>;
   sortBy: Accessor<'bag' | 'category'>;
   viewMode: Accessor<'pack' | 'add'>;
+  showUnpackedOnly: Accessor<boolean>;
+  onToggleShowUnpackedOnly: () => void;
   onToggleSelectMode: () => void;
   onToggleSortBy: () => void;
   onToggleViewMode: () => void;
@@ -180,9 +183,34 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
                   </svg>
                 </button>
               </div>
-              <p class="text-xs text-gray-600">
-                {props.packedCount()} of {props.totalCount()} packed
-              </p>
+              <Show
+                when={props.showUnpackedOnly()}
+                fallback={
+                  <p class="text-xs text-gray-600">
+                    {props.packedCount()} of {props.totalCount()} packed
+                    <Show when={props.unpackedCount() > 0 && props.viewMode() === 'pack'}>
+                      {' · '}
+                      <button
+                        onClick={props.onToggleShowUnpackedOnly}
+                        class="text-blue-600 hover:text-blue-800 hover:underline"
+                        title="Click to show only unpacked items"
+                      >
+                        {props.unpackedCount()} left to pack
+                      </button>
+                    </Show>
+                  </p>
+                }
+              >
+                <p class="text-xs">
+                  <button
+                    onClick={props.onToggleShowUnpackedOnly}
+                    class="rounded bg-blue-100 px-1.5 py-0.5 text-blue-700 hover:bg-blue-200"
+                    title="Click to show all items"
+                  >
+                    Showing {props.unpackedCount()} unpacked ✕
+                  </button>
+                </p>
+              </Show>
             </div>
           </div>
 

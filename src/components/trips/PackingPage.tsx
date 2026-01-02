@@ -56,6 +56,7 @@ export function PackingPage(props: PackingPageProps) {
   const [showEditTrip, setShowEditTrip] = createSignal(false);
   const [sortBy, setSortBy] = createSignal<'bag' | 'category'>('bag');
   const [viewMode, setViewMode] = createSignal<'pack' | 'add'>('pack');
+  const [showUnpackedOnly, setShowUnpackedOnly] = createSignal(false);
   const [searchQuery, setSearchQuery] = createSignal('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = createSignal('');
   const [pendingScrollItemId, setPendingScrollItemId] = createSignal<string | null>(null);
@@ -931,6 +932,7 @@ export function PackingPage(props: PackingPageProps) {
 
   const packedCount = () => items()?.filter((i) => i.is_packed).length || 0;
   const totalCount = () => items()?.length || 0;
+  const unpackedCount = () => totalCount() - packedCount();
   const progress = () => getPackingProgress(packedCount(), totalCount());
 
   // Get available containers for select mode
@@ -947,9 +949,12 @@ export function PackingPage(props: PackingPageProps) {
         trip={trip}
         packedCount={packedCount}
         totalCount={totalCount}
+        unpackedCount={unpackedCount}
         progress={progress}
         selectMode={selectMode}
         sortBy={sortBy}
+        showUnpackedOnly={showUnpackedOnly}
+        onToggleShowUnpackedOnly={() => setShowUnpackedOnly(!showUnpackedOnly())}
         onToggleSelectMode={toggleSelectMode}
         onToggleSortBy={() => setSortBy(sortBy() === 'bag' ? 'category' : 'bag')}
         onAddItem={handleAddItem}
@@ -1031,6 +1036,7 @@ export function PackingPage(props: PackingPageProps) {
                           categories={categories}
                           selectMode={selectMode}
                           selectedItems={selectedItems}
+                          showUnpackedOnly={showUnpackedOnly}
                           onTogglePacked={handleTogglePacked}
                           onEditItem={openEditItem}
                           onToggleItemSelection={toggleItemSelection}
@@ -1045,6 +1051,7 @@ export function PackingPage(props: PackingPageProps) {
                         categories={categories}
                         selectMode={selectMode}
                         selectedItems={selectedItems}
+                        showUnpackedOnly={showUnpackedOnly}
                         onTogglePacked={handleTogglePacked}
                         onEditItem={openEditItem}
                         onToggleItemSelection={toggleItemSelection}
