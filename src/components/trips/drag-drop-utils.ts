@@ -129,87 +129,21 @@ export const liveRectCollision = (
   return null;
 };
 
-/**
- * Auto-scroll when dragging near edges of scroll container.
- * Works with the main content area as the scroll container.
- */
-export function useAutoScroll() {
-  const EDGE_THRESHOLD = 60; // pixels from edge to start scrolling
-  const MAX_SCROLL_SPEED = 15; // pixels per frame at max intensity
-
-  let rafId: number | null = null;
-  let pointerY = -1;
-
-  const updatePointerPosition = (e: PointerEvent | TouchEvent) => {
-    if ('touches' in e && e.touches.length > 0) {
-      pointerY = e.touches[0].clientY;
-    } else if ('clientY' in e) {
-      pointerY = e.clientY;
-    }
-  };
-
-  const scrollLoop = () => {
-    // Find the scroll container (main element with overflow-y-auto)
-    const scrollContainer = document.querySelector('main.overflow-y-auto') as HTMLElement | null;
-    if (!scrollContainer) {
-      rafId = requestAnimationFrame(scrollLoop);
-      return;
-    }
-
-    const rect = scrollContainer.getBoundingClientRect();
-    const containerTop = rect.top;
-    const containerBottom = rect.bottom;
-
-    // Calculate scroll zones relative to the scroll container
-    const topZoneEnd = containerTop + EDGE_THRESHOLD;
-    const bottomZoneStart = containerBottom - EDGE_THRESHOLD;
-
-    if (pointerY >= 0 && pointerY >= containerTop && pointerY < topZoneEnd) {
-      // Near top of scroll container - scroll up
-      const distanceFromTop = pointerY - containerTop;
-      const intensity = 1 - distanceFromTop / EDGE_THRESHOLD;
-      const speed = Math.max(2, intensity * MAX_SCROLL_SPEED);
-      scrollContainer.scrollBy({ left: 0, top: -speed, behavior: 'instant' });
-    } else if (pointerY >= 0 && pointerY > bottomZoneStart && pointerY <= containerBottom) {
-      // Near bottom of scroll container - scroll down
-      const distanceFromBottom = containerBottom - pointerY;
-      const intensity = 1 - distanceFromBottom / EDGE_THRESHOLD;
-      const speed = Math.max(2, intensity * MAX_SCROLL_SPEED);
-      scrollContainer.scrollBy({ left: 0, top: speed, behavior: 'instant' });
-    }
-
-    rafId = requestAnimationFrame(scrollLoop);
-  };
-
-  const start = () => {
-    pointerY = -1;
-    document.addEventListener('pointermove', updatePointerPosition);
-    document.addEventListener('touchmove', updatePointerPosition);
-    rafId = requestAnimationFrame(scrollLoop);
-  };
-
-  const stop = () => {
-    document.removeEventListener('pointermove', updatePointerPosition);
-    document.removeEventListener('touchmove', updatePointerPosition);
-    if (rafId !== null) {
-      cancelAnimationFrame(rafId);
-      rafId = null;
-    }
-  };
-
-  return { start, stop };
-}
+// Auto-scroll configuration constants
+const AUTO_SCROLL_EDGE_THRESHOLD = 60; // pixels from edge to start scrolling
+const AUTO_SCROLL_MAX_SPEED = 15; // pixels per frame at max intensity
+const AUTO_SCROLL_MIN_SPEED = 2; // minimum scroll speed
 
 /**
- * Auto-scroll for multi-panel layouts (like Add Mode).
- * Only scrolls the specified panel when the pointer is actually within
- * the panel's bounds (both horizontally and vertically).
- * @param getPanelRef - Getter function returning the scroll container element
+ * Shared auto-scroll implementation for drag operations.
+ * @param getContainer - Function returning the scroll container element
+ * @param options - Configuration options
+ * @param options.checkHorizontalBounds - If true, only scroll when pointer is within container's horizontal bounds
  */
-export function usePanelAutoScroll(getPanelRef: () => HTMLElement | undefined) {
-  const EDGE_THRESHOLD = 60;
-  const MAX_SCROLL_SPEED = 15;
-
+function createAutoScroll(
+  getContainer: () => HTMLElement | null | undefined,
+  options: { checkHorizontalBounds?: boolean } = {}
+) {
   let rafId: number | null = null;
   let pointerX = -1;
   let pointerY = -1;
@@ -225,37 +159,34 @@ export function usePanelAutoScroll(getPanelRef: () => HTMLElement | undefined) {
   };
 
   const scrollLoop = () => {
-    const scrollContainer = getPanelRef();
-    if (!scrollContainer || pointerX < 0 || pointerY < 0) {
+    const scrollContainer = getContainer();
+    if (!scrollContainer || pointerY < 0) {
       rafId = requestAnimationFrame(scrollLoop);
       return;
     }
 
     const rect = scrollContainer.getBoundingClientRect();
 
-    // Only scroll if pointer is within the panel's horizontal bounds
-    if (pointerX < rect.left || pointerX > rect.right) {
+    // Optionally check horizontal bounds (for multi-panel layouts)
+    if (options.checkHorizontalBounds && (pointerX < rect.left || pointerX > rect.right)) {
       rafId = requestAnimationFrame(scrollLoop);
       return;
     }
 
-    const containerTop = rect.top;
-    const containerBottom = rect.bottom;
+    const topZoneEnd = rect.top + AUTO_SCROLL_EDGE_THRESHOLD;
+    const bottomZoneStart = rect.bottom - AUTO_SCROLL_EDGE_THRESHOLD;
 
-    const topZoneEnd = containerTop + EDGE_THRESHOLD;
-    const bottomZoneStart = containerBottom - EDGE_THRESHOLD;
-
-    if (pointerY >= containerTop && pointerY < topZoneEnd) {
+    if (pointerY >= rect.top && pointerY < topZoneEnd) {
       // Near top - scroll up
-      const distanceFromTop = pointerY - containerTop;
-      const intensity = 1 - distanceFromTop / EDGE_THRESHOLD;
-      const speed = Math.max(2, intensity * MAX_SCROLL_SPEED);
+      const distanceFromTop = pointerY - rect.top;
+      const intensity = 1 - distanceFromTop / AUTO_SCROLL_EDGE_THRESHOLD;
+      const speed = Math.max(AUTO_SCROLL_MIN_SPEED, intensity * AUTO_SCROLL_MAX_SPEED);
       scrollContainer.scrollBy({ left: 0, top: -speed, behavior: 'instant' });
-    } else if (pointerY > bottomZoneStart && pointerY <= containerBottom) {
+    } else if (pointerY > bottomZoneStart && pointerY <= rect.bottom) {
       // Near bottom - scroll down
-      const distanceFromBottom = containerBottom - pointerY;
-      const intensity = 1 - distanceFromBottom / EDGE_THRESHOLD;
-      const speed = Math.max(2, intensity * MAX_SCROLL_SPEED);
+      const distanceFromBottom = rect.bottom - pointerY;
+      const intensity = 1 - distanceFromBottom / AUTO_SCROLL_EDGE_THRESHOLD;
+      const speed = Math.max(AUTO_SCROLL_MIN_SPEED, intensity * AUTO_SCROLL_MAX_SPEED);
       scrollContainer.scrollBy({ left: 0, top: speed, behavior: 'instant' });
     }
 
@@ -283,6 +214,26 @@ export function usePanelAutoScroll(getPanelRef: () => HTMLElement | undefined) {
 }
 
 /**
+ * Auto-scroll when dragging near edges of scroll container.
+ * Works with the main content area as the scroll container.
+ */
+export function useAutoScroll() {
+  return createAutoScroll(
+    () => document.querySelector('main.overflow-y-auto') as HTMLElement | null
+  );
+}
+
+/**
+ * Auto-scroll for multi-panel layouts (like Add Mode).
+ * Only scrolls the specified panel when the pointer is actually within
+ * the panel's bounds (both horizontally and vertically).
+ * @param getPanelRef - Getter function returning the scroll container element
+ */
+export function usePanelAutoScroll(getPanelRef: () => HTMLElement | undefined) {
+  return createAutoScroll(getPanelRef, { checkHorizontalBounds: true });
+}
+
+/**
  * ESC key handler to cancel drag operations.
  * Must be used inside a DragDropProvider.
  * Dispatches a synthetic pointerup event to fully end the drag in solid-dnd.
@@ -292,8 +243,10 @@ export function EscapeCancelHandler(props: { onCancel: () => void }) {
   useDragDropContext();
 
   onMount(() => {
+    let mounted = true;
+
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+      if (e.key === 'Escape' && mounted) {
         // First call the cancel handler to set our state
         props.onCancel();
 
@@ -309,7 +262,10 @@ export function EscapeCancelHandler(props: { onCancel: () => void }) {
       }
     };
     document.addEventListener('keydown', handleKeyDown);
-    onCleanup(() => document.removeEventListener('keydown', handleKeyDown));
+    onCleanup(() => {
+      mounted = false;
+      document.removeEventListener('keydown', handleKeyDown);
+    });
   });
 
   return null;

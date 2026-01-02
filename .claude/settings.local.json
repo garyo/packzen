@@ -31,7 +31,10 @@
       "Bash(git remote:*)",
       "WebFetch(domain:solid-dnd.com)",
       "WebFetch(domain:raw.githubusercontent.com)",
-      "WebFetch(domain:docs.dndkit.com)"
+      "WebFetch(domain:docs.dndkit.com)",
+      "Bash(git show:*)",
+      "Bash(bun test:*)",
+      "Bash(npm test:*)"
     ]
   }
 }

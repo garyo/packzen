@@ -358,6 +358,17 @@ export function PackingPage(props: PackingPageProps) {
     const itemsToUpdate = Array.from(selectedItems());
     if (itemsToUpdate.length === 0) return;
 
+    // Capture previous state for rollback
+    const previousStates = new Map(
+      itemsToUpdate.map((id) => {
+        const item = items()?.find((i) => i.id === id);
+        return [
+          id,
+          { bag_id: item?.bag_id ?? null, container_item_id: item?.container_item_id ?? null },
+        ];
+      })
+    );
+
     // Optimistic update using store - no scroll disruption
     updateItemsInStore(itemsToUpdate, { bag_id: bagId, container_item_id: null });
 
@@ -377,7 +388,10 @@ export function PackingPage(props: PackingPageProps) {
       setSelectedItems(new Set<string>());
     } catch (error) {
       showToast('error', 'Failed to assign items');
-      refetch(); // Revert on error
+      // Restore previous state instead of full refetch
+      previousStates.forEach((state, id) => {
+        updateItemInStore(id, state);
+      });
     }
   };
 
@@ -394,6 +408,17 @@ export function PackingPage(props: PackingPageProps) {
       showToast('error', 'Containers cannot be placed inside other containers');
       return;
     }
+
+    // Capture previous state for rollback
+    const previousStates = new Map(
+      itemsToUpdate.map((id) => {
+        const item = currentItems.find((i) => i.id === id);
+        return [
+          id,
+          { bag_id: item?.bag_id ?? null, container_item_id: item?.container_item_id ?? null },
+        ];
+      })
+    );
 
     // Optimistic update using store - no scroll disruption
     updateItemsInStore(itemsToUpdate, { container_item_id: containerId, bag_id: null });
@@ -417,7 +442,10 @@ export function PackingPage(props: PackingPageProps) {
       setSelectedItems(new Set<string>());
     } catch (error) {
       showToast('error', 'Failed to assign items to container');
-      refetch(); // Revert on error
+      // Restore previous state instead of full refetch
+      previousStates.forEach((state, id) => {
+        updateItemInStore(id, state);
+      });
     }
   };
 
@@ -428,6 +456,14 @@ export function PackingPage(props: PackingPageProps) {
     const categoryName = categoryId
       ? categories()?.find((cat) => cat.id === categoryId)?.name || null
       : null;
+
+    // Capture previous state for rollback
+    const previousCategories = new Map(
+      itemsToUpdate.map((id) => {
+        const item = items()?.find((i) => i.id === id);
+        return [id, item?.category_name ?? null];
+      })
+    );
 
     // Optimistic update using store - no scroll disruption
     updateItemsInStore(itemsToUpdate, { category_name: categoryName });
@@ -450,13 +486,19 @@ export function PackingPage(props: PackingPageProps) {
       setSelectedItems(new Set<string>());
     } catch (error) {
       showToast('error', 'Failed to assign items to category');
-      refetch(); // Revert on error
+      // Restore previous state instead of full refetch
+      previousCategories.forEach((prevCategoryName, id) => {
+        updateItemInStore(id, { category_name: prevCategoryName });
+      });
     }
   };
 
   const handleBatchDelete = async () => {
     const itemsToDelete = Array.from(selectedItems());
     if (itemsToDelete.length === 0) return;
+
+    // Capture deleted items for rollback
+    const deletedItems = items()?.filter((item) => selectedItems().has(item.id)) || [];
 
     // Optimistic delete using store - no scroll disruption
     deleteItemsFromStore(itemsToDelete);
@@ -475,7 +517,8 @@ export function PackingPage(props: PackingPageProps) {
       setSelectedItems(new Set<string>());
     } catch (error) {
       showToast('error', 'Failed to delete items');
-      refetch(); // Revert on error
+      // Restore deleted items instead of full refetch
+      deletedItems.forEach((item) => addItemToStore(item));
     }
   };
 
@@ -529,7 +572,8 @@ export function PackingPage(props: PackingPageProps) {
       showToast('success', `Unpacked ${packedItems.length} items`);
     } catch (error) {
       showToast('error', 'Failed to unpack items');
-      refetch(); // Revert on error
+      // Restore packed state instead of full refetch
+      updateItemsInStore(packedItemIds, { is_packed: true });
     }
   };
 

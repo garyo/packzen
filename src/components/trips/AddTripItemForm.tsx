@@ -404,9 +404,9 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
     }
   };
 
-  const handleAddAnother = (e: Event) => {
+  const handleAddAnother = async (e: Event) => {
     setKeepOpen(true);
-    handleSubmit(e);
+    await handleSubmit(e);
   };
 
   return (
