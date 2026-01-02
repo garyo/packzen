@@ -13,6 +13,7 @@ import { LoadingSpinner } from './ui/LoadingSpinner';
 import { Toast } from './ui/Toast';
 import { fetchWithErrorHandling } from '../lib/resource-helpers';
 import { DashboardStats } from './dashboard/DashboardStats';
+import { OngoingTripsList } from './dashboard/OngoingTripsList';
 import { UpcomingTripsList } from './dashboard/UpcomingTripsList';
 import { AboutModal } from './dashboard/AboutModal';
 import { UserMenu } from './dashboard/UserMenu';
@@ -132,6 +133,9 @@ export function DashboardPage() {
               <div class="space-y-8">
                 {/* Statistics */}
                 <DashboardStats trips={trips} masterItems={masterItems} categories={categories} />
+
+                {/* Ongoing Trips (only shows if there are any) */}
+                <OngoingTripsList trips={trips} onTripUpdated={() => refetchTrips()} />
 
                 {/* Upcoming Trips */}
                 <UpcomingTripsList trips={trips} onTripUpdated={() => refetchTrips()} />
