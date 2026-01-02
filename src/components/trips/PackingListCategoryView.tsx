@@ -372,8 +372,12 @@ export function PackingListCategoryView(props: PackingListCategoryViewProps) {
                           sortedItems.filter((item) => item.is_packed).length;
                         const itemsToShow = () =>
                           props.showUnpackedOnly?.() ? unpackedItems() : sortedItems;
+                        const allBagPacked = () =>
+                          props.showUnpackedOnly?.() &&
+                          itemsToShow().length === 0 &&
+                          packedCount() > 0;
 
-                        // Skip bag section if filtering and no unpacked items (will be handled by category-level "all packed")
+                        // Skip bag section if filtering and no items at all
                         return (
                           <Show
                             when={
@@ -397,45 +401,12 @@ export function PackingListCategoryView(props: PackingListCategoryViewProps) {
                                   />
                                 </Show>
                                 {bag()?.name || 'No bag'}
-                              </h3>
-                              <div
-                                class="grid gap-2 md:gap-1.5"
-                                style="grid-template-columns: repeat(auto-fill, minmax(320px, 400px))"
-                              >
-                                <For each={itemsToShow()}>
-                                  {(item) => {
-                                    const canDrag = () => isDragEnabled();
-                                    return (
-                                      <DraggableItem
-                                        item={item}
-                                        categoryName={category}
-                                        enabled={canDrag()}
-                                      >
-                                        {(dragProps) => (
-                                          <PackingItemCard
-                                            item={item}
-                                            selectMode={props.selectMode()}
-                                            isSelected={props.selectedItems().has(item.id)}
-                                            bag={bag()}
-                                            showBagInfo={true}
-                                            onTogglePacked={() => props.onTogglePacked(item)}
-                                            onEdit={() => props.onEditItem(item)}
-                                            onToggleSelection={() =>
-                                              props.onToggleItemSelection(item.id)
-                                            }
-                                            dragActivators={dragProps.dragActivators}
-                                            isDragging={dragProps.isDragging}
-                                          />
-                                        )}
-                                      </DraggableItem>
-                                    );
-                                  }}
-                                </For>
-                                {/* Collapsed packed items row */}
-                                <Show when={props.showUnpackedOnly?.() && packedCount() > 0}>
-                                  <div class="flex items-center gap-2 rounded-lg bg-gray-100 px-3 py-2 text-sm text-gray-500">
+                                {/* Inline packed count when all items in bag are packed */}
+                                <Show when={allBagPacked()}>
+                                  <span class="ml-1 flex items-center gap-1 text-gray-400">
+                                    ·
                                     <svg
-                                      class="h-4 w-4 text-green-600"
+                                      class="h-3 w-3 text-green-600"
                                       fill="none"
                                       viewBox="0 0 24 24"
                                       stroke="currentColor"
@@ -447,10 +418,71 @@ export function PackingListCategoryView(props: PackingListCategoryViewProps) {
                                         d="M5 13l4 4L19 7"
                                       />
                                     </svg>
-                                    {packedCount()} packed
-                                  </div>
+                                    <span class="text-gray-500">{packedCount()} packed</span>
+                                  </span>
                                 </Show>
-                              </div>
+                              </h3>
+                              <Show when={!allBagPacked()}>
+                                <div
+                                  class="grid gap-2 md:gap-1.5"
+                                  style="grid-template-columns: repeat(auto-fill, minmax(320px, 400px))"
+                                >
+                                  <For each={itemsToShow()}>
+                                    {(item) => {
+                                      const canDrag = () => isDragEnabled();
+                                      return (
+                                        <DraggableItem
+                                          item={item}
+                                          categoryName={category}
+                                          enabled={canDrag()}
+                                        >
+                                          {(dragProps) => (
+                                            <PackingItemCard
+                                              item={item}
+                                              selectMode={props.selectMode()}
+                                              isSelected={props.selectedItems().has(item.id)}
+                                              bag={bag()}
+                                              showBagInfo={true}
+                                              onTogglePacked={() => props.onTogglePacked(item)}
+                                              onEdit={() => props.onEditItem(item)}
+                                              onToggleSelection={() =>
+                                                props.onToggleItemSelection(item.id)
+                                              }
+                                              dragActivators={dragProps.dragActivators}
+                                              isDragging={dragProps.isDragging}
+                                            />
+                                          )}
+                                        </DraggableItem>
+                                      );
+                                    }}
+                                  </For>
+                                  {/* Collapsed packed items row - only when there are also unpacked items */}
+                                  <Show
+                                    when={
+                                      props.showUnpackedOnly?.() &&
+                                      packedCount() > 0 &&
+                                      itemsToShow().length > 0
+                                    }
+                                  >
+                                    <div class="flex items-center gap-2 rounded-lg bg-gray-100 px-3 py-2 text-sm text-gray-500">
+                                      <svg
+                                        class="h-4 w-4 text-green-600"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        stroke="currentColor"
+                                      >
+                                        <path
+                                          stroke-linecap="round"
+                                          stroke-linejoin="round"
+                                          stroke-width="2"
+                                          d="M5 13l4 4L19 7"
+                                        />
+                                      </svg>
+                                      {packedCount()} packed
+                                    </div>
+                                  </Show>
+                                </div>
+                              </Show>
                             </DroppableBagSection>
                           </Show>
                         );
@@ -480,6 +512,10 @@ export function PackingListCategoryView(props: PackingListCategoryViewProps) {
                           sortedItems.filter((item) => item.is_packed).length;
                         const itemsToShow = () =>
                           props.showUnpackedOnly?.() ? unpackedItems() : sortedItems;
+                        const allContainerPacked = () =>
+                          props.showUnpackedOnly?.() &&
+                          itemsToShow().length === 0 &&
+                          packedCount() > 0;
 
                         return (
                           <Show
@@ -501,41 +537,12 @@ export function PackingListCategoryView(props: PackingListCategoryViewProps) {
                                     in {containerBag()!.name}
                                   </span>
                                 </Show>
-                              </h3>
-                              <div
-                                class="grid gap-2 md:gap-1.5"
-                                style="grid-template-columns: repeat(auto-fill, minmax(320px, 400px))"
-                              >
-                                <For each={itemsToShow()}>
-                                  {(item) => (
-                                    <DraggableItem
-                                      item={item}
-                                      categoryName={category}
-                                      enabled={isDragEnabled()}
-                                    >
-                                      {(dragProps) => (
-                                        <PackingItemCard
-                                          item={item}
-                                          selectMode={props.selectMode()}
-                                          isSelected={props.selectedItems().has(item.id)}
-                                          showBagInfo={false}
-                                          onTogglePacked={() => props.onTogglePacked(item)}
-                                          onEdit={() => props.onEditItem(item)}
-                                          onToggleSelection={() =>
-                                            props.onToggleItemSelection(item.id)
-                                          }
-                                          dragActivators={dragProps.dragActivators}
-                                          isDragging={dragProps.isDragging}
-                                        />
-                                      )}
-                                    </DraggableItem>
-                                  )}
-                                </For>
-                                {/* Collapsed packed items row */}
-                                <Show when={props.showUnpackedOnly?.() && packedCount() > 0}>
-                                  <div class="flex items-center gap-2 rounded-lg bg-gray-100 px-3 py-2 text-sm text-gray-500">
+                                {/* Inline packed count when all items in container are packed */}
+                                <Show when={allContainerPacked()}>
+                                  <span class="ml-1 flex items-center gap-1 text-gray-400">
+                                    ·
                                     <svg
-                                      class="h-4 w-4 text-green-600"
+                                      class="h-3 w-3 text-green-600"
                                       fill="none"
                                       viewBox="0 0 24 24"
                                       stroke="currentColor"
@@ -547,10 +554,67 @@ export function PackingListCategoryView(props: PackingListCategoryViewProps) {
                                         d="M5 13l4 4L19 7"
                                       />
                                     </svg>
-                                    {packedCount()} packed
-                                  </div>
+                                    <span class="text-gray-500">{packedCount()} packed</span>
+                                  </span>
                                 </Show>
-                              </div>
+                              </h3>
+                              <Show when={!allContainerPacked()}>
+                                <div
+                                  class="grid gap-2 md:gap-1.5"
+                                  style="grid-template-columns: repeat(auto-fill, minmax(320px, 400px))"
+                                >
+                                  <For each={itemsToShow()}>
+                                    {(item) => (
+                                      <DraggableItem
+                                        item={item}
+                                        categoryName={category}
+                                        enabled={isDragEnabled()}
+                                      >
+                                        {(dragProps) => (
+                                          <PackingItemCard
+                                            item={item}
+                                            selectMode={props.selectMode()}
+                                            isSelected={props.selectedItems().has(item.id)}
+                                            showBagInfo={false}
+                                            onTogglePacked={() => props.onTogglePacked(item)}
+                                            onEdit={() => props.onEditItem(item)}
+                                            onToggleSelection={() =>
+                                              props.onToggleItemSelection(item.id)
+                                            }
+                                            dragActivators={dragProps.dragActivators}
+                                            isDragging={dragProps.isDragging}
+                                          />
+                                        )}
+                                      </DraggableItem>
+                                    )}
+                                  </For>
+                                  {/* Collapsed packed items row - only when there are also unpacked items */}
+                                  <Show
+                                    when={
+                                      props.showUnpackedOnly?.() &&
+                                      packedCount() > 0 &&
+                                      itemsToShow().length > 0
+                                    }
+                                  >
+                                    <div class="flex items-center gap-2 rounded-lg bg-gray-100 px-3 py-2 text-sm text-gray-500">
+                                      <svg
+                                        class="h-4 w-4 text-green-600"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        stroke="currentColor"
+                                      >
+                                        <path
+                                          stroke-linecap="round"
+                                          stroke-linejoin="round"
+                                          stroke-width="2"
+                                          d="M5 13l4 4L19 7"
+                                        />
+                                      </svg>
+                                      {packedCount()} packed
+                                    </div>
+                                  </Show>
+                                </div>
+                              </Show>
                             </DroppableContainerSection>
                           </Show>
                         );
