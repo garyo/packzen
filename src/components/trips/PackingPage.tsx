@@ -7,7 +7,7 @@ import {
   createEffect,
   onCleanup,
 } from 'solid-js';
-import { createStore, produce } from 'solid-js/store';
+import { createStore, produce, reconcile } from 'solid-js/store';
 import { authStore } from '../../stores/auth';
 import { api, endpoints } from '../../lib/api';
 import type {
@@ -89,6 +89,9 @@ export function PackingPage(props: PackingPageProps) {
   // Accessor for compatibility with existing code that uses items()
   const items = () => (itemsState.loading ? undefined : itemsState.data);
 
+  // Track last fetch time for debouncing (declared here, used by silentRefresh below)
+  let lastFetchTime = 0;
+
   // Fetch items from server and populate store
   const fetchItems = async () => {
     setItemsState('loading', true);
@@ -100,6 +103,7 @@ export function PackingPage(props: PackingPageProps) {
       );
       setItemsState('data', result);
       setItemsState('loading', false);
+      lastFetchTime = Date.now();
     } catch (e) {
       setItemsState('error', e instanceof Error ? e.message : 'Failed to load items');
       setItemsState('loading', false);
@@ -108,6 +112,36 @@ export function PackingPage(props: PackingPageProps) {
 
   // Alias for compatibility with existing refetch() calls
   const refetch = fetchItems;
+
+  // Silent refresh - updates data without showing loading state (for background sync)
+  const REFETCH_DEBOUNCE_MS = 5000; // Don't refetch if we just fetched within 5 seconds
+
+  const silentRefresh = async () => {
+    const now = Date.now();
+    if (now - lastFetchTime < REFETCH_DEBOUNCE_MS) return;
+    lastFetchTime = now;
+
+    try {
+      const result = await api.get<TripItem[]>(endpoints.tripItems(props.tripId));
+      if (result.success && result.data) {
+        // Use reconcile for efficient diffing - only updates changed items
+        setItemsState('data', reconcile(result.data));
+      }
+    } catch {
+      // Silent failure - don't disrupt the user
+    }
+  };
+
+  // Refresh data when tab becomes visible (handles multi-device sync)
+  createEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        silentRefresh();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    onCleanup(() => document.removeEventListener('visibilitychange', handleVisibilityChange));
+  });
 
   // Store mutation helpers - these provide fine-grained updates without re-rendering entire list
 
@@ -251,16 +285,24 @@ export function PackingPage(props: PackingPageProps) {
   });
 
   const handleTogglePacked = async (item: TripItem) => {
+    const newPackedState = !item.is_packed;
+
     // Optimistic update using store - fine-grained, no scroll disruption
-    updateItemInStore(item.id, { is_packed: !item.is_packed });
+    updateItemInStore(item.id, { is_packed: newPackedState });
 
-    const response = await api.patch(endpoints.tripItems(props.tripId), {
-      id: item.id,
-      is_packed: !item.is_packed,
-    });
+    try {
+      const response = await api.patch(endpoints.tripItems(props.tripId), {
+        id: item.id,
+        is_packed: newPackedState,
+      });
 
-    if (!response.success) {
-      showToast('error', response.error || 'Failed to update item');
+      if (!response.success) {
+        showToast('error', response.error || 'Failed to update item');
+        // Revert on error
+        updateItemInStore(item.id, { is_packed: item.is_packed });
+      }
+    } catch (error) {
+      showToast('error', 'Failed to update item');
       // Revert on error
       updateItemInStore(item.id, { is_packed: item.is_packed });
     }

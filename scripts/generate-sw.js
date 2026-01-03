@@ -83,8 +83,9 @@ self.addEventListener('activate', (event) => {
 
 // Fetch event - stale-while-revalidate strategy with timeout
 self.addEventListener('fetch', (event) => {
-  // Skip non-GET requests
+  // Pass through non-GET requests directly to network (PATCH, POST, DELETE, etc.)
   if (event.request.method !== 'GET') {
+    event.respondWith(fetch(event.request));
     return;
   }
 
