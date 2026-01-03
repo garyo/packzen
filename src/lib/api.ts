@@ -66,7 +66,6 @@ async function makeRequest<T>(
       method === 'POST' || method === 'PUT' || method === 'PATCH' || method === 'DELETE';
     const csrfTokenValue = needsCsrf ? await getCsrfToken() : null;
 
-    console.log('API Request:', options.method, url.toString());
     const response = await fetch(url.toString(), {
       ...options,
       credentials: 'same-origin',
@@ -77,7 +76,6 @@ async function makeRequest<T>(
         ...options.headers,
       },
     });
-    console.log('API Response:', response.status, response.ok);
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ error: response.statusText }));
