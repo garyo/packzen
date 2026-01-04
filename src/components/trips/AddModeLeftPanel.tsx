@@ -14,6 +14,7 @@ import {
   getCategoriesForTripTypes,
 } from '../../lib/built-in-items';
 import type { SourceItemDragData } from './AddModeView';
+import { TrashIcon, PlusIcon } from '../ui/Icons';
 
 interface AddModeLeftPanelProps {
   activeTab: Accessor<'my-items' | 'built-in'>;
@@ -65,14 +66,7 @@ function DraggableSourceItem(props: DraggableItemProps) {
               onKeyDown={(e) => e.key === 'Enter' && props.onRemove!(props.tripItemId!)}
               title="Remove from trip"
             >
-              <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                />
-              </svg>
+              <TrashIcon class="h-4 w-4" />
             </div>
           ) : (
             <div class="h-6 w-6" /> // Spacer when no remove handler
@@ -332,19 +326,7 @@ export function AddModeLeftPanel(props: AddModeLeftPanelProps) {
             class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-blue-600 text-white hover:bg-blue-700 md:h-9 md:w-9"
             title="Add new item"
           >
-            <svg
-              class="h-4 w-4 md:h-5 md:w-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M12 4v16m8-8H4"
-              />
-            </svg>
+            <PlusIcon class="h-4 w-4 md:h-5 md:w-5" />
           </button>
         </Show>
       </div>

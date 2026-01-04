@@ -30,6 +30,7 @@ import type { TripItem, Bag, Category } from '../../lib/types';
 import { PackingItemCard } from './PackingItemCard';
 import { getBagColorClass, getBagColorStyle } from '../../lib/color-utils';
 import { liveRectCollision, useAutoScroll, EscapeCancelHandler } from './drag-drop-utils';
+import { CheckIcon } from '../ui/Icons';
 
 // Drop zone type identifiers
 // Simplified: D&D only moves items between locations (bags, containers), never changes category
@@ -604,14 +605,7 @@ export function PackingListBagView(props: PackingListBagViewProps) {
                     }
                   >
                     <div class="flex items-center gap-2 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">
-                      <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                          stroke-width="2"
-                          d="M5 13l4 4L19 7"
-                        />
-                      </svg>
+                      <CheckIcon class="h-4 w-4" />
                       All {totalItems()} items packed
                     </div>
                   </Show>
@@ -646,19 +640,7 @@ export function PackingListBagView(props: PackingListBagViewProps) {
                                 <Show when={allCategoryPacked()}>
                                   <span class="ml-1 flex items-center gap-1 text-gray-400">
                                     ·
-                                    <svg
-                                      class="h-3 w-3 text-green-600"
-                                      fill="none"
-                                      viewBox="0 0 24 24"
-                                      stroke="currentColor"
-                                    >
-                                      <path
-                                        stroke-linecap="round"
-                                        stroke-linejoin="round"
-                                        stroke-width="2"
-                                        d="M5 13l4 4L19 7"
-                                      />
-                                    </svg>
+                                    <CheckIcon class="h-3 w-3 text-green-600" />
                                     <span class="text-gray-500">{packedCount()} packed</span>
                                   </span>
                                 </Show>
@@ -722,19 +704,7 @@ export function PackingListBagView(props: PackingListBagViewProps) {
                                     }
                                   >
                                     <div class="flex items-center gap-2 rounded-lg bg-gray-100 px-3 py-2 text-sm text-gray-500">
-                                      <svg
-                                        class="h-4 w-4 text-green-600"
-                                        fill="none"
-                                        viewBox="0 0 24 24"
-                                        stroke="currentColor"
-                                      >
-                                        <path
-                                          stroke-linecap="round"
-                                          stroke-linejoin="round"
-                                          stroke-width="2"
-                                          d="M5 13l4 4L19 7"
-                                        />
-                                      </svg>
+                                      <CheckIcon class="h-4 w-4 text-green-600" />
                                       {packedCount()} packed
                                     </div>
                                   </Show>
@@ -896,19 +866,7 @@ export function PackingListBagView(props: PackingListBagViewProps) {
                                           }
                                         >
                                           <div class="flex items-center gap-2 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">
-                                            <svg
-                                              class="h-4 w-4"
-                                              fill="none"
-                                              viewBox="0 0 24 24"
-                                              stroke="currentColor"
-                                            >
-                                              <path
-                                                stroke-linecap="round"
-                                                stroke-linejoin="round"
-                                                stroke-width="2"
-                                                d="M5 13l4 4L19 7"
-                                              />
-                                            </svg>
+                                            <CheckIcon class="h-4 w-4" />
                                             All {contents().length} items packed
                                           </div>
                                         </Show>
@@ -955,19 +913,7 @@ export function PackingListBagView(props: PackingListBagViewProps) {
                                               }
                                             >
                                               <div class="flex items-center gap-2 rounded-lg bg-gray-100 px-3 py-2 text-sm text-gray-500">
-                                                <svg
-                                                  class="h-4 w-4 text-green-600"
-                                                  fill="none"
-                                                  viewBox="0 0 24 24"
-                                                  stroke="currentColor"
-                                                >
-                                                  <path
-                                                    stroke-linecap="round"
-                                                    stroke-linejoin="round"
-                                                    stroke-width="2"
-                                                    d="M5 13l4 4L19 7"
-                                                  />
-                                                </svg>
+                                                <CheckIcon class="h-4 w-4 text-green-600" />
                                                 {packedContentsCount()} packed
                                               </div>
                                             </Show>

@@ -7,6 +7,7 @@
 
 import { Show, type JSX } from 'solid-js';
 import type { TripItem, Bag } from '../../lib/types';
+import { DragHandleIcon, EditIcon } from '../ui/Icons';
 
 // Type for drag activators from solid-dnd
 type DragActivators = Record<string, (event: any) => void>;
@@ -51,14 +52,7 @@ export function PackingItemCard(props: PackingItemCardProps) {
           style={{ 'touch-action': 'none' }}
           {...props.dragActivators}
         >
-          <svg class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
-            <circle cx="9" cy="6" r="1.5" />
-            <circle cx="15" cy="6" r="1.5" />
-            <circle cx="9" cy="12" r="1.5" />
-            <circle cx="15" cy="12" r="1.5" />
-            <circle cx="9" cy="18" r="1.5" />
-            <circle cx="15" cy="18" r="1.5" />
-          </svg>
+          <DragHandleIcon class="h-5 w-5" />
         </div>
       </Show>
       <Show when={!props.selectMode}>
@@ -119,14 +113,7 @@ export function PackingItemCard(props: PackingItemCardProps) {
             class="p-2 text-gray-400 transition-colors hover:text-blue-600"
             aria-label="Edit item"
           >
-            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-              />
-            </svg>
+            <EditIcon class="h-5 w-5" />
           </button>
         }
       >

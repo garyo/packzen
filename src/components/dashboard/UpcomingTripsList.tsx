@@ -9,6 +9,7 @@ import { For, Show, createSignal, type Accessor } from 'solid-js';
 import type { Trip } from '../../lib/types';
 import { formatDateRange, getTripStatus } from '../../lib/utils';
 import { TripForm } from '../trips/TripForm';
+import { EditIcon } from '../ui/Icons';
 
 interface UpcomingTripsListProps {
   trips: Accessor<Trip[] | undefined>;
@@ -120,14 +121,7 @@ function TripCard(props: TripCardProps) {
             class="rounded p-1 text-gray-600 hover:bg-gray-200 hover:text-gray-900"
             title="Edit trip"
           >
-            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-              />
-            </svg>
+            <EditIcon class="h-5 w-5" />
           </button>
           <span class="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800">
             Upcoming

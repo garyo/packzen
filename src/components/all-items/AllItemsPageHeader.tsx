@@ -12,6 +12,7 @@ import { Button } from '../ui/Button';
 import { showToast } from '../ui/Toast';
 import { masterItemsToCSV, csvToMasterItems, downloadCSV } from '../../lib/csv';
 import { api, endpoints } from '../../lib/api';
+import { MoreVerticalIcon } from '../ui/Icons';
 
 interface AllItemsPageHeaderProps {
   items: Accessor<MasterItemWithCategory[] | undefined>;
@@ -192,11 +193,7 @@ export function AllItemsPageHeader(props: AllItemsPageHeaderProps) {
             {/* More menu (Import/Export) */}
             <div class="relative" ref={menuRef}>
               <Button variant="secondary" size="sm" onClick={() => setShowMenu(!showMenu())}>
-                <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
-                  <circle cx="12" cy="5" r="2" />
-                  <circle cx="12" cy="12" r="2" />
-                  <circle cx="12" cy="19" r="2" />
-                </svg>
+                <MoreVerticalIcon class="h-5 w-5" />
               </Button>
               <Show when={showMenu()}>
                 <div class="absolute top-full right-0 z-20 mt-1 w-48 rounded-lg border border-gray-200 bg-white shadow-lg">

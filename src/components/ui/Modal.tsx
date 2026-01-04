@@ -1,5 +1,6 @@
 import { type JSX } from 'solid-js';
 import { Portal } from 'solid-js/web';
+import { CloseIcon } from './Icons';
 
 interface ModalProps {
   onClose: () => void;
@@ -41,14 +42,7 @@ export function Modal(props: ModalProps) {
                 class="text-gray-400 transition-colors hover:text-gray-600"
                 aria-label="Close modal"
               >
-                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
+                <CloseIcon class="h-6 w-6" />
               </button>
             </div>
 

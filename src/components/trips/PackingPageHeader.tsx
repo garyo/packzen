@@ -8,6 +8,7 @@
 import { Show, type Accessor, onMount, onCleanup, createEffect, createSignal } from 'solid-js';
 import type { Trip } from '../../lib/types';
 import { Button } from '../ui/Button';
+import { HomeIcon, ChevronLeftIcon, EditIcon, SearchIcon, MoreVerticalIcon } from '../ui/Icons';
 import { formatDateRange } from '../../lib/utils';
 
 interface PackingPageHeaderProps {
@@ -124,38 +125,14 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
               class="flex flex-shrink-0 items-center text-gray-600 hover:text-gray-900"
               title="Home"
             >
-              <svg
-                class="h-6 w-6 lg:h-5 lg:w-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
-                />
-              </svg>
+              <HomeIcon class="h-6 w-6 lg:h-5 lg:w-5" />
             </a>
             <a
               href="/trips"
               class="flex flex-shrink-0 items-center text-gray-600 hover:text-gray-900"
               title="Back to Trips"
             >
-              <svg
-                class="h-5 w-5 lg:h-4 lg:w-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M15 19l-7-7 7-7"
-                />
-              </svg>
+              <ChevronLeftIcon class="h-5 w-5 lg:h-4 lg:w-4" />
             </a>
             <div class="min-w-0 flex-1">
               <div class="flex items-center">
@@ -173,14 +150,7 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
                   class="flex-shrink-0 rounded p-1 text-gray-600 hover:bg-gray-200 hover:text-gray-900"
                   title="Edit trip details"
                 >
-                  <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                    />
-                  </svg>
+                  <EditIcon class="h-4 w-4" />
                 </button>
               </div>
               <Show
@@ -232,14 +202,7 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
                       onClick={() => (isSearchOpen() ? closeSearch() : openSearch())}
                       title="Search items"
                     >
-                      <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                          stroke-width="2"
-                          d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 100-15 7.5 7.5 0 000 15z"
-                        />
-                      </svg>
+                      <SearchIcon class="h-4 w-4" />
                     </Button>
                     <Show when={isSearchOpen()}>
                       <div
@@ -318,11 +281,7 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
                       class="h-full"
                       onClick={() => setShowMenu(!showMenu())}
                     >
-                      <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
-                        <circle cx="12" cy="5" r="2.5" />
-                        <circle cx="12" cy="12" r="2.5" />
-                        <circle cx="12" cy="19" r="2.5" />
-                      </svg>
+                      <MoreVerticalIcon class="h-4 w-4" />
                     </Button>
                     <Show when={showMenu()}>
                       <div class="absolute top-full right-0 z-20 mt-1 w-48 rounded-lg border border-gray-200 bg-white shadow-lg">

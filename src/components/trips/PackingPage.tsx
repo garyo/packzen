@@ -39,6 +39,7 @@ import { fetchWithErrorHandling, fetchSingleWithErrorHandling } from '../../lib/
 import { tripToYAML, downloadYAML } from '../../lib/yaml';
 import { deleteTripWithConfirm } from '../../lib/trip-actions';
 import { TripForm } from './TripForm';
+import { ChevronLeftIcon } from '../ui/Icons';
 
 interface PackingPageProps {
   tripId: string;
@@ -1235,14 +1236,7 @@ export function PackingPage(props: PackingPageProps) {
             href="/trips"
             class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-3 shadow-lg hover:bg-gray-50"
           >
-            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M15 19l-7-7 7-7"
-              />
-            </svg>
+            <ChevronLeftIcon class="h-5 w-5" />
             Back
           </a>
         </div>
