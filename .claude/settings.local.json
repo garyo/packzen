@@ -35,7 +35,9 @@
       "Bash(git show:*)",
       "Bash(bun test:*)",
       "Bash(npm test:*)",
-      "Bash(TZ=UTC date:*)"
+      "Bash(TZ=UTC date:*)",
+      "WebFetch(domain:community.cloudflare.com)",
+      "WebFetch(domain:gist.github.com)"
     ]
   }
 }

@@ -45,7 +45,7 @@ function DraggableSourceItem(props: DraggableItemProps) {
   return (
     <div
       ref={draggable.ref}
-      class="flex items-center gap-1.5 rounded-md px-2 py-1.5 transition-colors md:gap-2 md:px-3 md:py-2"
+      class="flex items-center gap-1 rounded-md px-0 py-1.5 transition-colors md:gap-2 md:px-3 md:py-2"
       classList={{
         'opacity-50': props.isInTrip,
         'hover:bg-gray-50': !props.isInTrip,
@@ -57,10 +57,12 @@ function DraggableSourceItem(props: DraggableItemProps) {
         when={!props.isInTrip}
         fallback={
           props.onRemove && props.tripItemId ? (
-            <button
-              type="button"
-              class="flex h-6 w-6 items-center justify-center rounded text-gray-400 hover:bg-red-100 hover:text-red-600"
+            <div
+              role="button"
+              tabindex="0"
+              class="flex h-5 w-7 cursor-pointer items-center justify-center rounded text-gray-400 hover:bg-red-100 hover:text-red-600"
               onClick={() => props.onRemove!(props.tripItemId!)}
+              onKeyDown={(e) => e.key === 'Enter' && props.onRemove!(props.tripItemId!)}
               title="Remove from trip"
             >
               <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -71,7 +73,7 @@ function DraggableSourceItem(props: DraggableItemProps) {
                   d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
                 />
               </svg>
-            </button>
+            </div>
           ) : (
             <div class="h-6 w-6" /> // Spacer when no remove handler
           )
@@ -79,7 +81,7 @@ function DraggableSourceItem(props: DraggableItemProps) {
       >
         {/* Drag handle - only this area triggers drag on touch */}
         <div
-          class="flex cursor-grab flex-col gap-0.5 p-1 text-gray-400"
+          class="flex cursor-grab flex-col gap-0.5 p-1 pl-2 text-gray-400"
           style={{ 'touch-action': 'none' }}
           {...draggable.dragActivators}
         >
@@ -369,7 +371,7 @@ export function AddModeLeftPanel(props: AddModeLeftPanelProps) {
 
       {/* Item List - disable scroll during drag to prevent unwanted auto-scroll */}
       <div
-        class="flex-1 p-1.5 md:p-2"
+        class="flex-1 p-1 md:p-2"
         classList={{
           'overflow-y-auto': !props.isDragging?.(),
           'overflow-hidden': props.isDragging?.(),
@@ -402,7 +404,7 @@ export function AddModeLeftPanel(props: AddModeLeftPanelProps) {
                     <span class="text-xs font-normal text-gray-500">({items.length})</span>
                   </button>
                   <Show when={isCategoryExpanded(category)}>
-                    <div class="ml-2">
+                    <div class="ml-1">
                       <For each={items}>
                         {(item) => (
                           <DraggableSourceItem

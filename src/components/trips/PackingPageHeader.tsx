@@ -114,9 +114,9 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
 
   return (
     <header class="relative flex-shrink-0 border-b border-gray-200 bg-white">
-      <div class="container mx-auto px-4 py-4 md:py-2">
-        {/* Two-row layout on mobile, single row on desktop */}
-        <div class="mb-3 flex flex-col gap-2 md:mb-2 md:flex-row md:items-center md:justify-between">
+      <div class="container mx-auto px-4 py-4 lg:py-2">
+        {/* Two-row layout on mobile/tablet, single row on desktop */}
+        <div class="mb-3 flex flex-col gap-2 lg:mb-2 lg:flex-row lg:items-center lg:justify-between">
           {/* Title row */}
           <div class="flex min-w-0 flex-1 items-center gap-2">
             <a
@@ -125,7 +125,7 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
               title="Home"
             >
               <svg
-                class="h-6 w-6 md:h-5 md:w-5"
+                class="h-6 w-6 lg:h-5 lg:w-5"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -144,7 +144,7 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
               title="Back to Trips"
             >
               <svg
-                class="h-5 w-5 md:h-4 md:w-4"
+                class="h-5 w-5 lg:h-4 lg:w-4"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -160,7 +160,7 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
             <div class="min-w-0 flex-1">
               <div class="flex items-center">
                 <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0">
-                  <h1 class="text-xl font-bold break-words text-gray-900 md:text-lg">
+                  <h1 class="text-xl font-bold break-words text-gray-900 lg:text-lg">
                     {props.trip()?.name || 'Packing'}
                   </h1>
                   <p class="text-xs text-gray-600">
@@ -190,13 +190,17 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
                     {props.packedCount()} of {props.totalCount()} packed
                     <Show when={props.unpackedCount() > 0 && props.viewMode() === 'pack'}>
                       {' · '}
-                      <button
-                        onClick={props.onToggleShowUnpackedOnly}
+                      <a
+                        href="#"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          props.onToggleShowUnpackedOnly();
+                        }}
                         class="text-blue-600 hover:text-blue-800 hover:underline"
                         title="Click to show only unpacked items"
                       >
                         {props.unpackedCount()} left to pack
-                      </button>
+                      </a>
                     </Show>
                   </p>
                 }
@@ -215,20 +219,17 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
           </div>
 
           {/* Buttons row */}
-          <div class="flex flex-shrink-0 gap-2">
+          <div class="flex flex-shrink-0 items-stretch gap-2">
             <Show
               when={props.selectMode()}
               fallback={
                 <>
-                  <div class="relative" ref={searchContainerRef}>
-                    <button
-                      type="button"
+                  <div class="relative flex" ref={searchContainerRef}>
+                    <Button
+                      variant={isSearchActive() || isSearchOpen() ? 'primary' : 'secondary'}
+                      size="sm"
+                      class="h-full"
                       onClick={() => (isSearchOpen() ? closeSearch() : openSearch())}
-                      class={`relative inline-flex h-9 w-9 items-center justify-center rounded-lg border text-gray-600 transition hover:bg-gray-100 md:h-8 md:w-8 ${
-                        isSearchActive() || isSearchOpen()
-                          ? 'border-blue-200 bg-blue-50 text-blue-600'
-                          : 'border-transparent'
-                      }`}
                       title="Search items"
                     >
                       <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -239,7 +240,7 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
                           d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 100-15 7.5 7.5 0 000 15z"
                         />
                       </svg>
-                    </button>
+                    </Button>
                     <Show when={isSearchOpen()}>
                       <div
                         ref={searchOverlayRef}
@@ -303,19 +304,24 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
                       title={`Currently sorting by ${props.sortBy()}. Click to switch.`}
                     >
                       <div class="text-center text-xs leading-tight">
-                        <div class="text-[10px] text-gray-500">Sorting:</div>
+                        <div class="text-[10px] text-gray-500">Sort:</div>
                         <div class="font-medium">
-                          {props.sortBy() === 'bag' ? 'Bag→Category' : 'Category→Bag'}
+                          {props.sortBy() === 'bag' ? 'by Bag' : 'by Category'}
                         </div>
                       </div>
                     </Button>
                   </Show>
-                  <div class="relative" ref={menuRef}>
-                    <Button variant="secondary" size="sm" onClick={() => setShowMenu(!showMenu())}>
-                      <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
-                        <circle cx="12" cy="5" r="2" />
-                        <circle cx="12" cy="12" r="2" />
-                        <circle cx="12" cy="19" r="2" />
+                  <div class="relative flex" ref={menuRef}>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      class="h-full"
+                      onClick={() => setShowMenu(!showMenu())}
+                    >
+                      <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+                        <circle cx="12" cy="5" r="2.5" />
+                        <circle cx="12" cy="12" r="2.5" />
+                        <circle cx="12" cy="19" r="2.5" />
                       </svg>
                     </Button>
                     <Show when={showMenu()}>
