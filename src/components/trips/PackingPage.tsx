@@ -287,6 +287,7 @@ export function PackingPage(props: PackingPageProps) {
 
   const handleTogglePacked = async (item: TripItem) => {
     const newPackedState = !item.is_packed;
+    const originalPackedState = item.is_packed;
 
     // Optimistic update using store - fine-grained, no scroll disruption
     updateItemInStore(item.id, { is_packed: newPackedState });
@@ -300,12 +301,32 @@ export function PackingPage(props: PackingPageProps) {
       if (!response.success) {
         showToast('error', response.error || 'Failed to update item');
         // Revert on error
-        updateItemInStore(item.id, { is_packed: item.is_packed });
+        updateItemInStore(item.id, { is_packed: originalPackedState });
+      } else {
+        // Show toast with undo option
+        const actionText = newPackedState ? 'packed' : 'unpacked';
+        showToast('info', `${item.name} ${actionText}`, {
+          action: {
+            label: 'Undo',
+            onClick: async () => {
+              updateItemInStore(item.id, { is_packed: originalPackedState });
+              try {
+                await api.patch(endpoints.tripItems(props.tripId), {
+                  id: item.id,
+                  is_packed: originalPackedState,
+                });
+              } catch {
+                showToast('error', 'Failed to undo');
+                updateItemInStore(item.id, { is_packed: newPackedState });
+              }
+            },
+          },
+        });
       }
     } catch (error) {
       showToast('error', 'Failed to update item');
       // Revert on error
-      updateItemInStore(item.id, { is_packed: item.is_packed });
+      updateItemInStore(item.id, { is_packed: originalPackedState });
     }
   };
 
@@ -613,7 +634,27 @@ export function PackingPage(props: PackingPageProps) {
         )
       );
 
-      showToast('success', `Unpacked ${packedItems.length} items`);
+      showToast('info', `Unpacked ${packedItems.length} items`, {
+        action: {
+          label: 'Undo',
+          onClick: async () => {
+            updateItemsInStore(packedItemIds, { is_packed: true });
+            try {
+              await Promise.all(
+                packedItems.map((item) =>
+                  api.patch(endpoints.tripItems(props.tripId), {
+                    id: item.id,
+                    is_packed: true,
+                  })
+                )
+              );
+            } catch {
+              showToast('error', 'Failed to undo');
+              updateItemsInStore(packedItemIds, { is_packed: false });
+            }
+          },
+        },
+      });
     } catch (error) {
       showToast('error', 'Failed to unpack items');
       // Restore packed state instead of full refetch

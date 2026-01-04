@@ -101,14 +101,19 @@ function DraggableSourceItem(props: DraggableItemProps) {
           {props.quantity && props.quantity > 1 && (
             <span class="text-xs text-gray-500">x{props.quantity}</span>
           )}
-          {props.isInTrip && (
-            <span class="rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-700">
-              {props.isPacked ? 'Packed' : 'Added'}
-            </span>
-          )}
         </div>
         {props.description && <p class="truncate text-xs text-gray-500">{props.description}</p>}
       </div>
+
+      {/* Status indicator */}
+      {props.isInTrip && (
+        <span
+          class={`flex-shrink-0 ${props.isPacked ? 'text-green-600' : 'text-gray-400'}`}
+          title={props.isPacked ? 'Packed' : 'Added'}
+        >
+          {props.isPacked ? '✓' : '☐'}
+        </span>
+      )}
     </div>
   );
 }
