@@ -28,6 +28,8 @@ import {
 } from '@thisbeyond/solid-dnd';
 import type { TripItem, Bag, Category } from '../../lib/types';
 import { PackingItemCard } from './PackingItemCard';
+import { TripNotesButton } from './TripNotesButton';
+import { TripNotesPanel } from './TripNotesPanel';
 import { getBagColorClass, getBagColorStyle } from '../../lib/color-utils';
 import { liveRectCollision, useAutoScroll, EscapeCancelHandler } from './drag-drop-utils';
 import { CheckIcon } from '../ui/Icons';
@@ -96,6 +98,10 @@ function WayfindingNavBar(props: {
   currentSection: () => string | null;
   activeItem: () => TripItem | null;
   onScrollToSection: (sectionId: string) => void;
+  // Notes props
+  hasNotes?: boolean;
+  showNotesPanel?: () => boolean;
+  onToggleNotesPanel?: () => void;
 }) {
   const [dndState] = useDragDropContext()!;
 
@@ -118,39 +124,13 @@ function WayfindingNavBar(props: {
 
   return (
     <div class="sticky top-0 z-10 -mx-4 bg-gray-50/95 px-4 py-1.5 backdrop-blur-sm md:-mx-3 md:px-3">
-      <div class="flex flex-wrap gap-x-1 gap-y-0">
-        {/* Bags */}
-        <For each={props.bags}>
-          {(bag) => {
-            const sectionId = bag.id ? `bag-section-${bag.id}` : 'bag-section-none';
-            const isHighlighted = () => highlightedNavItem() === sectionId;
-            return (
-              <button
-                onClick={() => props.onScrollToSection(sectionId)}
-                class={`flex items-center gap-1 px-1.5 py-0.5 text-xs ${
-                  isHighlighted()
-                    ? 'text-gray-900 underline decoration-2 underline-offset-2'
-                    : 'text-gray-500 hover:text-gray-900'
-                }`}
-                style="min-height: 16px"
-              >
-                <Show when={bag.id !== null} fallback={<span class="text-[10px]">👕</span>}>
-                  <div
-                    class={`h-2 w-2 rounded-full border border-gray-300 ${getBagColorClass(bag.color)}`}
-                    style={getBagColorStyle(bag.color)}
-                  />
-                </Show>
-                <span class="max-w-[130px] truncate">{bag.name}</span>
-              </button>
-            );
-          }}
-        </For>
-        {/* Containers */}
-        <Show when={props.containers.length > 0}>
-          <span class="mx-1 self-center text-gray-300">|</span>
-          <For each={props.containers}>
-            {(container) => {
-              const sectionId = `container-section-${container.id}`;
+      <div class="flex items-center gap-x-1 gap-y-0">
+        {/* Bags and containers - flex-wrap for overflow */}
+        <div class="flex flex-1 flex-wrap gap-x-1 gap-y-0">
+          {/* Bags */}
+          <For each={props.bags}>
+            {(bag) => {
+              const sectionId = bag.id ? `bag-section-${bag.id}` : 'bag-section-none';
               const isHighlighted = () => highlightedNavItem() === sectionId;
               return (
                 <button
@@ -162,12 +142,50 @@ function WayfindingNavBar(props: {
                   }`}
                   style="min-height: 16px"
                 >
-                  <span class="text-[10px]">📦</span>
-                  <span class="max-w-[130px] truncate">{container.name}</span>
+                  <Show when={bag.id !== null} fallback={<span class="text-[10px]">👕</span>}>
+                    <div
+                      class={`h-2 w-2 rounded-full border border-gray-300 ${getBagColorClass(bag.color)}`}
+                      style={getBagColorStyle(bag.color)}
+                    />
+                  </Show>
+                  <span class="max-w-[130px] truncate">{bag.name}</span>
                 </button>
               );
             }}
           </For>
+          {/* Containers */}
+          <Show when={props.containers.length > 0}>
+            <span class="mx-1 self-center text-gray-300">|</span>
+            <For each={props.containers}>
+              {(container) => {
+                const sectionId = `container-section-${container.id}`;
+                const isHighlighted = () => highlightedNavItem() === sectionId;
+                return (
+                  <button
+                    onClick={() => props.onScrollToSection(sectionId)}
+                    class={`flex items-center gap-1 px-1.5 py-0.5 text-xs ${
+                      isHighlighted()
+                        ? 'text-gray-900 underline decoration-2 underline-offset-2'
+                        : 'text-gray-500 hover:text-gray-900'
+                    }`}
+                    style="min-height: 16px"
+                  >
+                    <span class="text-[10px]">📦</span>
+                    <span class="max-w-[130px] truncate">{container.name}</span>
+                  </button>
+                );
+              }}
+            </For>
+          </Show>
+        </div>
+
+        {/* Trip Notes Button - at the far right */}
+        <Show when={props.onToggleNotesPanel}>
+          <TripNotesButton
+            hasNotes={props.hasNotes || false}
+            isOpen={props.showNotesPanel?.() || false}
+            onClick={() => props.onToggleNotesPanel?.()}
+          />
         </Show>
       </div>
     </div>
@@ -217,6 +235,11 @@ interface PackingListBagViewProps {
   // Drag-and-drop handlers
   onMoveItemToBag?: (itemId: string, bagId: string | null) => void;
   onMoveItemToContainer?: (itemId: string, containerId: string) => void;
+  // Trip notes props
+  tripNotes?: string;
+  showNotesPanel?: Accessor<boolean>;
+  onToggleNotesPanel?: () => void;
+  onNotesChange?: (notes: string) => void;
 }
 
 export function PackingListBagView(props: PackingListBagViewProps) {
@@ -491,6 +514,18 @@ export function PackingListBagView(props: PackingListBagViewProps) {
             currentSection={currentSection}
             activeItem={activeItem}
             onScrollToSection={scrollToSection}
+            hasNotes={Boolean(props.tripNotes?.trim())}
+            showNotesPanel={props.showNotesPanel}
+            onToggleNotesPanel={props.onToggleNotesPanel}
+          />
+        </Show>
+
+        {/* Trip Notes Panel - expands below nav bar */}
+        <Show when={props.showNotesPanel?.() && props.onNotesChange}>
+          <TripNotesPanel
+            notes={props.tripNotes || ''}
+            onNotesChange={props.onNotesChange!}
+            onClose={() => props.onToggleNotesPanel?.()}
           />
         </Show>
 

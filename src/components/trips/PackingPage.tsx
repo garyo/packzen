@@ -39,6 +39,7 @@ import { fetchWithErrorHandling, fetchSingleWithErrorHandling } from '../../lib/
 import { tripToYAML, downloadYAML } from '../../lib/yaml';
 import { deleteTripWithConfirm } from '../../lib/trip-actions';
 import { TripForm } from './TripForm';
+import { TripNotesPanel } from './TripNotesPanel';
 import { ChevronLeftIcon } from '../ui/Icons';
 
 interface PackingPageProps {
@@ -58,6 +59,7 @@ export function PackingPage(props: PackingPageProps) {
   const [sortBy, setSortBy] = createSignal<'bag' | 'category'>('bag');
   const [viewMode, setViewMode] = createSignal<'pack' | 'add'>('pack');
   const [showUnpackedOnly, setShowUnpackedOnly] = createSignal(false);
+  const [showNotesPanel, setShowNotesPanel] = createSignal(false);
   const [searchQuery, setSearchQuery] = createSignal('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = createSignal('');
   const [pendingScrollItemId, setPendingScrollItemId] = createSignal<string | null>(null);
@@ -672,6 +674,24 @@ export function PackingPage(props: PackingPageProps) {
     });
   };
 
+  // Handler for updating trip notes
+  const handleUpdateTripNotes = async (notes: string) => {
+    const currentTrip = trip();
+    if (!currentTrip) return;
+
+    try {
+      const response = await api.patch(endpoints.trip(props.tripId), { notes });
+      if (response.success) {
+        // Refetch trip to update local state
+        refetchTrip();
+      } else {
+        showToast('error', response.error || 'Failed to save notes');
+      }
+    } catch {
+      showToast('error', 'Failed to save notes');
+    }
+  };
+
   // Helper to get bag name for display
   const getBagName = (bagId: string | null) => {
     if (!bagId) return 'No Bag';
@@ -1151,6 +1171,10 @@ export function PackingPage(props: PackingPageProps) {
                         }
                         onMoveItemToBag={handleMoveItemToBag}
                         onMoveItemToContainer={handleMoveItemToContainer}
+                        tripNotes={trip()?.notes || ''}
+                        showNotesPanel={showNotesPanel}
+                        onToggleNotesPanel={() => setShowNotesPanel(!showNotesPanel())}
+                        onNotesChange={handleUpdateTripNotes}
                       />
                     </Show>
                   </Show>
