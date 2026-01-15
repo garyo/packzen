@@ -58,10 +58,13 @@ export function PackingItemCard(props: PackingItemCardProps) {
       <Show when={!props.selectMode}>
         <input
           type="checkbox"
+          id={`pack-checkbox-${props.item.id}`}
           checked={props.item.is_packed}
+          aria-checked={props.item.is_packed ? 'true' : 'false'}
           onChange={props.onTogglePacked}
           class="h-8 w-8 cursor-pointer rounded border-2 border-gray-300 text-green-600 focus:ring-2 focus:ring-green-500 md:h-6 md:w-6"
           title={isContainer() ? 'Mark container as packed (in bag)' : 'Mark item as packed'}
+          aria-label={`Pack ${props.item.name}`}
         />
       </Show>
       <div
@@ -119,9 +122,12 @@ export function PackingItemCard(props: PackingItemCardProps) {
       >
         <input
           type="checkbox"
+          id={`select-checkbox-${props.item.id}`}
           checked={props.isSelected}
+          aria-checked={props.isSelected ? 'true' : 'false'}
           onChange={props.onToggleSelection}
           class="h-8 w-8 cursor-pointer rounded border-2 border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
+          aria-label={`Select ${props.item.name}`}
         />
       </Show>
     </div>
