@@ -37,7 +37,10 @@
       "Bash(npm test:*)",
       "Bash(TZ=UTC date:*)",
       "WebFetch(domain:community.cloudflare.com)",
-      "WebFetch(domain:gist.github.com)"
+      "WebFetch(domain:gist.github.com)",
+      "Bash(uvx webctl agent-prompt)",
+      "Bash(uvx webctl:*)",
+      "Bash(jq:*)"
     ]
   }
 }

@@ -64,10 +64,18 @@ export interface AddModeBagDropData {
   containerId?: string;
 }
 
+// Selected target for click-to-add
+export interface SelectedTarget {
+  bagId: string | null;
+  containerId: string | null;
+}
+
 export function AddModeView(props: AddModeViewProps) {
   const [activeTab, setActiveTab] = createSignal<'my-items' | 'built-in'>('my-items');
   const [draggedItem, setDraggedItem] = createSignal<SourceItemDragData | null>(null);
   const [dragCancelled, setDragCancelled] = createSignal(false);
+  // Selected target for click-to-add (undefined means no selection)
+  const [selectedTarget, setSelectedTarget] = createSignal<SelectedTarget | undefined>(undefined);
   let rightPanelRef: HTMLDivElement | undefined;
   const autoScroll = usePanelAutoScroll(() => rightPanelRef);
 
@@ -132,6 +140,18 @@ export function AddModeView(props: AddModeViewProps) {
     autoScroll.stop();
   };
 
+  // Handle click-to-add for items
+  const handleAddToSelectedBag = async (dragData: SourceItemDragData) => {
+    const target = selectedTarget();
+    if (!target) return; // No target selected
+
+    if (dragData.sourceType === 'master' && dragData.masterItem) {
+      await props.onAddMasterItem(dragData.masterItem, target.bagId, target.containerId);
+    } else if (dragData.sourceType === 'built-in' && dragData.builtInItem) {
+      await props.onAddBuiltInItem(dragData.builtInItem, target.bagId, target.containerId);
+    }
+  };
+
   return (
     <DragDropProvider
       onDragStart={handleDragStart}
@@ -153,6 +173,8 @@ export function AddModeView(props: AddModeViewProps) {
             onRemoveFromTrip={props.onRemoveFromTrip}
             onAddNewItem={props.onAddNewItem}
             isDragging={() => draggedItem() !== null}
+            selectedTarget={selectedTarget}
+            onAddToSelectedBag={handleAddToSelectedBag}
           />
         </div>
 
@@ -162,7 +184,13 @@ export function AddModeView(props: AddModeViewProps) {
             ref={rightPanelRef}
             class="h-full overflow-y-auto rounded-lg border border-gray-200 bg-white p-1 shadow-sm md:p-4"
           >
-            <AddModeBagCards items={props.items} bags={props.bags} categories={props.categories} />
+            <AddModeBagCards
+              items={props.items}
+              bags={props.bags}
+              categories={props.categories}
+              selectedTarget={selectedTarget}
+              onSelectTarget={setSelectedTarget}
+            />
           </div>
           {/* Manage Bags FAB */}
           {props.onManageBags && (

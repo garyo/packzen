@@ -8,13 +8,16 @@
 import { Show, For, createMemo, createSignal, type Accessor } from 'solid-js';
 import { createDroppable } from '@thisbeyond/solid-dnd';
 import type { TripItem, Bag, Category } from '../../lib/types';
-import type { AddModeBagDropData } from './AddModeView';
+import type { AddModeBagDropData, SelectedTarget } from './AddModeView';
 
 interface AddModeBagCardsProps {
   items: Accessor<TripItem[] | undefined>;
   bags: Accessor<Bag[] | undefined>;
   categories: Accessor<Category[] | undefined>;
   onManageBags?: () => void;
+  // For click-to-add: selected target (bag or container) gets highlighted border
+  selectedTarget?: Accessor<SelectedTarget | undefined>;
+  onSelectTarget?: (target: SelectedTarget | undefined) => void;
 }
 
 interface BagCardProps {
@@ -29,6 +32,9 @@ interface BagCardProps {
   // For passing accordion state to nested containers
   expandedCardId?: Accessor<string | null>;
   onSetExpandedCardId?: (id: string) => void;
+  // For click-to-add selection (bags and containers)
+  selectedTarget?: Accessor<SelectedTarget | undefined>;
+  onSelectTarget?: (target: SelectedTarget | undefined) => void;
 }
 
 function DroppableBagCard(props: BagCardProps) {
@@ -107,14 +113,61 @@ function DroppableBagCard(props: BagCardProps) {
 
   const bagColor = () => props.bag?.color || '#6b7280';
 
+  // Compute if this card is selected
+  const isSelected = createMemo(() => {
+    const target = props.selectedTarget?.();
+    if (!target) return false;
+    if (props.isContainer && props.containerId) {
+      // Container: selected when containerId matches
+      return target.containerId === props.containerId;
+    } else {
+      // Bag: selected when bagId matches and no containerId
+      return target.bagId === props.bagId && target.containerId === null;
+    }
+  });
+
+  const handleSelect = () => {
+    if (!props.onSelectTarget) return;
+    // Toggle off if already selected
+    if (isSelected()) {
+      props.onSelectTarget(undefined);
+      return;
+    }
+    if (props.isContainer && props.containerId) {
+      // Container: set containerId, bagId is the parent bag
+      props.onSelectTarget({ bagId: props.bagId, containerId: props.containerId });
+    } else {
+      // Bag: set bagId, containerId is null
+      props.onSelectTarget({ bagId: props.bagId, containerId: null });
+    }
+  };
+
   return (
     <div
       ref={droppable.ref}
-      class="rounded-lg border-2 px-1 py-2 transition-all md:p-3"
+      role="button"
+      tabindex={0}
+      aria-label={`Select ${bagName()} as target ${props.isContainer ? 'container' : 'bag'}`}
+      aria-pressed={isSelected()}
+      class="cursor-pointer rounded-lg border-2 px-1 py-2 transition-all md:p-3"
       classList={{
         'border-blue-400 bg-blue-50 shadow-md': droppable.isActiveDroppable,
-        'border-gray-200 bg-white hover:border-gray-300': !droppable.isActiveDroppable,
+        'border-green-500 bg-green-50 ring-2 ring-green-200':
+          !droppable.isActiveDroppable && isSelected(),
+        'border-gray-200 bg-white hover:border-gray-300':
+          !droppable.isActiveDroppable && !isSelected(),
         'ml-2 md:ml-6': props.isContainer,
+      }}
+      onClick={(e) => {
+        e.stopPropagation();
+        handleSelect();
+      }}
+      onKeyDown={(e) => {
+        // Support keyboard activation
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          handleSelect();
+        }
       }}
     >
       {/* Header */}
@@ -213,6 +266,8 @@ function DroppableBagCard(props: BagCardProps) {
                   containerId={container.id}
                   isExpanded={props.expandedCardId?.() === containerId}
                   onToggleExpand={() => props.onSetExpandedCardId?.(containerId)}
+                  selectedTarget={props.selectedTarget}
+                  onSelectTarget={props.onSelectTarget}
                 />
               );
             }}
@@ -261,7 +316,7 @@ export function AddModeBagCards(props: AddModeBagCardsProps) {
   return (
     <div class="space-y-1.5 md:space-y-3">
       <h3 class="mb-1 text-[10px] font-semibold tracking-wide text-gray-500 uppercase md:mb-4 md:text-sm">
-        Drop items into bags
+        Drop items into bags, or click bag then +
       </h3>
 
       {/* Regular bags */}
@@ -278,6 +333,8 @@ export function AddModeBagCards(props: AddModeBagCardsProps) {
               onToggleExpand={() => toggleExpand(cardId)}
               expandedCardId={expandedCardId}
               onSetExpandedCardId={(id) => toggleExpand(id)}
+              selectedTarget={props.selectedTarget}
+              onSelectTarget={props.onSelectTarget}
             />
           );
         }}
@@ -296,6 +353,8 @@ export function AddModeBagCards(props: AddModeBagCardsProps) {
             onToggleExpand={() => toggleExpand(cardId)}
             expandedCardId={expandedCardId}
             onSetExpandedCardId={(id) => toggleExpand(id)}
+            selectedTarget={props.selectedTarget}
+            onSelectTarget={props.onSelectTarget}
           />
         );
       })()}

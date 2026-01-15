@@ -13,7 +13,7 @@ import {
   getItemsByTripTypes,
   getCategoriesForTripTypes,
 } from '../../lib/built-in-items';
-import type { SourceItemDragData } from './AddModeView';
+import type { SourceItemDragData, SelectedTarget } from './AddModeView';
 import { TrashIcon, PlusIcon } from '../ui/Icons';
 
 interface AddModeLeftPanelProps {
@@ -25,6 +25,9 @@ interface AddModeLeftPanelProps {
   onRemoveFromTrip?: (tripItemId: string) => void;
   onAddNewItem?: () => void;
   isDragging?: Accessor<boolean>;
+  // For click-to-add (bag or container selection)
+  selectedTarget?: Accessor<SelectedTarget | undefined>;
+  onAddToSelectedBag?: (dragData: SourceItemDragData) => void;
 }
 
 interface DraggableItemProps {
@@ -38,6 +41,9 @@ interface DraggableItemProps {
   tripItemId?: string; // ID of the trip item (for removal)
   dragData: SourceItemDragData;
   onRemove?: (tripItemId: string) => void;
+  // For click-to-add
+  canClickToAdd?: boolean;
+  onClickAdd?: () => void;
 }
 
 function DraggableSourceItem(props: DraggableItemProps) {
@@ -114,6 +120,21 @@ function DraggableSourceItem(props: DraggableItemProps) {
           {props.isPacked ? '✓' : '☐'}
         </span>
       )}
+
+      {/* Click-to-add button - shown when bag is selected and item not in trip */}
+      <Show when={props.canClickToAdd && !props.isInTrip}>
+        <button
+          type="button"
+          class="ml-1 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-green-500 text-white hover:bg-green-600"
+          onClick={(e) => {
+            e.stopPropagation();
+            props.onClickAdd?.();
+          }}
+          title="Add to selected bag"
+        >
+          <PlusIcon class="h-4 w-4" />
+        </button>
+      </Show>
     </div>
   );
 }
@@ -393,24 +414,29 @@ export function AddModeLeftPanel(props: AddModeLeftPanelProps) {
                   <Show when={isCategoryExpanded(category)}>
                     <div class="ml-1">
                       <For each={items}>
-                        {(item) => (
-                          <DraggableSourceItem
-                            id={`master-${item.id}`}
-                            name={item.name}
-                            category={item.category_name || 'Uncategorized'}
-                            quantity={item.default_quantity}
-                            description={item.description}
-                            isInTrip={isItemInTrip(item.id, item.name, 'master')}
-                            isPacked={isItemPacked(item.id, item.name, 'master')}
-                            tripItemId={getTripItemId(item.id, item.name, 'master')}
-                            onRemove={props.onRemoveFromTrip}
-                            dragData={{
-                              type: 'source-item',
-                              sourceType: 'master',
-                              masterItem: item,
-                            }}
-                          />
-                        )}
+                        {(item) => {
+                          const dragData: SourceItemDragData = {
+                            type: 'source-item',
+                            sourceType: 'master',
+                            masterItem: item,
+                          };
+                          return (
+                            <DraggableSourceItem
+                              id={`master-${item.id}`}
+                              name={item.name}
+                              category={item.category_name || 'Uncategorized'}
+                              quantity={item.default_quantity}
+                              description={item.description}
+                              isInTrip={isItemInTrip(item.id, item.name, 'master')}
+                              isPacked={isItemPacked(item.id, item.name, 'master')}
+                              tripItemId={getTripItemId(item.id, item.name, 'master')}
+                              onRemove={props.onRemoveFromTrip}
+                              dragData={dragData}
+                              canClickToAdd={props.selectedTarget?.() !== undefined}
+                              onClickAdd={() => props.onAddToSelectedBag?.(dragData)}
+                            />
+                          );
+                        }}
                       </For>
                     </div>
                   </Show>
@@ -449,29 +475,34 @@ export function AddModeLeftPanel(props: AddModeLeftPanelProps) {
                   <Show when={isCategoryExpanded(`built-in-${category}`)}>
                     <div class="ml-2">
                       <For each={items}>
-                        {(item) => (
-                          <DraggableSourceItem
-                            id={`built-in-${item.name}`}
-                            name={item.name}
-                            category={item.category}
-                            quantity={item.default_quantity}
-                            description={item.description}
-                            isInTrip={isItemInTrip('', item.name, 'built-in')}
-                            isPacked={isItemPacked('', item.name, 'built-in')}
-                            tripItemId={getTripItemId('', item.name, 'built-in')}
-                            onRemove={props.onRemoveFromTrip}
-                            dragData={{
-                              type: 'source-item',
-                              sourceType: 'built-in',
-                              builtInItem: {
-                                name: item.name,
-                                description: item.description,
-                                category: item.category,
-                                quantity: item.default_quantity,
-                              },
-                            }}
-                          />
-                        )}
+                        {(item) => {
+                          const dragData: SourceItemDragData = {
+                            type: 'source-item',
+                            sourceType: 'built-in',
+                            builtInItem: {
+                              name: item.name,
+                              description: item.description,
+                              category: item.category,
+                              quantity: item.default_quantity,
+                            },
+                          };
+                          return (
+                            <DraggableSourceItem
+                              id={`built-in-${item.name}`}
+                              name={item.name}
+                              category={item.category}
+                              quantity={item.default_quantity}
+                              description={item.description}
+                              isInTrip={isItemInTrip('', item.name, 'built-in')}
+                              isPacked={isItemPacked('', item.name, 'built-in')}
+                              tripItemId={getTripItemId('', item.name, 'built-in')}
+                              onRemove={props.onRemoveFromTrip}
+                              dragData={dragData}
+                              canClickToAdd={props.selectedTarget?.() !== undefined}
+                              onClickAdd={() => props.onAddToSelectedBag?.(dragData)}
+                            />
+                          );
+                        }}
                       </For>
                     </div>
                   </Show>
