@@ -193,7 +193,7 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
           </div>
 
           {/* Buttons row */}
-          <div class="flex flex-shrink-0 items-stretch gap-2">
+          <div class="flex flex-shrink-0 flex-wrap items-stretch gap-2">
             <Show
               when={props.selectMode()}
               fallback={
@@ -202,7 +202,7 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
                     <Button
                       variant={isSearchActive() || isSearchOpen() ? 'primary' : 'secondary'}
                       size="sm"
-                      class="h-full"
+                      class="h-full !px-2 md:!px-3"
                       onClick={() => (isSearchOpen() ? closeSearch() : openSearch())}
                       title="Search items"
                     >
@@ -248,18 +248,45 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
                     </Show>
                   </div>
                   {/* Mode toggle button - primary CTA */}
-                  <Button variant="primary" size="sm" onClick={props.onToggleViewMode}>
-                    {props.viewMode() === 'add' ? 'Start Packing' : 'Add More Items'}
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    class="!px-2 md:!px-3"
+                    onClick={props.onToggleViewMode}
+                  >
+                    <span class="hidden md:inline">
+                      {props.viewMode() === 'add' ? 'Start Packing' : 'Add More Items'}
+                    </span>
+                    <span class="md:hidden">{props.viewMode() === 'add' ? 'Pack' : 'Add'}</span>
                   </Button>
                   {/* Only show these in Pack mode */}
                   <Show when={props.viewMode() === 'pack'}>
-                    <Button variant="secondary" size="sm" onClick={props.onManageBags}>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      class="!px-2 md:!px-3"
+                      onClick={props.onManageBags}
+                    >
                       Bags
                     </Button>
-                    <Button variant="secondary" size="sm" onClick={props.onAddItem}>
-                      Quick Add
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      class="!px-2 md:!px-3"
+                      onClick={props.onAddItem}
+                    >
+                      <span class="hidden md:inline">Quick Add</span>
+                      <span class="text-center text-xs leading-tight md:hidden">
+                        <div>Quick</div>
+                        <div>Add</div>
+                      </span>
                     </Button>
-                    <Button variant="secondary" size="sm" onClick={props.onToggleSelectMode}>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      class="!hidden !px-2 md:!inline-flex md:!px-3"
+                      onClick={props.onToggleSelectMode}
+                    >
                       Select Batch
                     </Button>
                   </Show>
@@ -267,6 +294,7 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
                     <Button
                       variant="secondary"
                       size="sm"
+                      class="!px-2 md:!px-3"
                       onClick={props.onToggleSortBy}
                       title={`Currently sorting by ${props.sortBy()}. Click to switch.`}
                     >
@@ -282,13 +310,24 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
                     <Button
                       variant="secondary"
                       size="sm"
-                      class="h-full"
+                      class="h-full !px-2 md:!px-3"
                       onClick={() => setShowMenu(!showMenu())}
                     >
                       <MoreVerticalIcon class="h-4 w-4" />
                     </Button>
                     <Show when={showMenu()}>
                       <div class="absolute top-full right-0 z-20 mt-1 w-48 rounded-lg border border-gray-200 bg-white shadow-lg">
+                        <Show when={props.viewMode() === 'pack'}>
+                          <button
+                            onClick={() => {
+                              props.onToggleSelectMode();
+                              setShowMenu(false);
+                            }}
+                            class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 md:hidden"
+                          >
+                            Select Batch
+                          </button>
+                        </Show>
                         <a
                           href={`/trips/${props.trip()?.id}/print?sortBy=${props.sortBy()}`}
                           target="_blank"

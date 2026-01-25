@@ -17,6 +17,7 @@ import {
 } from '@thisbeyond/solid-dnd';
 import type { TripItem, Bag, Category } from '../../lib/types';
 import { PackingItemCard } from './PackingItemCard';
+import { SwipeProvider, useSwipeContext } from './SwipeContext';
 import { getBagColorClass, getBagColorStyle } from '../../lib/color-utils';
 import { liveRectCollision, useAutoScroll, EscapeCancelHandler } from './drag-drop-utils';
 import { CheckIcon } from '../ui/Icons';
@@ -142,10 +143,15 @@ interface PackingListCategoryViewProps {
   onMoveItemToContainer?: (itemId: string, containerId: string) => void;
 }
 
-export function PackingListCategoryView(props: PackingListCategoryViewProps) {
+// Inner component that uses swipe context
+function PackingListCategoryViewInner(props: PackingListCategoryViewProps) {
   const [activeItem, setActiveItem] = createSignal<TripItem | null>(null);
   const [activeCategoryName, setActiveCategoryName] = createSignal<string | null>(null);
   const autoScroll = useAutoScroll();
+  const swipeContext = useSwipeContext();
+
+  // Close revealed item when drag starts
+  const closeSwipeOnDrag = () => swipeContext.closeAll();
 
   // Handle drag end - only move if dropping in same category
   const handleDragEnd = (event: DragEvent) => {
@@ -176,6 +182,7 @@ export function PackingListCategoryView(props: PackingListCategoryViewProps) {
     setActiveItem(dragData.item);
     setActiveCategoryName(dragData.categoryName);
     autoScroll.start();
+    closeSwipeOnDrag(); // Close any revealed swipe actions when starting drag
   };
 
   // Check if current drop target is valid (same category as dragged item)
@@ -434,6 +441,8 @@ export function PackingListCategoryView(props: PackingListCategoryViewProps) {
                                               }
                                               dragActivators={dragProps.dragActivators}
                                               isDragging={dragProps.isDragging}
+                                              revealedItemId={swipeContext.revealedItemId}
+                                              onRevealChange={swipeContext.setRevealedItemId}
                                             />
                                           )}
                                         </DraggableItem>
@@ -544,6 +553,8 @@ export function PackingListCategoryView(props: PackingListCategoryViewProps) {
                                             }
                                             dragActivators={dragProps.dragActivators}
                                             isDragging={dragProps.isDragging}
+                                            revealedItemId={swipeContext.revealedItemId}
+                                            onRevealChange={swipeContext.setRevealedItemId}
                                           />
                                         )}
                                       </DraggableItem>
@@ -589,5 +600,14 @@ export function PackingListCategoryView(props: PackingListCategoryViewProps) {
         </Show>
       </DragOverlay>
     </DragDropProvider>
+  );
+}
+
+// Export wrapper that provides swipe context
+export function PackingListCategoryView(props: PackingListCategoryViewProps) {
+  return (
+    <SwipeProvider>
+      <PackingListCategoryViewInner {...props} />
+    </SwipeProvider>
   );
 }
