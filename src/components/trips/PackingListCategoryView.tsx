@@ -369,7 +369,8 @@ function PackingListCategoryViewInner(props: PackingListCategoryViewProps) {
                         const sortedItems = [...bagItems].sort((a, b) =>
                           a.name.localeCompare(b.name)
                         );
-                        const unpackedItems = () => sortedItems.filter((item) => !item.is_packed);
+                        const unpackedItems = () =>
+                          sortedItems.filter((item) => !item.is_packed && !item.is_skipped);
                         const packedCount = () =>
                           sortedItems.filter((item) => item.is_packed).length;
                         const itemsToShow = () =>
@@ -488,7 +489,8 @@ function PackingListCategoryViewInner(props: PackingListCategoryViewProps) {
                         const sortedItems = [...containerItems].sort((a, b) =>
                           a.name.localeCompare(b.name)
                         );
-                        const unpackedItems = () => sortedItems.filter((item) => !item.is_packed);
+                        const unpackedItems = () =>
+                          sortedItems.filter((item) => !item.is_packed && !item.is_skipped);
                         const packedCount = () =>
                           sortedItems.filter((item) => item.is_packed).length;
                         const itemsToShow = () =>

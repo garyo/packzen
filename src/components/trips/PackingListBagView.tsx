@@ -656,7 +656,8 @@ function PackingListBagViewInner(props: PackingListBagViewProps) {
                   <Show when={!props.showUnpackedOnly?.() || packedItems() < totalItems()}>
                     <For each={sortedCategories()}>
                       {([category, categoryItems]) => {
-                        const unpackedItems = () => categoryItems.filter((item) => !item.is_packed);
+                        const unpackedItems = () =>
+                          categoryItems.filter((item) => !item.is_packed && !item.is_skipped);
                         const packedCount = () =>
                           categoryItems.filter((item) => item.is_packed).length;
                         const itemsToShow = () =>
@@ -895,7 +896,9 @@ function PackingListBagViewInner(props: PackingListBagViewProps) {
                                 >
                                   {(() => {
                                     const unpackedContents = () =>
-                                      sortedContents().filter((item) => !item.is_packed);
+                                      sortedContents().filter(
+                                        (item) => !item.is_packed && !item.is_skipped
+                                      );
                                     const packedContentsCount = () =>
                                       sortedContents().filter((item) => item.is_packed).length;
                                     const contentsToShow = () =>
