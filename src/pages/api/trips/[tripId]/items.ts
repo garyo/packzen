@@ -97,6 +97,7 @@ export const POST: APIRoute = async (context) => {
       is_container,
       notes,
       is_packed,
+      is_skipped,
     } = validation.data;
     const { merge_duplicates } = validation.data;
 
@@ -181,6 +182,7 @@ export const POST: APIRoute = async (context) => {
         container_item_id: container_item_id || null,
         is_container: is_container || false,
         is_packed: is_packed ?? false,
+        is_skipped: is_skipped ?? false,
         notes: notes || null,
       })
       .returning()
@@ -216,6 +218,7 @@ export const PATCH: APIRoute = createPatchHandler<
     const {
       id,
       is_packed,
+      is_skipped,
       quantity,
       bag_id,
       category_name,
@@ -294,6 +297,7 @@ export const PATCH: APIRoute = createPatchHandler<
         | 'quantity'
         | 'bag_id'
         | 'is_packed'
+        | 'is_skipped'
         | 'container_item_id'
         | 'is_container'
         | 'notes'
@@ -301,6 +305,7 @@ export const PATCH: APIRoute = createPatchHandler<
     >;
     const updates: TripItemUpdate & { updated_at: Date } = { updated_at: new Date() };
     if (is_packed !== undefined) updates.is_packed = is_packed;
+    if (is_skipped !== undefined) updates.is_skipped = is_skipped;
     if (quantity !== undefined) updates.quantity = quantity;
     if (bag_id !== undefined) updates.bag_id = bag_id;
     if (category_name !== undefined) updates.category_name = category_name;

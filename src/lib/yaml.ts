@@ -27,6 +27,7 @@ export interface TripExport {
     quantity: number;
     bag_name: string | null;
     is_packed: boolean;
+    is_skipped?: boolean;
     notes: string | null;
     is_container?: boolean;
     container_name?: string | null; // Name of parent container for items inside containers
@@ -79,6 +80,7 @@ export interface FullBackup {
       quantity: number;
       bag_name: string | null;
       is_packed: boolean;
+      is_skipped?: boolean;
       notes: string | null;
       is_container?: boolean;
       container_name?: string | null;
@@ -121,6 +123,7 @@ export function tripToYAML(trip: Trip, bags: Bag[], items: TripItem[]): string {
         quantity: item.quantity,
         bag_name: bag?.name || null,
         is_packed: item.is_packed,
+        is_skipped: item.is_skipped || undefined,
         notes: item.notes,
         is_container: item.is_container || undefined,
         container_name: container?.name || undefined,
@@ -178,6 +181,7 @@ export function yamlToTrip(yamlString: string): TripExport {
         quantity: item.quantity,
         bag_name: item.bag_name || null,
         is_packed: item.is_packed,
+        is_skipped: item.is_skipped || undefined,
         notes: item.notes || null,
         is_container: item.is_container || undefined,
         container_name: item.container_name || undefined,
@@ -254,6 +258,7 @@ export function fullBackupToYAML(
           quantity: item.quantity,
           bag_name: bag?.name || null,
           is_packed: item.is_packed,
+          is_skipped: item.is_skipped || undefined,
           notes: item.notes,
           is_container: item.is_container || undefined,
           container_name: container?.name || undefined,
@@ -332,6 +337,7 @@ export function yamlToFullBackup(yamlString: string): FullBackup {
           quantity: item.quantity,
           bag_name: item.bag_name || null,
           is_packed: item.is_packed,
+          is_skipped: item.is_skipped || undefined,
           notes: item.notes || null,
           is_container: item.is_container || undefined,
           container_name: item.container_name || undefined,

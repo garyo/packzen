@@ -88,6 +88,7 @@ export const POST: APIRoute = createPostHandler<Record<string, never>, typeof tr
             notes: item.notes,
             is_container: item.is_container,
             is_packed: false, // Reset packed status for new trip
+            is_skipped: false, // Reset skipped status for new trip
           })
           .returning()
           .get();

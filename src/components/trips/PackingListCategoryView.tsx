@@ -134,6 +134,7 @@ interface PackingListCategoryViewProps {
   selectedItems: Accessor<Set<string>>;
   showUnpackedOnly?: Accessor<boolean>;
   onTogglePacked: (item: TripItem) => void;
+  onToggleSkipped: (item: TripItem) => void;
   onEditItem: (item: TripItem) => void;
   onToggleItemSelection: (itemId: string) => void;
   // Drag-and-drop handlers - only moves between locations, keeps category
@@ -426,6 +427,7 @@ export function PackingListCategoryView(props: PackingListCategoryViewProps) {
                                               bag={bag()}
                                               showBagInfo={true}
                                               onTogglePacked={() => props.onTogglePacked(item)}
+                                              onToggleSkipped={() => props.onToggleSkipped(item)}
                                               onEdit={() => props.onEditItem(item)}
                                               onToggleSelection={() =>
                                                 props.onToggleItemSelection(item.id)
@@ -535,6 +537,7 @@ export function PackingListCategoryView(props: PackingListCategoryViewProps) {
                                             isSelected={props.selectedItems().has(item.id)}
                                             showBagInfo={false}
                                             onTogglePacked={() => props.onTogglePacked(item)}
+                                            onToggleSkipped={() => props.onToggleSkipped(item)}
                                             onEdit={() => props.onEditItem(item)}
                                             onToggleSelection={() =>
                                               props.onToggleItemSelection(item.id)

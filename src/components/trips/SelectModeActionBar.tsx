@@ -17,6 +17,8 @@ interface SelectModeActionBarProps {
   onAssignToBag: (bagId: string | null) => void;
   onAssignToContainer: (containerId: string | null) => void;
   onAssignToCategory: (categoryId: string | null) => void;
+  onSkipAll: () => void;
+  onUnskipAll: () => void;
   onDeleteAll: () => void;
 }
 
@@ -82,6 +84,20 @@ export function SelectModeActionBar(props: SelectModeActionBarProps) {
                 </For>
               </select>
             </div>
+
+            {/* Skip/Unskip Buttons */}
+            <button
+              onClick={props.onSkipAll}
+              class="rounded-lg border border-orange-300 bg-orange-50 px-3 py-1.5 text-sm font-medium text-orange-600 hover:bg-orange-100"
+            >
+              Skip
+            </button>
+            <button
+              onClick={props.onUnskipAll}
+              class="rounded-lg border border-gray-300 bg-gray-50 px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-100"
+            >
+              Unskip
+            </button>
 
             {/* Delete All Button */}
             <button

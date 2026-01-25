@@ -14,6 +14,7 @@ import { formatDateRange } from '../../lib/utils';
 interface PackingPageHeaderProps {
   trip: Accessor<Trip | null | undefined>;
   packedCount: Accessor<number>;
+  skippedCount: Accessor<number>;
   totalCount: Accessor<number>;
   unpackedCount: Accessor<number>;
   visibleItemCount: Accessor<number>;
@@ -157,7 +158,10 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
                 when={props.showUnpackedOnly()}
                 fallback={
                   <p class="text-xs text-gray-600">
-                    {props.packedCount()} of {props.totalCount()} packed
+                    {props.packedCount()} of {props.totalCount() - props.skippedCount()} packed
+                    <Show when={props.skippedCount() > 0}>
+                      <span class="text-gray-400"> · {props.skippedCount()} skipped</span>
+                    </Show>
                     <Show when={props.unpackedCount() > 0 && props.viewMode() === 'pack'}>
                       {' · '}
                       <a

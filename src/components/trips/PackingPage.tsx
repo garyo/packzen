@@ -332,6 +332,51 @@ export function PackingPage(props: PackingPageProps) {
     }
   };
 
+  const handleToggleSkipped = async (item: TripItem) => {
+    const newSkippedState = !item.is_skipped;
+    const originalSkippedState = item.is_skipped;
+
+    // Optimistic update using store - fine-grained, no scroll disruption
+    updateItemInStore(item.id, { is_skipped: newSkippedState });
+
+    try {
+      const response = await api.patch(endpoints.tripItems(props.tripId), {
+        id: item.id,
+        is_skipped: newSkippedState,
+      });
+
+      if (!response.success) {
+        showToast('error', response.error || 'Failed to update item');
+        // Revert on error
+        updateItemInStore(item.id, { is_skipped: originalSkippedState });
+      } else {
+        // Show toast with undo option
+        const actionText = newSkippedState ? 'skipped' : 'unskipped';
+        showToast('info', `${item.name} ${actionText}`, {
+          action: {
+            label: 'Undo',
+            onClick: async () => {
+              updateItemInStore(item.id, { is_skipped: originalSkippedState });
+              try {
+                await api.patch(endpoints.tripItems(props.tripId), {
+                  id: item.id,
+                  is_skipped: originalSkippedState,
+                });
+              } catch {
+                showToast('error', 'Failed to undo');
+                updateItemInStore(item.id, { is_skipped: newSkippedState });
+              }
+            },
+          },
+        });
+      }
+    } catch (error) {
+      showToast('error', 'Failed to update item');
+      // Revert on error
+      updateItemInStore(item.id, { is_skipped: originalSkippedState });
+    }
+  };
+
   const handleAddItem = () => {
     setShowAddForm(true);
   };
@@ -557,6 +602,58 @@ export function PackingPage(props: PackingPageProps) {
       previousCategories.forEach((prevCategoryName, id) => {
         updateItemInStore(id, { category_name: prevCategoryName });
       });
+    }
+  };
+
+  const handleBatchSkip = async () => {
+    const itemsToUpdate = Array.from(selectedItems());
+    if (itemsToUpdate.length === 0) return;
+
+    // Optimistic update
+    updateItemsInStore(itemsToUpdate, { is_skipped: true });
+
+    try {
+      await Promise.all(
+        itemsToUpdate.map((itemId) =>
+          api.patch(endpoints.tripItems(props.tripId), {
+            id: itemId,
+            is_skipped: true,
+          })
+        )
+      );
+
+      showToast('success', `Skipped ${itemsToUpdate.length} items`);
+      setSelectMode(false);
+      setSelectedItems(new Set<string>());
+    } catch (error) {
+      showToast('error', 'Failed to skip items');
+      updateItemsInStore(itemsToUpdate, { is_skipped: false });
+    }
+  };
+
+  const handleBatchUnskip = async () => {
+    const itemsToUpdate = Array.from(selectedItems());
+    if (itemsToUpdate.length === 0) return;
+
+    // Optimistic update
+    updateItemsInStore(itemsToUpdate, { is_skipped: false });
+
+    try {
+      await Promise.all(
+        itemsToUpdate.map((itemId) =>
+          api.patch(endpoints.tripItems(props.tripId), {
+            id: itemId,
+            is_skipped: false,
+          })
+        )
+      );
+
+      showToast('success', `Unskipped ${itemsToUpdate.length} items`);
+      setSelectMode(false);
+      setSelectedItems(new Set<string>());
+    } catch (error) {
+      showToast('error', 'Failed to unskip items');
+      updateItemsInStore(itemsToUpdate, { is_skipped: true });
     }
   };
 
@@ -1035,9 +1132,10 @@ export function PackingPage(props: PackingPageProps) {
   };
 
   const packedCount = () => items()?.filter((i) => i.is_packed).length || 0;
+  const skippedCount = () => items()?.filter((i) => i.is_skipped).length || 0;
   const totalCount = () => items()?.length || 0;
-  const unpackedCount = () => totalCount() - packedCount();
-  const progress = () => getPackingProgress(packedCount(), totalCount());
+  const unpackedCount = () => totalCount() - packedCount() - skippedCount();
+  const progress = () => getPackingProgress(packedCount(), totalCount() - skippedCount());
 
   // Get available containers for select mode
   const getContainers = () => {
@@ -1052,6 +1150,7 @@ export function PackingPage(props: PackingPageProps) {
       <PackingPageHeader
         trip={trip}
         packedCount={packedCount}
+        skippedCount={skippedCount}
         totalCount={totalCount}
         unpackedCount={unpackedCount}
         progress={progress}
@@ -1142,6 +1241,7 @@ export function PackingPage(props: PackingPageProps) {
                           selectedItems={selectedItems}
                           showUnpackedOnly={showUnpackedOnly}
                           onTogglePacked={handleTogglePacked}
+                          onToggleSkipped={handleToggleSkipped}
                           onEditItem={openEditItem}
                           onToggleItemSelection={toggleItemSelection}
                           onMoveItemToBag={handleMoveItemToBag}
@@ -1157,6 +1257,7 @@ export function PackingPage(props: PackingPageProps) {
                         selectedItems={selectedItems}
                         showUnpackedOnly={showUnpackedOnly}
                         onTogglePacked={handleTogglePacked}
+                        onToggleSkipped={handleToggleSkipped}
                         onEditItem={openEditItem}
                         onToggleItemSelection={toggleItemSelection}
                         onAddToBag={(bagId) => openAddForm(bagId)}
@@ -1290,6 +1391,8 @@ export function PackingPage(props: PackingPageProps) {
           onAssignToBag={handleBatchAssignToBag}
           onAssignToContainer={handleBatchAssignToContainer}
           onAssignToCategory={handleBatchAssignToCategory}
+          onSkipAll={handleBatchSkip}
+          onUnskipAll={handleBatchUnskip}
           onDeleteAll={handleBatchDelete}
         />
       </Show>

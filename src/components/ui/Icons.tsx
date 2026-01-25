@@ -188,3 +188,13 @@ export function NotesIcon(props: IconProps): JSX.Element {
     </svg>
   );
 }
+
+/** Skip icon (circle with diagonal line / "not needed") */
+export function SkipIcon(props: IconProps): JSX.Element {
+  return (
+    <svg class={props.class ?? 'h-4 w-4'} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <circle cx="12" cy="12" r="9" stroke-width="2" />
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 19L19 5" />
+    </svg>
+  );
+}

@@ -168,6 +168,7 @@ export const tripItemCreateSchema = z.object({
   notes: sanitizeString(MAX_NOTES_LENGTH).nullable().optional(),
   is_container: z.boolean().default(false),
   is_packed: z.boolean().default(false),
+  is_skipped: z.boolean().default(false),
   merge_duplicates: z.boolean().default(true),
 });
 
@@ -178,6 +179,7 @@ export const tripItemUpdateSchema = z.object({
   quantity: z.number().int().min(MIN_QUANTITY).max(MAX_QUANTITY).optional(),
   bag_id: z.string().uuid().nullable().optional(),
   is_packed: z.boolean().optional(),
+  is_skipped: z.boolean().optional(),
   container_item_id: z.string().uuid().nullable().optional(),
   is_container: z.boolean().optional(),
   notes: sanitizeString(MAX_NOTES_LENGTH).nullable().optional(),
@@ -243,6 +245,7 @@ const yamlTripItemSchema = z.object({
   quantity: z.number().int().min(MIN_QUANTITY).max(MAX_QUANTITY).default(1),
   bag_name: sanitizeString(MAX_NAME_LENGTH).nullable().optional(),
   is_packed: z.boolean().default(false),
+  is_skipped: z.boolean().default(false),
   notes: sanitizeString(MAX_NOTES_LENGTH).nullable().optional(),
   is_container: z.boolean().default(false),
   container_name: sanitizeString(MAX_NAME_LENGTH).nullable().optional(), // Name of parent container for YAML import

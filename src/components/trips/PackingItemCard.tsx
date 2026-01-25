@@ -7,7 +7,7 @@
 
 import { Show, type JSX } from 'solid-js';
 import type { TripItem, Bag } from '../../lib/types';
-import { DragHandleIcon, EditIcon } from '../ui/Icons';
+import { DragHandleIcon, EditIcon, SkipIcon } from '../ui/Icons';
 
 // Type for drag activators from solid-dnd
 type DragActivators = Record<string, (event: any) => void>;
@@ -21,6 +21,7 @@ interface PackingItemCardProps {
   showCategoryInfo?: boolean;
   categoryIcon?: string; // Icon for the item's category (used for containers)
   onTogglePacked: () => void;
+  onToggleSkipped: () => void;
   onEdit: () => void;
   onToggleSelection: () => void;
   // Container-specific props
@@ -43,7 +44,7 @@ export function PackingItemCard(props: PackingItemCardProps) {
       data-trip-item-id={props.item.id}
       class={`flex items-center gap-4 rounded-lg p-4 shadow-sm md:gap-2 md:p-2 ${
         isContainer() ? 'border border-blue-200 bg-blue-50' : 'bg-white'
-      } ${props.item.is_packed ? 'opacity-60' : ''} ${props.selectMode && props.isSelected ? 'ring-2 ring-blue-500' : ''} ${props.isDragging ? 'opacity-50' : ''}`}
+      } ${props.item.is_skipped ? 'bg-gray-100 opacity-50' : ''} ${props.item.is_packed && !props.item.is_skipped ? 'opacity-60' : ''} ${props.selectMode && props.isSelected ? 'ring-2 ring-blue-500' : ''} ${props.isDragging ? 'opacity-50' : ''}`}
     >
       {/* Drag handle - only shown when drag is enabled */}
       <Show when={props.dragActivators}>
@@ -78,11 +79,16 @@ export function PackingItemCard(props: PackingItemCardProps) {
             </span>
           </Show>
           <div
-            class={`min-w-0 flex-1 overflow-hidden text-lg font-medium text-ellipsis whitespace-nowrap md:text-base ${props.item.is_packed ? 'text-gray-500 line-through' : 'text-gray-900'}`}
+            class={`min-w-0 flex-1 overflow-hidden text-lg font-medium text-ellipsis whitespace-nowrap md:text-base ${props.item.is_skipped ? 'text-gray-400 italic' : props.item.is_packed ? 'text-gray-500 line-through' : 'text-gray-900'}`}
           >
             {props.item.name}
+            <Show when={props.item.is_skipped}>
+              <span class="ml-2 rounded bg-gray-200 px-1.5 py-0.5 text-xs font-normal text-gray-500 not-italic">
+                Skipped
+              </span>
+            </Show>
             <Show when={props.item.notes}>
-              <span class="ml-2 text-xs font-normal text-gray-500">{props.item.notes}</span>
+              <span class="ml-2 text-xs font-normal text-gray-500 not-italic">{props.item.notes}</span>
             </Show>
           </div>
           <Show when={hasContents()}>
@@ -111,13 +117,26 @@ export function PackingItemCard(props: PackingItemCardProps) {
       <Show
         when={props.selectMode}
         fallback={
-          <button
-            onClick={props.onEdit}
-            class="p-2 text-gray-400 transition-colors hover:text-blue-600"
-            aria-label="Edit item"
-          >
-            <EditIcon class="h-5 w-5" />
-          </button>
+          <div class="flex items-center">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                props.onToggleSkipped();
+              }}
+              class={`p-2 transition-colors ${props.item.is_skipped ? 'text-orange-500 hover:text-orange-600' : 'text-gray-400 hover:text-orange-500'}`}
+              aria-label={props.item.is_skipped ? 'Unskip item' : 'Skip item'}
+              title={props.item.is_skipped ? 'Unskip (need this item)' : 'Skip (not needed for this trip)'}
+            >
+              <SkipIcon class="h-5 w-5" />
+            </button>
+            <button
+              onClick={props.onEdit}
+              class="p-2 text-gray-400 transition-colors hover:text-blue-600"
+              aria-label="Edit item"
+            >
+              <EditIcon class="h-5 w-5" />
+            </button>
+          </div>
         }
       >
         <input

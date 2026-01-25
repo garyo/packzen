@@ -107,6 +107,7 @@ export const tripItems = sqliteTable('trip_items', {
   category_name: text('category_name'), // Denormalized
   quantity: integer('quantity').notNull().default(1),
   is_packed: integer('is_packed', { mode: 'boolean' }).notNull().default(false),
+  is_skipped: integer('is_skipped', { mode: 'boolean' }).notNull().default(false),
   notes: text('notes'),
   created_at: integer('created_at', { mode: 'timestamp' })
     .notNull()

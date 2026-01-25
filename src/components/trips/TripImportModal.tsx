@@ -100,6 +100,7 @@ export function TripImportModal(props: TripImportModalProps) {
             quantity: itemData.quantity,
             bag_id: bagId,
             is_packed: itemData.is_packed,
+            is_skipped: itemData.is_skipped,
           });
         } else {
           // Create new item
@@ -109,6 +110,7 @@ export function TripImportModal(props: TripImportModalProps) {
             quantity: itemData.quantity,
             bag_id: bagId,
             master_item_id: null,
+            is_skipped: itemData.is_skipped,
           });
           importedCount++;
         }

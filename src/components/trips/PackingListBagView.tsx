@@ -223,6 +223,7 @@ interface PackingListBagViewProps {
   selectedItems: Accessor<Set<string>>;
   showUnpackedOnly?: Accessor<boolean>;
   onTogglePacked: (item: TripItem) => void;
+  onToggleSkipped: (item: TripItem) => void;
   onEditItem: (item: TripItem) => void;
   onToggleItemSelection: (itemId: string) => void;
   // Add item callbacks for bags and containers
@@ -702,6 +703,7 @@ export function PackingListBagView(props: PackingListBagViewProps) {
                                                   : undefined
                                               }
                                               onTogglePacked={() => props.onTogglePacked(item)}
+                                              onToggleSkipped={() => props.onToggleSkipped(item)}
                                               onEdit={() => props.onEditItem(item)}
                                               onToggleSelection={() =>
                                                 props.onToggleItemSelection(item.id)
@@ -927,6 +929,9 @@ export function PackingListBagView(props: PackingListBagViewProps) {
                                                       showCategoryInfo={true}
                                                       onTogglePacked={() =>
                                                         props.onTogglePacked(item)
+                                                      }
+                                                      onToggleSkipped={() =>
+                                                        props.onToggleSkipped(item)
                                                       }
                                                       onEdit={() => props.onEditItem(item)}
                                                       onToggleSelection={() =>
