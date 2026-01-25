@@ -4,9 +4,35 @@
  * Expandable panel for viewing and editing trip notes.
  * Auto-saves on blur with debouncing.
  * Mobile-responsive layout with auto-growing textarea.
+ * URLs in notes are clickable when in view mode.
  */
 
-import { createSignal, onCleanup, onMount } from 'solid-js';
+import { createSignal, onCleanup, onMount, Show } from 'solid-js';
+
+// Convert URLs in text to clickable links
+function linkifyText(text: string) {
+  const urlRegex = /(https?:\/\/[^\s<]+[^\s<.,;:!?"'\])}>])/g;
+  const parts: Array<{ type: 'text' | 'link'; content: string }> = [];
+  let lastIndex = 0;
+  let match;
+
+  while ((match = urlRegex.exec(text)) !== null) {
+    // Add text before the URL
+    if (match.index > lastIndex) {
+      parts.push({ type: 'text', content: text.slice(lastIndex, match.index) });
+    }
+    // Add the URL
+    parts.push({ type: 'link', content: match[1] });
+    lastIndex = match.index + match[1].length;
+  }
+
+  // Add remaining text
+  if (lastIndex < text.length) {
+    parts.push({ type: 'text', content: text.slice(lastIndex) });
+  }
+
+  return parts;
+}
 
 interface TripNotesPanelProps {
   notes: string;
@@ -18,12 +44,19 @@ export function TripNotesPanel(props: TripNotesPanelProps) {
   // Initialize from props once - don't sync afterwards to avoid overwriting user input
   const [localNotes, setLocalNotes] = createSignal(props.notes || '');
   const [isSaving, setIsSaving] = createSignal(false);
+  const [isEditing, setIsEditing] = createSignal(!props.notes); // Start in edit mode if no notes
   let saveTimeoutId: ReturnType<typeof setTimeout> | null = null;
   let textareaRef: HTMLTextAreaElement | undefined;
   let panelRef: HTMLDivElement | undefined;
+  let justEnteredEditMode = false; // Flag to prevent close when entering edit mode
 
   // Click outside to close
   const handleClickOutside = (e: MouseEvent) => {
+    // Skip if we just entered edit mode (the click that triggered edit mode)
+    if (justEnteredEditMode) {
+      justEnteredEditMode = false;
+      return;
+    }
     if (panelRef && !panelRef.contains(e.target as Node)) {
       // Save before closing if there are changes
       if (localNotes() !== props.notes) {
@@ -93,6 +126,54 @@ export function TripNotesPanel(props: TripNotesPanelProps) {
     }
 
     saveNotes(localNotes());
+    // Exit edit mode if there's content
+    if (localNotes().trim()) {
+      setIsEditing(false);
+    }
+  };
+
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if (e.key === 'Escape' && isEditing() && localNotes().trim()) {
+      e.preventDefault();
+      // Save and exit edit mode
+      saveNotes(localNotes());
+      setIsEditing(false);
+    }
+  };
+
+  const enterEditMode = () => {
+    justEnteredEditMode = true;
+    setIsEditing(true);
+    // Focus textarea after render
+    requestAnimationFrame(() => {
+      textareaRef?.focus();
+      adjustHeight();
+    });
+  };
+
+  // Render linkified text preserving newlines
+  const renderLinkedNotes = () => {
+    const lines = localNotes().split('\n');
+    return lines.map((line, lineIndex) => (
+      <>
+        {lineIndex > 0 && <br />}
+        {linkifyText(line).map((part) =>
+          part.type === 'link' ? (
+            <a
+              href={part.content}
+              target="_blank"
+              rel="noopener noreferrer"
+              class="text-blue-600 underline hover:text-blue-800"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {part.content}
+            </a>
+          ) : (
+            <>{part.content}</>
+          )
+        )}
+      </>
+    ));
   };
 
   return (
@@ -105,17 +186,31 @@ export function TripNotesPanel(props: TripNotesPanelProps) {
         {isSaving() && <span class="text-xs text-amber-600">Saving...</span>}
       </div>
 
-      <textarea
-        ref={textareaRef}
-        value={localNotes()}
-        onInput={(e) => handleChange(e.currentTarget.value)}
-        onBlur={handleBlur}
-        placeholder="Add notes..."
-        class="w-full rounded border border-amber-200 bg-white p-2 text-sm text-gray-800 placeholder-gray-400 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 focus:outline-none"
-        style="font-size: 16px; min-height: 80px; max-height: 400px; overflow-y: auto"
-        maxLength={10000}
-        onFocus={adjustHeight}
-      />
+      <Show
+        when={isEditing()}
+        fallback={
+          <div
+            onClick={() => enterEditMode()}
+            class="min-h-[80px] w-full cursor-text rounded border border-amber-200 bg-white p-2 text-sm whitespace-pre-wrap text-gray-800"
+            style="font-size: 16px; max-height: 400px; overflow-y: auto"
+          >
+            {renderLinkedNotes()}
+          </div>
+        }
+      >
+        <textarea
+          ref={textareaRef}
+          value={localNotes()}
+          onInput={(e) => handleChange(e.currentTarget.value)}
+          onBlur={handleBlur}
+          onKeyDown={handleKeyDown}
+          placeholder="Add notes..."
+          class="w-full rounded border border-amber-200 bg-white p-2 text-sm text-gray-800 placeholder-gray-400 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 focus:outline-none"
+          style="font-size: 16px; min-height: 80px; max-height: 400px; overflow-y: auto"
+          maxLength={10000}
+          onFocus={adjustHeight}
+        />
+      </Show>
     </div>
   );
 }
