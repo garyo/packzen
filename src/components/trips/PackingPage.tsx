@@ -209,12 +209,14 @@ export function PackingPage(props: PackingPageProps) {
     );
   });
 
-  const [masterItems] = createResource<MasterItemWithCategory[]>(async () => {
-    return fetchWithErrorHandling(
-      () => api.get<MasterItemWithCategory[]>(endpoints.masterItems),
-      'Failed to load master items'
-    );
-  });
+  const [masterItems, { refetch: refetchMasterItems }] = createResource<MasterItemWithCategory[]>(
+    async () => {
+      return fetchWithErrorHandling(
+        () => api.get<MasterItemWithCategory[]>(endpoints.masterItems),
+        'Failed to load master items'
+      );
+    }
+  );
 
   const filteredItems = createMemo(() => {
     const allItems = items();
@@ -1006,6 +1008,7 @@ export function PackingPage(props: PackingPageProps) {
       }
 
       showToast('success', `Added ${itemsToAdd.length} items to trip and master list`);
+      refetchMasterItems();
     } catch (error) {
       showToast('error', 'Failed to add items');
       console.error('Error adding built-in items to trip:', error);
@@ -1119,6 +1122,7 @@ export function PackingPage(props: PackingPageProps) {
 
       if (tripItemResponse.success && tripItemResponse.data) {
         addItemToStore(tripItemResponse.data as TripItem);
+        refetchMasterItems();
         showToast('success', `Added ${item.name}`);
       } else {
         showToast('error', (tripItemResponse as any).error || 'Failed to add item');
