@@ -59,7 +59,7 @@ export function UpcomingTripsList(props: UpcomingTripsListProps) {
           <div class="py-8 text-center">
             <p class="text-gray-500">No upcoming trips</p>
             <a
-              href="/trips"
+              href="/trips?new=true"
               class="mt-2 inline-block text-lg font-medium text-blue-600 hover:text-blue-500"
             >
               Plan a trip →

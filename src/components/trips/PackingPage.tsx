@@ -916,18 +916,27 @@ export function PackingPage(props: PackingPageProps) {
     containerId?: string | null
   ) => {
     try {
-      // Fetch current master items and categories
-      const [masterItemsResponse, categoriesResponse] = await Promise.all([
-        api.get(endpoints.masterItems),
-        api.get(endpoints.categories),
-      ]);
+      // Use already-loaded resources, fall back to fetching if not yet loaded
+      let currentMasterItems: any[] = masterItems() ? [...masterItems()!] : [];
+      let existingCategories: any[] = categories() ? [...categories()!] : [];
 
-      if (!masterItemsResponse.success || !categoriesResponse.success) {
-        throw new Error('Failed to fetch master items or categories');
+      if (!currentMasterItems.length || !existingCategories.length) {
+        const [masterItemsResponse, categoriesResponse] = await Promise.all([
+          currentMasterItems.length
+            ? Promise.resolve({ success: true, data: currentMasterItems })
+            : api.get(endpoints.masterItems),
+          existingCategories.length
+            ? Promise.resolve({ success: true, data: existingCategories })
+            : api.get(endpoints.categories),
+        ]);
+
+        if (!masterItemsResponse.success || !categoriesResponse.success) {
+          throw new Error('Failed to fetch master items or categories');
+        }
+
+        currentMasterItems = masterItemsResponse.data as any[];
+        existingCategories = categoriesResponse.data as any[];
       }
-
-      const masterItems = masterItemsResponse.data as any[];
-      const existingCategories = categoriesResponse.data as any[];
 
       // Helper to get or create category
       const getCategoryId = async (categoryName: string): Promise<string | null> => {
@@ -955,7 +964,7 @@ export function PackingPage(props: PackingPageProps) {
 
       // Helper to get or create master item
       const getMasterItemId = async (item: SelectedBuiltInItem): Promise<string | null> => {
-        let masterItem = masterItems.find(
+        let masterItem = currentMasterItems.find(
           (m: any) => m.name.toLowerCase() === item.name.toLowerCase()
         );
 
@@ -970,7 +979,7 @@ export function PackingPage(props: PackingPageProps) {
 
           if (response.success && response.data) {
             masterItem = response.data;
-            masterItems.push(masterItem);
+            currentMasterItems.push(masterItem);
           }
         }
 
@@ -981,7 +990,7 @@ export function PackingPage(props: PackingPageProps) {
       for (const item of itemsToAdd) {
         const masterItemId = await getMasterItemId(item);
 
-        await api.post(endpoints.tripItems(props.tripId), {
+        const response = await api.post(endpoints.tripItems(props.tripId), {
           name: item.name,
           category_name: item.category,
           quantity: item.quantity,
@@ -990,10 +999,13 @@ export function PackingPage(props: PackingPageProps) {
           container_item_id: containerId || null,
           master_item_id: masterItemId,
         });
+
+        if (response.success && response.data) {
+          addItemToStore(response.data as TripItem);
+        }
       }
 
       showToast('success', `Added ${itemsToAdd.length} items to trip and master list`);
-      refetch();
     } catch (error) {
       showToast('error', 'Failed to add items');
       console.error('Error adding built-in items to trip:', error);
@@ -1036,18 +1048,27 @@ export function PackingPage(props: PackingPageProps) {
     containerId: string | null
   ) => {
     try {
-      // Fetch current master items and categories
-      const [masterItemsResponse, categoriesResponse] = await Promise.all([
-        api.get(endpoints.masterItems),
-        api.get(endpoints.categories),
-      ]);
+      // Use already-loaded resources, fall back to fetching if not yet loaded
+      let currentMasterItems: any[] = masterItems() ? [...masterItems()!] : [];
+      let existingCategories: any[] = categories() ? [...categories()!] : [];
 
-      if (!masterItemsResponse.success || !categoriesResponse.success) {
-        throw new Error('Failed to fetch master items or categories');
+      if (!currentMasterItems.length || !existingCategories.length) {
+        const [masterItemsResponse, categoriesResponse] = await Promise.all([
+          currentMasterItems.length
+            ? Promise.resolve({ success: true, data: currentMasterItems })
+            : api.get(endpoints.masterItems),
+          existingCategories.length
+            ? Promise.resolve({ success: true, data: existingCategories })
+            : api.get(endpoints.categories),
+        ]);
+
+        if (!masterItemsResponse.success || !categoriesResponse.success) {
+          throw new Error('Failed to fetch master items or categories');
+        }
+
+        currentMasterItems = masterItemsResponse.data as any[];
+        existingCategories = categoriesResponse.data as any[];
       }
-
-      const currentMasterItems = masterItemsResponse.data as any[];
-      const existingCategories = categoriesResponse.data as any[];
 
       // Get or create category
       let category = existingCategories.find(

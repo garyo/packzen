@@ -1,7 +1,7 @@
 export const prerender = false;
 
 import type { APIRoute } from 'astro';
-import { eq, and, asc, count } from 'drizzle-orm';
+import { eq, and, asc, count, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { tripItems, trips, bags } from '../../../../../db/schema';
 import {
@@ -101,23 +101,26 @@ export const POST: APIRoute = async (context) => {
     } = validation.data;
     const { merge_duplicates } = validation.data;
 
-    // Check if an item with the same name and category already exists
-    const existingItems = await db
-      .select()
-      .from(tripItems)
-      .where(eq(tripItems.trip_id, tripId))
-      .all();
-
+    // Check if an item with the same name and category already exists (targeted query)
     const duplicateItem =
       merge_duplicates !== false
-        ? existingItems.find(
-            (item) =>
-              item.name.toLowerCase() === name.toLowerCase() &&
-              (item.category_name?.toLowerCase() || null) ===
-                (category_name?.toLowerCase() || null) &&
-              (item.bag_id || null) === (bag_id || null) &&
-              (item.container_item_id || null) === (container_item_id || null)
-          )
+        ? await db
+            .select()
+            .from(tripItems)
+            .where(
+              and(
+                eq(tripItems.trip_id, tripId),
+                sql`lower(${tripItems.name}) = lower(${name})`,
+                category_name
+                  ? sql`lower(${tripItems.category_name}) = lower(${category_name})`
+                  : sql`${tripItems.category_name} is null`,
+                bag_id ? eq(tripItems.bag_id, bag_id) : sql`${tripItems.bag_id} is null`,
+                container_item_id
+                  ? eq(tripItems.container_item_id, container_item_id)
+                  : sql`${tripItems.container_item_id} is null`
+              )
+            )
+            .get()
         : null;
 
     // If duplicate exists, increment its quantity instead of creating a new item
