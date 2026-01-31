@@ -259,7 +259,7 @@ export function AddFromMasterList(props: AddFromMasterListProps) {
   };
 
   return (
-    <Modal title="Add from My Items" onClose={props.onClose}>
+    <Modal title="Add from My Saved Items" onClose={props.onClose}>
       {/* Container Selector (if containers exist) */}
       <Show when={availableContainers().length > 0}>
         <div class="mb-4">

@@ -2,11 +2,11 @@
  * AddModeView Component
  *
  * Two-panel view for adding items to trip bags via drag-and-drop.
- * Left panel: Item sources (My Items, Built-in templates)
+ * Left panel: Item sources (My Saved Items, Built-in templates)
  * Right panel: Compact bag cards as drop targets
  */
 
-import { createSignal, type Accessor } from 'solid-js';
+import { createSignal, createEffect, type Accessor } from 'solid-js';
 import {
   DragDropProvider,
   DragDropSensors,
@@ -72,6 +72,19 @@ export interface SelectedTarget {
 
 export function AddModeView(props: AddModeViewProps) {
   const [activeTab, setActiveTab] = createSignal<'my-items' | 'built-in'>('my-items');
+
+  // Auto-select Built-in tab if the user has no saved items
+  let hasSetInitialTab = false;
+  createEffect(() => {
+    const items = props.masterItems();
+    if (!hasSetInitialTab && items !== undefined) {
+      hasSetInitialTab = true;
+      if (items.length === 0) {
+        setActiveTab('built-in');
+      }
+    }
+  });
+
   const [draggedItem, setDraggedItem] = createSignal<SourceItemDragData | null>(null);
   const [dragCancelled, setDragCancelled] = createSignal(false);
   // Selected target for click-to-add (undefined means no selection)

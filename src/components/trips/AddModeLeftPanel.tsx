@@ -1,7 +1,7 @@
 /**
  * AddModeLeftPanel Component
  *
- * Left panel with tabs for item sources (My Items, Built-in)
+ * Left panel with tabs for item sources (My Saved Items, Built-in)
  * Items are draggable to bag cards in the right panel
  */
 
@@ -322,7 +322,7 @@ export function AddModeLeftPanel(props: AddModeLeftPanelProps) {
           }}
           onClick={() => props.onTabChange('my-items')}
         >
-          My Items
+          My Saved Items
         </button>
         <button
           class="flex-1 px-4 py-3 text-sm font-medium transition-colors"
@@ -390,7 +390,7 @@ export function AddModeLeftPanel(props: AddModeLeftPanelProps) {
             when={groupedMasterItems().length > 0}
             fallback={
               <div class="py-8 text-center text-gray-500">
-                <p>No items in My Items list</p>
+                <p>No items in My Saved Items list</p>
                 <p class="mt-1 text-sm">Add items on the All Items page first</p>
               </div>
             }
