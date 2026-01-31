@@ -215,6 +215,13 @@ items:
     trip_types: ['hiking', 'week']
 
   # Toiletries
+  - name: 'Toilet Kit'
+    description: 'Zippered bag for toiletries'
+    category: 'Toiletries'
+    default_quantity: 1
+    trip_types: ['overnight', 'weekend', 'week', 'business', 'beach', 'hiking']
+    is_container: true
+
   - name: 'Toothbrush'
     description: 'Travel toothbrush'
     category: 'Toiletries'

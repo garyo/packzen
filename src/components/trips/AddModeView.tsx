@@ -55,6 +55,7 @@ export interface SourceItemDragData {
     description: string | null;
     category: string;
     quantity: number;
+    is_container?: boolean;
   };
 }
 

@@ -81,6 +81,7 @@ export interface BuiltInItem {
   category: string;
   default_quantity: number;
   trip_types: string[]; // Array of trip_type IDs
+  is_container?: boolean;
 }
 
 export interface BuiltInItemsData {
@@ -95,4 +96,5 @@ export interface SelectedBuiltInItem {
   description: string | null;
   category: string;
   quantity: number; // User-adjusted quantity
+  is_container?: boolean;
 }

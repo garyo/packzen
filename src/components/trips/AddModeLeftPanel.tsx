@@ -38,6 +38,7 @@ interface DraggableItemProps {
   description?: string | null;
   isInTrip: boolean;
   isPacked?: boolean;
+  isContainer?: boolean;
   tripItemId?: string; // ID of the trip item (for removal)
   dragData: SourceItemDragData;
   onRemove?: (tripItemId: string) => void;
@@ -103,6 +104,11 @@ function DraggableSourceItem(props: DraggableItemProps) {
       {/* Item info */}
       <div class="min-w-0 flex-1">
         <div class="flex items-center gap-2">
+          {props.isContainer && (
+            <span class="text-xs" title="Container">
+              📦
+            </span>
+          )}
           <span class="truncate font-medium text-gray-900">{props.name}</span>
           {props.quantity && props.quantity > 1 && (
             <span class="text-xs text-gray-500">x{props.quantity}</span>
@@ -429,6 +435,7 @@ export function AddModeLeftPanel(props: AddModeLeftPanelProps) {
                               description={item.description}
                               isInTrip={isItemInTrip(item.id, item.name, 'master')}
                               isPacked={isItemPacked(item.id, item.name, 'master')}
+                              isContainer={item.is_container}
                               tripItemId={getTripItemId(item.id, item.name, 'master')}
                               onRemove={props.onRemoveFromTrip}
                               dragData={dragData}
@@ -484,6 +491,7 @@ export function AddModeLeftPanel(props: AddModeLeftPanelProps) {
                               description: item.description,
                               category: item.category,
                               quantity: item.default_quantity,
+                              is_container: item.is_container,
                             },
                           };
                           return (
@@ -495,6 +503,7 @@ export function AddModeLeftPanel(props: AddModeLeftPanelProps) {
                               description={item.description}
                               isInTrip={isItemInTrip('', item.name, 'built-in')}
                               isPacked={isItemPacked('', item.name, 'built-in')}
+                              isContainer={item.is_container}
                               tripItemId={getTripItemId('', item.name, 'built-in')}
                               onRemove={props.onRemoveFromTrip}
                               dragData={dragData}

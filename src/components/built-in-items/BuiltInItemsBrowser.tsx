@@ -205,6 +205,7 @@ export function BuiltInItemsBrowser(props: BuiltInItemsBrowserProps) {
           description: item.description,
           category: item.category,
           quantity,
+          is_container: item.is_container,
         };
       }
     );
@@ -408,7 +409,14 @@ export function BuiltInItemsBrowser(props: BuiltInItemsBrowserProps) {
                                 class="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                               />
                               <div class="flex-1">
-                                <p class="font-medium text-gray-900">{item.name}</p>
+                                <p class="font-medium text-gray-900">
+                                  {item.is_container && (
+                                    <span class="mr-1 text-xs" title="Container">
+                                      📦
+                                    </span>
+                                  )}
+                                  {item.name}
+                                </p>
                                 {item.description && (
                                   <p class="text-sm text-gray-600">{item.description}</p>
                                 )}

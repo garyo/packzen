@@ -977,6 +977,7 @@ export function PackingPage(props: PackingPageProps) {
             description: item.description,
             category_id: categoryId,
             default_quantity: item.quantity,
+            is_container: item.is_container || false,
           });
 
           if (response.success && response.data) {
@@ -1000,6 +1001,7 @@ export function PackingPage(props: PackingPageProps) {
           bag_id: containerId ? null : bagId || null, // Clear bag if using container
           container_item_id: containerId || null,
           master_item_id: masterItemId,
+          is_container: item.is_container || false,
         });
 
         if (response.success && response.data) {
@@ -1046,7 +1048,13 @@ export function PackingPage(props: PackingPageProps) {
 
   // Handler for adding built-in items from Add mode drag-drop
   const handleAddBuiltInItemFromAddMode = async (
-    item: { name: string; description: string | null; category: string; quantity: number },
+    item: {
+      name: string;
+      description: string | null;
+      category: string;
+      quantity: number;
+      is_container?: boolean;
+    },
     bagId: string | null,
     containerId: string | null
   ) => {
@@ -1102,6 +1110,7 @@ export function PackingPage(props: PackingPageProps) {
           description: item.description,
           category_id: category?.id || null,
           default_quantity: item.quantity,
+          is_container: item.is_container || false,
         });
 
         if (response.success && response.data) {
@@ -1118,6 +1127,7 @@ export function PackingPage(props: PackingPageProps) {
         bag_id: containerId ? null : bagId,
         container_item_id: containerId,
         master_item_id: masterItem?.id || null,
+        is_container: item.is_container || false,
       });
 
       if (tripItemResponse.success && tripItemResponse.data) {
