@@ -238,12 +238,21 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
     // Populate category
     if (item.categoryId) {
       setCategoryId(item.categoryId);
+      setIsNewCategory(false);
     } else if (item.categoryName) {
       // Match built-in category name to user's categories (case-insensitive)
       const matchedCategory = categories()?.find(
         (cat) => cat.name.toLowerCase() === item.categoryName!.toLowerCase()
       );
-      setCategoryId(matchedCategory?.id || null);
+      if (matchedCategory) {
+        setCategoryId(matchedCategory.id);
+        setIsNewCategory(false);
+      } else {
+        // Pre-fill new category with the built-in category name
+        setCategoryId(null);
+        setIsNewCategory(true);
+        setNewCategoryName(item.categoryName);
+      }
     }
 
     // Populate quantity
@@ -261,6 +270,21 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
   const sortedCategories = createMemo(() => {
     const cats = categories() || [];
     return [...cats].sort((a, b) => a.name.localeCompare(b.name));
+  });
+
+  // Built-in category names not already in user's categories
+  const builtInOnlyCategories = createMemo(() => {
+    const userNames = new Set((categories() || []).map((c) => c.name.toLowerCase()));
+    const seen = new Set<string>();
+    return builtInItems.categories
+      .map((c) => c.name)
+      .filter((name) => {
+        const lower = name.toLowerCase();
+        if (userNames.has(lower) || seen.has(lower)) return false;
+        seen.add(lower);
+        return true;
+      })
+      .sort((a, b) => a.localeCompare(b));
   });
 
   const handleSubmit = async (e: Event) => {
@@ -460,6 +484,10 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
                 if (value === '__new__') {
                   setIsNewCategory(true);
                   setCategoryId(null);
+                } else if (value.startsWith('__builtin__:')) {
+                  setIsNewCategory(true);
+                  setCategoryId(null);
+                  setNewCategoryName(value.substring('__builtin__:'.length));
                 } else {
                   setCategoryId(value || null);
                 }
@@ -470,6 +498,13 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
               <For each={sortedCategories()}>
                 {(category) => <option value={category.id}>{category.name}</option>}
               </For>
+              <Show when={builtInOnlyCategories().length > 0}>
+                <optgroup label="Built-in categories">
+                  <For each={builtInOnlyCategories()}>
+                    {(name) => <option value={`__builtin__:${name}`}>{name}</option>}
+                  </For>
+                </optgroup>
+              </Show>
               <option value="__new__">+ New category...</option>
             </select>
           </Show>
