@@ -148,8 +148,17 @@ function DraggableSourceItem(props: DraggableItemProps) {
 export function AddModeLeftPanel(props: AddModeLeftPanelProps) {
   const [searchQuery, setSearchQuery] = createSignal('');
   const [selectedTripTypes, setSelectedTripTypes] = createSignal<Set<string>>(new Set());
-  // Track manually collapsed categories (all categories start expanded)
-  const [manuallyCollapsed, setManuallyCollapsed] = createSignal<Set<string>>(new Set());
+  // Track manually expanded categories (all categories start collapsed), persisted in localStorage
+  const STORAGE_KEY = 'packzen-addmode-expanded-categories';
+  const loadExpanded = (): Set<string> => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch {
+      return new Set();
+    }
+  };
+  const [manuallyExpanded, setManuallyExpanded] = createSignal<Set<string>>(loadExpanded());
 
   // Get set of master item IDs already in trip
   const tripMasterItemIds = createMemo(() => {
@@ -268,28 +277,29 @@ export function AddModeLeftPanel(props: AddModeLeftPanelProps) {
   });
 
   const toggleCategory = (category: string) => {
-    setManuallyCollapsed((prev) => {
+    setManuallyExpanded((prev) => {
       const next = new Set(prev);
       if (next.has(category)) {
         next.delete(category);
       } else {
         next.add(category);
       }
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify([...next]));
+      } catch {}
       return next;
     });
   };
 
   // Category is expanded if:
-  // - It's not manually collapsed, OR
-  // - There's an active search (override manual collapse to show results)
+  // - It's been manually expanded, OR
+  // - There's an active search (override to show results)
   const isCategoryExpanded = (category: string) => {
     const isSearching = searchQuery().trim().length > 0;
     if (isSearching) {
-      // When searching, always show categories with results
       return true;
     }
-    // Not searching - respect manual collapse state (default is expanded)
-    return !manuallyCollapsed().has(category);
+    return manuallyExpanded().has(category);
   };
 
   // Trip types from built-in-items.yaml
