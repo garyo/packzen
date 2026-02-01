@@ -26,9 +26,9 @@ const PLAN_LIMITS: Record<BillingPlan | 'none', PlanLimits> = {
   // Free users - baseline limits
   free_user: {
     maxTrips: 3,
-    maxItemsPerTrip: 50,
+    maxItemsPerTrip: 100,
     maxCategories: 50,
-    maxMasterItems: 50,
+    maxMasterItems: 100,
     maxBagTemplates: 3,
   },
   // Standard (paid) plan - same for now, can increase later
