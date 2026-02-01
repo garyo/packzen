@@ -41,7 +41,12 @@
       "Bash(uvx webctl agent-prompt)",
       "Bash(uvx webctl:*)",
       "Bash(jq:*)",
-      "Bash(bunx eslint:*)"
+      "Bash(bunx eslint:*)",
+      "Bash(npx tsc:*)",
+      "Bash(gh run list:*)",
+      "Bash(node_modules/.bin/wrangler d1 execute:*)",
+      "Bash(chmod:*)",
+      "Bash(bash:*)"
     ]
   }
 }

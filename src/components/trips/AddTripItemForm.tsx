@@ -28,6 +28,7 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
   const [newCategoryName, setNewCategoryName] = createSignal('');
   const [isContainer, setIsContainer] = createSignal(false);
   const [skipMasterAddition, setSkipMasterAddition] = createSignal(false);
+  let formRef: HTMLFormElement | undefined;
 
   // Use pre-loaded bags if available, otherwise fetch
   const [bags] = createResource<Bag[]>(
@@ -407,18 +408,16 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
           setTimeout(() => {
             setLocation(`container:${newContainerId}`);
             setCategoryId(lastCategoryId);
+            formRef?.querySelector<HTMLInputElement>('input[type="text"]')?.focus();
           }, 250);
         } else {
           // For regular items, restore location and category after refetch
           setTimeout(() => {
             setLocation(lastLocation);
             setCategoryId(lastCategoryId);
+            formRef?.querySelector<HTMLInputElement>('input[type="text"]')?.focus();
           }, 250);
         }
-        // Focus back on name input
-        setTimeout(() => {
-          document.querySelector<HTMLInputElement>('input[type="text"]')?.focus();
-        }, 0);
       } else {
         props.onSaved(createdItem);
         props.onClose();
@@ -435,7 +434,7 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
 
   return (
     <Modal title="Add Item" onClose={props.onClose}>
-      <form onSubmit={handleAddAnother} class="space-y-4">
+      <form ref={formRef} onSubmit={handleAddAnother} class="space-y-4">
         <div>
           <label class="mb-1 block text-sm font-medium text-gray-700">Item Name</label>
           <Combobox
