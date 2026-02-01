@@ -81,7 +81,7 @@ export function BagSelectionForm(props: BagSelectionFormProps) {
       {/* Templates Section */}
       <Show when={props.templates.length > 0}>
         <div>
-          <h4 class="mb-3 text-sm font-medium text-gray-700">My Bags</h4>
+          <h4 class="mb-3 text-sm font-medium text-gray-700">My Saved Bags (click to select)</h4>
           <div class="grid gap-3 sm:grid-cols-2">
             <For each={props.templates}>
               {(template) => {
@@ -294,7 +294,7 @@ export function BagSelectionForm(props: BagSelectionFormProps) {
             Skip Bags
           </Button>
           <Button type="button" onClick={props.onSubmit}>
-            {totalBagsSelected() > 0 ? 'Create Trip with Bags' : 'Create Trip'}
+            {totalBagsSelected() > 0 ? 'Create Trip with Bags' : 'Create Trip (no bags)'}
           </Button>
         </div>
       </div>

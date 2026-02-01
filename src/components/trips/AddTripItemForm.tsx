@@ -575,19 +575,18 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
           </label>
         </div>
 
-        <div class="flex flex-col gap-2 pt-4">
-          <Button type="submit" class="flex w-full items-center justify-center gap-2">
-            <span>Add Another</span>
-            <span class="rounded bg-white/20 px-1.5 py-0.5 font-mono text-xs">↵</span>
+        <div class="flex gap-2 pt-4">
+          <Button type="button" onClick={handleSubmit} class="flex-1">
+            Add
           </Button>
-          <div class="flex gap-2">
-            <Button type="button" variant="secondary" onClick={handleSubmit} class="flex-1">
-              Add & Close
-            </Button>
-            <Button type="button" variant="secondary" onClick={props.onClose}>
-              Close
-            </Button>
-          </div>
+          <Button
+            type="submit"
+            class="flex flex-1 items-center justify-center gap-2"
+            variant="secondary"
+          >
+            <span>Add More</span>
+            <span class="rounded bg-gray-900/10 px-1.5 py-0.5 font-mono text-xs">↵</span>
+          </Button>
         </div>
       </form>
     </Modal>
