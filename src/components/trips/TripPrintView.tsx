@@ -442,7 +442,7 @@ export function TripPrintView(props: TripPrintViewProps) {
               window.location.href = `/trips/${props.tripId}/print?sortBy=${newSortBy}&columns=${columns}`;
             }}
           >
-            {props.sortBy === 'bag' ? '📁 Sort by Category' : '👜 Sort by Bag'}
+            {props.sortBy === 'category' ? '📁 Sort by Category' : '👜 Sort by Bag'}
           </button>
           <button
             class="sort-button"
@@ -452,7 +452,7 @@ export function TripPrintView(props: TripPrintViewProps) {
               window.location.href = `/trips/${props.tripId}/print?sortBy=${sortBy}&columns=${newColumns}`;
             }}
           >
-            {twoColumn() ? '📄 1 Column' : '📄 2 Columns'}
+            {twoColumn() ? '📄 2 Columns' : '📄 1 Column'}
           </button>
           <button class="print-button" onClick={() => window.print()}>
             🖨️ Print
