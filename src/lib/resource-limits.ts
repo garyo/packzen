@@ -68,96 +68,87 @@ export interface LimitCheckResult {
 }
 
 /**
- * Check if user can create another trip
+ * Generic resource limit checker.
+ * All specific check functions delegate to this.
  */
+function checkLimit(
+  currentCount: number,
+  billingStatus: BillingStatus | null,
+  limitKey: keyof PlanLimits,
+  message: (max: number) => string
+): LimitCheckResult {
+  const limits = getLimitsForPlan(billingStatus);
+  const maxAllowed = limits[limitKey];
+  const allowed = currentCount < maxAllowed;
+  return {
+    allowed,
+    currentCount,
+    maxAllowed,
+    message: allowed ? undefined : message(maxAllowed),
+  };
+}
+
 export function checkTripLimit(
   currentCount: number,
   billingStatus: BillingStatus | null
 ): LimitCheckResult {
-  const limits = getLimitsForPlan(billingStatus);
-  const allowed = currentCount < limits.maxTrips;
-  return {
-    allowed,
+  return checkLimit(
     currentCount,
-    maxAllowed: limits.maxTrips,
-    message: allowed
-      ? undefined
-      : `You've reached the maximum of ${limits.maxTrips} trips. Please delete some trips to create new ones.`,
-  };
+    billingStatus,
+    'maxTrips',
+    (max) =>
+      `You've reached the maximum of ${max} trips. Please delete some trips to create new ones, or upgrade your subscription.`
+  );
 }
 
-/**
- * Check if user can add another item to a trip
- */
 export function checkTripItemLimit(
   currentCount: number,
   billingStatus: BillingStatus | null
 ): LimitCheckResult {
-  const limits = getLimitsForPlan(billingStatus);
-  const allowed = currentCount < limits.maxItemsPerTrip;
-  return {
-    allowed,
+  return checkLimit(
     currentCount,
-    maxAllowed: limits.maxItemsPerTrip,
-    message: allowed
-      ? undefined
-      : `This trip has reached the maximum of ${limits.maxItemsPerTrip} items.`,
-  };
+    billingStatus,
+    'maxItemsPerTrip',
+    (max) =>
+      `This trip has reached the maximum of ${max} items. Please remove some, or upgrade your subscription.`
+  );
 }
 
-/**
- * Check if user can create another category
- */
 export function checkCategoryLimit(
   currentCount: number,
   billingStatus: BillingStatus | null
 ): LimitCheckResult {
-  const limits = getLimitsForPlan(billingStatus);
-  const allowed = currentCount < limits.maxCategories;
-  return {
-    allowed,
+  return checkLimit(
     currentCount,
-    maxAllowed: limits.maxCategories,
-    message: allowed
-      ? undefined
-      : `You've reached the maximum of ${limits.maxCategories} categories.`,
-  };
+    billingStatus,
+    'maxCategories',
+    (max) =>
+      `You've reached the maximum of ${max} categories. Please remove some, or upgrade your subscription.`
+  );
 }
 
-/**
- * Check if user can create another master item
- */
 export function checkMasterItemLimit(
   currentCount: number,
   billingStatus: BillingStatus | null
 ): LimitCheckResult {
-  const limits = getLimitsForPlan(billingStatus);
-  const allowed = currentCount < limits.maxMasterItems;
-  return {
-    allowed,
+  return checkLimit(
     currentCount,
-    maxAllowed: limits.maxMasterItems,
-    message: allowed
-      ? undefined
-      : `You've reached the maximum of ${limits.maxMasterItems} items in your master list.`,
-  };
+    billingStatus,
+    'maxMasterItems',
+    (max) =>
+      `You've reached the maximum of ${max} items in your master list. Please remove some, or upgrade your subscription.`
+  );
 }
 
-/**
- * Check if user can create another bag template
- */
 export function checkBagTemplateLimit(
   currentCount: number,
   billingStatus: BillingStatus | null
 ): LimitCheckResult {
-  const limits = getLimitsForPlan(billingStatus);
-  const allowed = currentCount < limits.maxBagTemplates;
-  return {
-    allowed,
+  return checkLimit(
     currentCount,
-    maxAllowed: limits.maxBagTemplates,
-    message: allowed
-      ? undefined
-      : `You've reached the maximum of ${limits.maxBagTemplates} bag templates.`,
-  };
+    billingStatus,
+    'maxBagTemplates',
+    (max) =>
+      `You've reached the maximum of ${max} bag templates. Please remove some, or upgrade your subscription.`
+  );
 }

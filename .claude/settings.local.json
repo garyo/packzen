@@ -46,7 +46,11 @@
       "Bash(gh run list:*)",
       "Bash(node_modules/.bin/wrangler d1 execute:*)",
       "Bash(chmod:*)",
-      "Bash(bash:*)"
+      "Bash(bash:*)",
+      "Bash(sort:*)",
+      "Bash(du:*)",
+      "Bash(npx astro check:*)",
+      "Bash(node -e:*)"
     ]
   }
 }

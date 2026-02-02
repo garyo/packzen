@@ -2,7 +2,6 @@ export const prerender = false;
 
 import type { APIRoute } from 'astro';
 import { eq, and, count } from 'drizzle-orm';
-import { z } from 'zod';
 import { masterItems, categories } from '../../../../db/schema';
 import { masterItemCreateSchema, validateRequestSafe } from '../../../lib/validation';
 import {
@@ -16,38 +15,28 @@ import {
 } from '../../../lib/api-helpers';
 import { checkMasterItemLimit } from '../../../lib/resource-limits';
 
+/** Shared select shape for master items joined with category name */
+export const masterItemWithCategorySelect = {
+  id: masterItems.id,
+  clerk_user_id: masterItems.clerk_user_id,
+  category_id: masterItems.category_id,
+  name: masterItems.name,
+  description: masterItems.description,
+  default_quantity: masterItems.default_quantity,
+  is_container: masterItems.is_container,
+  created_at: masterItems.created_at,
+  updated_at: masterItems.updated_at,
+  category_name: categories.name,
+} as const;
+
 export const GET: APIRoute = createGetHandler(async ({ db, userId }) => {
   return await db
-    .select({
-      id: masterItems.id,
-      clerk_user_id: masterItems.clerk_user_id,
-      category_id: masterItems.category_id,
-      name: masterItems.name,
-      description: masterItems.description,
-      default_quantity: masterItems.default_quantity,
-      is_container: masterItems.is_container,
-      created_at: masterItems.created_at,
-      updated_at: masterItems.updated_at,
-      category_name: categories.name,
-    })
+    .select(masterItemWithCategorySelect)
     .from(masterItems)
     .leftJoin(categories, eq(masterItems.category_id, categories.id))
     .where(eq(masterItems.clerk_user_id, userId))
     .all();
 }, 'fetch master items');
-
-type MasterItemWithCategory = {
-  id: string;
-  clerk_user_id: string;
-  category_id: string | null;
-  name: string;
-  description: string | null;
-  default_quantity: number;
-  is_container: boolean;
-  created_at: Date;
-  updated_at: Date;
-  category_name: string | null;
-};
 
 export const POST: APIRoute = async (context) => {
   try {
@@ -55,7 +44,6 @@ export const POST: APIRoute = async (context) => {
     const userId = getUserId(context.locals);
     const billingStatus = getBillingStatus(context.locals);
 
-    // Validate request body
     const body = await context.request.json();
     const validation = validateRequestSafe(masterItemCreateSchema, body);
     if (!validation.success) {
@@ -103,18 +91,7 @@ export const POST: APIRoute = async (context) => {
 
     // Fetch the item with category name
     const result = await db
-      .select({
-        id: masterItems.id,
-        clerk_user_id: masterItems.clerk_user_id,
-        category_id: masterItems.category_id,
-        name: masterItems.name,
-        description: masterItems.description,
-        default_quantity: masterItems.default_quantity,
-        is_container: masterItems.is_container,
-        created_at: masterItems.created_at,
-        updated_at: masterItems.updated_at,
-        category_name: categories.name,
-      })
+      .select(masterItemWithCategorySelect)
       .from(masterItems)
       .leftJoin(categories, eq(masterItems.category_id, categories.id))
       .where(eq(masterItems.id, newItem.id))

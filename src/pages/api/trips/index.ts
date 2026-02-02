@@ -2,12 +2,10 @@ export const prerender = false;
 
 import type { APIRoute } from 'astro';
 import { eq, desc, count, sql } from 'drizzle-orm';
-import { z } from 'zod';
-import { trips, bags, tripItems } from '../../../../db/schema';
+import { trips } from '../../../../db/schema';
 import { tripCreateSchema, validateRequestSafe } from '../../../lib/validation';
 import {
   createGetHandler,
-  createPostHandler,
   getBillingStatus,
   errorResponse,
   getDatabaseConnection,

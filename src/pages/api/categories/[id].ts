@@ -5,7 +5,7 @@ import { eq, and } from 'drizzle-orm';
 import { z } from 'zod';
 import { categories } from '../../../../db/schema';
 import { categoryUpdateSchema, validateRequestSafe } from '../../../lib/validation';
-import { createPatchHandler, createDeleteHandler, errorResponse } from '../../../lib/api-helpers';
+import { createPatchHandler, createDeleteHandler } from '../../../lib/api-helpers';
 
 export const PATCH: APIRoute = createPatchHandler<
   z.infer<typeof categoryUpdateSchema>,
@@ -41,7 +41,7 @@ export const PATCH: APIRoute = createPatchHandler<
   (data) => validateRequestSafe(categoryUpdateSchema, data)
 );
 
-export const DELETE: APIRoute = createDeleteHandler(async ({ db, userId, params, request }) => {
+export const DELETE: APIRoute = createDeleteHandler(async ({ db, userId, params }) => {
   const categoryId = params.id;
   if (!categoryId) {
     return false;

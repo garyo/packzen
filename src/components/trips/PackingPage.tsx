@@ -39,7 +39,6 @@ import { fetchWithErrorHandling, fetchSingleWithErrorHandling } from '../../lib/
 import { tripToYAML, downloadYAML } from '../../lib/yaml';
 import { deleteTripWithConfirm } from '../../lib/trip-actions';
 import { TripForm } from './TripForm';
-import { TripNotesPanel } from './TripNotesPanel';
 import { ChevronLeftIcon } from '../ui/Icons';
 
 interface PackingPageProps {
@@ -289,95 +288,54 @@ export function PackingPage(props: PackingPageProps) {
     }
   });
 
-  const handleTogglePacked = async (item: TripItem) => {
-    const newPackedState = !item.is_packed;
-    const originalPackedState = item.is_packed;
+  // Generic optimistic toggle with undo support
+  async function handleToggleField(
+    item: TripItem,
+    field: 'is_packed' | 'is_skipped',
+    actionLabel: string
+  ) {
+    const newValue = !item[field];
+    const originalValue = item[field];
 
-    // Optimistic update using store - fine-grained, no scroll disruption
-    updateItemInStore(item.id, { is_packed: newPackedState });
+    updateItemInStore(item.id, { [field]: newValue });
 
     try {
       const response = await api.patch(endpoints.tripItems(props.tripId), {
         id: item.id,
-        is_packed: newPackedState,
+        [field]: newValue,
       });
 
       if (!response.success) {
         showToast('error', response.error || 'Failed to update item');
-        // Revert on error
-        updateItemInStore(item.id, { is_packed: originalPackedState });
+        updateItemInStore(item.id, { [field]: originalValue });
       } else {
-        // Show toast with undo option
-        const actionText = newPackedState ? 'packed' : 'unpacked';
+        const actionText = newValue ? actionLabel : `un${actionLabel}`;
         showToast('info', `${item.name} ${actionText}`, {
           action: {
             label: 'Undo',
             onClick: async () => {
-              updateItemInStore(item.id, { is_packed: originalPackedState });
+              updateItemInStore(item.id, { [field]: originalValue });
               try {
                 await api.patch(endpoints.tripItems(props.tripId), {
                   id: item.id,
-                  is_packed: originalPackedState,
+                  [field]: originalValue,
                 });
               } catch {
                 showToast('error', 'Failed to undo');
-                updateItemInStore(item.id, { is_packed: newPackedState });
+                updateItemInStore(item.id, { [field]: newValue });
               }
             },
           },
         });
       }
-    } catch (error) {
+    } catch {
       showToast('error', 'Failed to update item');
-      // Revert on error
-      updateItemInStore(item.id, { is_packed: originalPackedState });
+      updateItemInStore(item.id, { [field]: originalValue });
     }
-  };
+  }
 
-  const handleToggleSkipped = async (item: TripItem) => {
-    const newSkippedState = !item.is_skipped;
-    const originalSkippedState = item.is_skipped;
-
-    // Optimistic update using store - fine-grained, no scroll disruption
-    updateItemInStore(item.id, { is_skipped: newSkippedState });
-
-    try {
-      const response = await api.patch(endpoints.tripItems(props.tripId), {
-        id: item.id,
-        is_skipped: newSkippedState,
-      });
-
-      if (!response.success) {
-        showToast('error', response.error || 'Failed to update item');
-        // Revert on error
-        updateItemInStore(item.id, { is_skipped: originalSkippedState });
-      } else {
-        // Show toast with undo option
-        const actionText = newSkippedState ? 'skipped' : 'unskipped';
-        showToast('info', `${item.name} ${actionText}`, {
-          action: {
-            label: 'Undo',
-            onClick: async () => {
-              updateItemInStore(item.id, { is_skipped: originalSkippedState });
-              try {
-                await api.patch(endpoints.tripItems(props.tripId), {
-                  id: item.id,
-                  is_skipped: originalSkippedState,
-                });
-              } catch {
-                showToast('error', 'Failed to undo');
-                updateItemInStore(item.id, { is_skipped: newSkippedState });
-              }
-            },
-          },
-        });
-      }
-    } catch (error) {
-      showToast('error', 'Failed to update item');
-      // Revert on error
-      updateItemInStore(item.id, { is_skipped: originalSkippedState });
-    }
-  };
+  const handleTogglePacked = (item: TripItem) => handleToggleField(item, 'is_packed', 'packed');
+  const handleToggleSkipped = (item: TripItem) => handleToggleField(item, 'is_skipped', 'skipped');
 
   const handleAddItem = () => {
     setShowAddForm(true);
@@ -414,42 +372,32 @@ export function PackingPage(props: PackingPageProps) {
   };
 
   // Open add modals with pre-selected bag or container
-  const openAddForm = (bagId?: string, containerId?: string) => {
+  function openModalWithPreSelection(
+    setter: (v: boolean) => void,
+    bagId?: string,
+    containerId?: string
+  ) {
     setPreSelectedBagId(bagId || null);
     setPreSelectedContainerId(containerId || null);
-    setShowAddForm(true);
-  };
+    setter(true);
+  }
 
-  const openAddFromMaster = (bagId?: string, containerId?: string) => {
-    setPreSelectedBagId(bagId || null);
-    setPreSelectedContainerId(containerId || null);
-    setShowAddFromMaster(true);
-  };
-
-  const openBrowseTemplates = (bagId?: string, containerId?: string) => {
-    setPreSelectedBagId(bagId || null);
-    setPreSelectedContainerId(containerId || null);
-    setShowBuiltInItems(true);
-  };
-
-  // Clear pre-selection when closing modals
-  const closeAddForm = () => {
-    setShowAddForm(false);
+  function closeModalWithPreSelection(setter: (v: boolean) => void) {
+    setter(false);
     setPreSelectedBagId(null);
     setPreSelectedContainerId(null);
-  };
+  }
 
-  const closeAddFromMaster = () => {
-    setShowAddFromMaster(false);
-    setPreSelectedBagId(null);
-    setPreSelectedContainerId(null);
-  };
+  const openAddForm = (bagId?: string, containerId?: string) =>
+    openModalWithPreSelection(setShowAddForm, bagId, containerId);
+  const openAddFromMaster = (bagId?: string, containerId?: string) =>
+    openModalWithPreSelection(setShowAddFromMaster, bagId, containerId);
+  const openBrowseTemplates = (bagId?: string, containerId?: string) =>
+    openModalWithPreSelection(setShowBuiltInItems, bagId, containerId);
 
-  const closeBrowseTemplates = () => {
-    setShowBuiltInItems(false);
-    setPreSelectedBagId(null);
-    setPreSelectedContainerId(null);
-  };
+  const closeAddForm = () => closeModalWithPreSelection(setShowAddForm);
+  const closeAddFromMaster = () => closeModalWithPreSelection(setShowAddFromMaster);
+  const closeBrowseTemplates = () => closeModalWithPreSelection(setShowBuiltInItems);
 
   const toggleSelectMode = () => {
     setSelectMode(!selectMode());
@@ -607,57 +555,34 @@ export function PackingPage(props: PackingPageProps) {
     }
   };
 
-  const handleBatchSkip = async () => {
+  async function handleBatchSetSkipped(skip: boolean) {
     const itemsToUpdate = Array.from(selectedItems());
     if (itemsToUpdate.length === 0) return;
 
-    // Optimistic update
-    updateItemsInStore(itemsToUpdate, { is_skipped: true });
+    updateItemsInStore(itemsToUpdate, { is_skipped: skip });
 
     try {
       await Promise.all(
         itemsToUpdate.map((itemId) =>
           api.patch(endpoints.tripItems(props.tripId), {
             id: itemId,
-            is_skipped: true,
+            is_skipped: skip,
           })
         )
       );
 
-      showToast('success', `Skipped ${itemsToUpdate.length} items`);
+      const label = skip ? 'Skipped' : 'Unskipped';
+      showToast('success', `${label} ${itemsToUpdate.length} items`);
       setSelectMode(false);
       setSelectedItems(new Set<string>());
-    } catch (error) {
-      showToast('error', 'Failed to skip items');
-      updateItemsInStore(itemsToUpdate, { is_skipped: false });
+    } catch {
+      showToast('error', `Failed to ${skip ? 'skip' : 'unskip'} items`);
+      updateItemsInStore(itemsToUpdate, { is_skipped: !skip });
     }
-  };
+  }
 
-  const handleBatchUnskip = async () => {
-    const itemsToUpdate = Array.from(selectedItems());
-    if (itemsToUpdate.length === 0) return;
-
-    // Optimistic update
-    updateItemsInStore(itemsToUpdate, { is_skipped: false });
-
-    try {
-      await Promise.all(
-        itemsToUpdate.map((itemId) =>
-          api.patch(endpoints.tripItems(props.tripId), {
-            id: itemId,
-            is_skipped: false,
-          })
-        )
-      );
-
-      showToast('success', `Unskipped ${itemsToUpdate.length} items`);
-      setSelectMode(false);
-      setSelectedItems(new Set<string>());
-    } catch (error) {
-      showToast('error', 'Failed to unskip items');
-      updateItemsInStore(itemsToUpdate, { is_skipped: true });
-    }
-  };
+  const handleBatchSkip = () => handleBatchSetSkipped(true);
+  const handleBatchUnskip = () => handleBatchSetSkipped(false);
 
   const handleBatchDelete = async () => {
     const itemsToDelete = Array.from(selectedItems());
@@ -847,12 +772,6 @@ export function PackingPage(props: PackingPageProps) {
     }
   };
 
-  // Helper to get container name for display
-  const getContainerName = (containerId: string | null) => {
-    if (!containerId) return 'No Container';
-    return items()?.find((i) => i.id === containerId)?.name || 'Unknown Container';
-  };
-
   const handleMoveItemToContainer = async (itemId: string, containerId: string) => {
     const item = items()?.find((i) => i.id === itemId);
     const container = items()?.find((i) => i.id === containerId);
@@ -912,93 +831,116 @@ export function PackingPage(props: PackingPageProps) {
     }
   };
 
+  /**
+   * Ensure master items and categories are loaded, fetching from API if needed.
+   * Returns mutable arrays that helpers can append to (for caching new creates).
+   */
+  async function ensureResourcesLoaded(): Promise<{
+    masterItemsList: any[];
+    categoriesList: any[];
+  }> {
+    let masterItemsList: any[] = masterItems() ? [...masterItems()!] : [];
+    let categoriesList: any[] = categories() ? [...categories()!] : [];
+
+    if (!masterItemsList.length || !categoriesList.length) {
+      const [masterItemsResponse, categoriesResponse] = await Promise.all([
+        masterItemsList.length
+          ? Promise.resolve({ success: true, data: masterItemsList })
+          : api.get(endpoints.masterItems),
+        categoriesList.length
+          ? Promise.resolve({ success: true, data: categoriesList })
+          : api.get(endpoints.categories),
+      ]);
+
+      if (!masterItemsResponse.success || !categoriesResponse.success) {
+        throw new Error('Failed to fetch master items or categories');
+      }
+
+      masterItemsList = masterItemsResponse.data as any[];
+      categoriesList = categoriesResponse.data as any[];
+    }
+
+    return { masterItemsList, categoriesList };
+  }
+
+  /** Get or create a category by name, appending to the cache array */
+  async function getOrCreateCategory(
+    categoryName: string,
+    categoriesList: any[]
+  ): Promise<string | null> {
+    let category = categoriesList.find(
+      (c: any) => c.name.toLowerCase() === categoryName.toLowerCase()
+    );
+
+    if (!category) {
+      const builtInCategory = builtInItems.categories.find(
+        (c) => c.name.toLowerCase() === categoryName.toLowerCase()
+      );
+      const response = await api.post(endpoints.categories, {
+        name: categoryName,
+        icon: builtInCategory?.icon || null,
+      });
+      if (response.success && response.data) {
+        category = response.data;
+        categoriesList.push(category);
+      }
+    }
+
+    return category?.id || null;
+  }
+
+  /** Get or create a master item, appending to the cache array */
+  async function getOrCreateMasterItem(
+    item: {
+      name: string;
+      description: string | null;
+      category: string;
+      quantity: number;
+      is_container?: boolean;
+    },
+    masterItemsList: any[],
+    categoriesList: any[]
+  ): Promise<string | null> {
+    let masterItem = masterItemsList.find(
+      (m: any) => m.name.toLowerCase() === item.name.toLowerCase()
+    );
+
+    if (!masterItem) {
+      const categoryId = await getOrCreateCategory(item.category, categoriesList);
+      const response = await api.post(endpoints.masterItems, {
+        name: item.name,
+        description: item.description,
+        category_id: categoryId,
+        default_quantity: item.quantity,
+        is_container: item.is_container || false,
+      });
+
+      if (response.success && response.data) {
+        masterItem = response.data;
+        masterItemsList.push(masterItem);
+      }
+    }
+
+    return masterItem?.id || null;
+  }
+
   const handleAddBuiltInItemsToTrip = async (
     itemsToAdd: SelectedBuiltInItem[],
     bagId?: string | null,
     containerId?: string | null
   ) => {
     try {
-      // Use already-loaded resources, fall back to fetching if not yet loaded
-      let currentMasterItems: any[] = masterItems() ? [...masterItems()!] : [];
-      let existingCategories: any[] = categories() ? [...categories()!] : [];
+      const { masterItemsList, categoriesList } = await ensureResourcesLoaded();
 
-      if (!currentMasterItems.length || !existingCategories.length) {
-        const [masterItemsResponse, categoriesResponse] = await Promise.all([
-          currentMasterItems.length
-            ? Promise.resolve({ success: true, data: currentMasterItems })
-            : api.get(endpoints.masterItems),
-          existingCategories.length
-            ? Promise.resolve({ success: true, data: existingCategories })
-            : api.get(endpoints.categories),
-        ]);
-
-        if (!masterItemsResponse.success || !categoriesResponse.success) {
-          throw new Error('Failed to fetch master items or categories');
-        }
-
-        currentMasterItems = masterItemsResponse.data as any[];
-        existingCategories = categoriesResponse.data as any[];
-      }
-
-      // Helper to get or create category
-      const getCategoryId = async (categoryName: string): Promise<string | null> => {
-        let category = existingCategories.find(
-          (c: any) => c.name.toLowerCase() === categoryName.toLowerCase()
-        );
-
-        if (!category) {
-          // Get icon from built-in categories
-          const builtInCategory = builtInItems.categories.find(
-            (c) => c.name.toLowerCase() === categoryName.toLowerCase()
-          );
-          const response = await api.post(endpoints.categories, {
-            name: categoryName,
-            icon: builtInCategory?.icon || null,
-          });
-          if (response.success && response.data) {
-            category = response.data;
-            existingCategories.push(category);
-          }
-        }
-
-        return category?.id || null;
-      };
-
-      // Helper to get or create master item
-      const getMasterItemId = async (item: SelectedBuiltInItem): Promise<string | null> => {
-        let masterItem = currentMasterItems.find(
-          (m: any) => m.name.toLowerCase() === item.name.toLowerCase()
-        );
-
-        if (!masterItem) {
-          const categoryId = await getCategoryId(item.category);
-          const response = await api.post(endpoints.masterItems, {
-            name: item.name,
-            description: item.description,
-            category_id: categoryId,
-            default_quantity: item.quantity,
-            is_container: item.is_container || false,
-          });
-
-          if (response.success && response.data) {
-            masterItem = response.data;
-            currentMasterItems.push(masterItem);
-          }
-        }
-
-        return masterItem?.id || null;
-      };
-
-      // Add items to trip with master_item_id
       for (const item of itemsToAdd) {
-        const masterItemId = await getMasterItemId(item);
+        const masterItemId = await getOrCreateMasterItem(item, masterItemsList, categoriesList);
 
         const response = await api.post(endpoints.tripItems(props.tripId), {
           name: item.name,
           category_name: item.category,
           quantity: item.quantity,
           notes: item.description,
-          bag_id: containerId ? null : bagId || null, // Clear bag if using container
+          bag_id: containerId ? null : bagId || null,
           container_item_id: containerId || null,
           master_item_id: masterItemId,
           is_container: item.is_container || false,
@@ -1059,66 +1001,9 @@ export function PackingPage(props: PackingPageProps) {
     containerId: string | null
   ) => {
     try {
-      // Use already-loaded resources, fall back to fetching if not yet loaded
-      let currentMasterItems: any[] = masterItems() ? [...masterItems()!] : [];
-      let existingCategories: any[] = categories() ? [...categories()!] : [];
+      const { masterItemsList, categoriesList } = await ensureResourcesLoaded();
+      const masterItemId = await getOrCreateMasterItem(item, masterItemsList, categoriesList);
 
-      if (!currentMasterItems.length || !existingCategories.length) {
-        const [masterItemsResponse, categoriesResponse] = await Promise.all([
-          currentMasterItems.length
-            ? Promise.resolve({ success: true, data: currentMasterItems })
-            : api.get(endpoints.masterItems),
-          existingCategories.length
-            ? Promise.resolve({ success: true, data: existingCategories })
-            : api.get(endpoints.categories),
-        ]);
-
-        if (!masterItemsResponse.success || !categoriesResponse.success) {
-          throw new Error('Failed to fetch master items or categories');
-        }
-
-        currentMasterItems = masterItemsResponse.data as any[];
-        existingCategories = categoriesResponse.data as any[];
-      }
-
-      // Get or create category
-      let category = existingCategories.find(
-        (c: any) => c.name.toLowerCase() === item.category.toLowerCase()
-      );
-
-      if (!category) {
-        const builtInCategory = builtInItems.categories.find(
-          (c) => c.name.toLowerCase() === item.category.toLowerCase()
-        );
-        const response = await api.post(endpoints.categories, {
-          name: item.category,
-          icon: builtInCategory?.icon || null,
-        });
-        if (response.success && response.data) {
-          category = response.data;
-        }
-      }
-
-      // Get or create master item
-      let masterItem = currentMasterItems.find(
-        (m: any) => m.name.toLowerCase() === item.name.toLowerCase()
-      );
-
-      if (!masterItem) {
-        const response = await api.post(endpoints.masterItems, {
-          name: item.name,
-          description: item.description,
-          category_id: category?.id || null,
-          default_quantity: item.quantity,
-          is_container: item.is_container || false,
-        });
-
-        if (response.success && response.data) {
-          masterItem = response.data;
-        }
-      }
-
-      // Create trip item
       const tripItemResponse = await api.post(endpoints.tripItems(props.tripId), {
         name: item.name,
         category_name: item.category,
@@ -1126,7 +1011,7 @@ export function PackingPage(props: PackingPageProps) {
         notes: item.description,
         bag_id: containerId ? null : bagId,
         container_item_id: containerId,
-        master_item_id: masterItem?.id || null,
+        master_item_id: masterItemId,
         is_container: item.is_container || false,
       });
 

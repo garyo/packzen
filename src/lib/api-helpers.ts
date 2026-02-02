@@ -56,20 +56,6 @@ export function handleApiError(error: unknown, operation: string): Response {
 }
 
 /**
- * Validate required parameter exists
- */
-export function validateParam(
-  params: Record<string, string | undefined>,
-  paramName: string
-): string | Response {
-  const value = params[paramName];
-  if (!value) {
-    return errorResponse(`${paramName} is required`, 400);
-  }
-  return value;
-}
-
-/**
  * Create a standardized API route handler with consistent error handling
  *
  * @example
@@ -124,6 +110,62 @@ export function createGetHandler<T>(
   }, operationName);
 }
 
+/** Sentinel error for "resource not found" in handler wrappers */
+class NotFoundError extends Error {
+  constructor() {
+    super('Resource not found');
+  }
+}
+
+/**
+ * Shared implementation for POST/PATCH handlers that read a JSON body,
+ * optionally validate it, and return a JSON response.
+ */
+function createBodyHandler<TInput, TOutput>(
+  handler: (context: {
+    db: DrizzleD1Database;
+    userId: string;
+    validatedData: TInput;
+    params: Record<string, string | undefined>;
+  }) => Promise<TOutput>,
+  operationName: string,
+  successStatus: number,
+  validator?: (data: unknown) => { success: true; data: TInput } | { success: false; error: string }
+) {
+  return async (context: APIContext): Promise<Response> => {
+    try {
+      const db = getDatabaseConnection(context.locals);
+      const userId = getUserId(context.locals);
+      const body = await context.request.json();
+
+      let validatedData: TInput;
+      if (validator) {
+        const validation = validator(body);
+        if (!validation.success) {
+          return errorResponse(validation.error, 400);
+        }
+        validatedData = validation.data;
+      } else {
+        validatedData = body as TInput;
+      }
+
+      const result = await handler({
+        db,
+        userId,
+        validatedData,
+        params: context.params,
+      });
+
+      return successResponse(result, successStatus);
+    } catch (error) {
+      if (error instanceof NotFoundError) {
+        return errorResponse('Resource not found', 404);
+      }
+      return handleApiError(error, operationName);
+    }
+  };
+}
+
 /**
  * Create a POST handler with validation (convenience wrapper)
  */
@@ -137,46 +179,12 @@ export function createPostHandler<TInput, TOutput>(
   operationName: string,
   validator?: (data: unknown) => { success: true; data: TInput } | { success: false; error: string }
 ) {
-  return async (context: APIContext): Promise<Response> => {
-    try {
-      const db = getDatabaseConnection(context.locals);
-      const userId = getUserId(context.locals);
-      const body = await context.request.json();
-
-      // Validate if validator provided
-      if (validator) {
-        const validation = validator(body);
-        if (!validation.success) {
-          return errorResponse(validation.error, 400);
-        }
-
-        const result = await handler({
-          db,
-          userId,
-          validatedData: validation.data,
-          params: context.params,
-        });
-
-        return successResponse(result, 201);
-      }
-
-      // No validation, pass body directly
-      const result = await handler({
-        db,
-        userId,
-        validatedData: body as TInput,
-        params: context.params,
-      });
-
-      return successResponse(result, 201);
-    } catch (error) {
-      return handleApiError(error, operationName);
-    }
-  };
+  return createBodyHandler(handler, operationName, 201, validator);
 }
 
 /**
  * Create a PATCH handler with validation (convenience wrapper)
+ * Returns 404 if handler returns null.
  */
 export function createPatchHandler<TInput, TOutput>(
   handler: (context: {
@@ -188,50 +196,16 @@ export function createPatchHandler<TInput, TOutput>(
   operationName: string,
   validator?: (data: unknown) => { success: true; data: TInput } | { success: false; error: string }
 ) {
-  return async (context: APIContext): Promise<Response> => {
-    try {
-      const db = getDatabaseConnection(context.locals);
-      const userId = getUserId(context.locals);
-      const body = await context.request.json();
-
-      // Validate if validator provided
-      if (validator) {
-        const validation = validator(body);
-        if (!validation.success) {
-          return errorResponse(validation.error, 400);
-        }
-
-        const result = await handler({
-          db,
-          userId,
-          validatedData: validation.data,
-          params: context.params,
-        });
-
-        if (!result) {
-          return errorResponse('Resource not found', 404);
-        }
-
-        return successResponse(result);
-      }
-
-      // No validation, pass body directly
-      const result = await handler({
-        db,
-        userId,
-        validatedData: body as TInput,
-        params: context.params,
-      });
-
-      if (!result) {
-        return errorResponse('Resource not found', 404);
-      }
-
-      return successResponse(result);
-    } catch (error) {
-      return handleApiError(error, operationName);
-    }
-  };
+  return createBodyHandler(
+    async (ctx) => {
+      const result = await handler(ctx);
+      if (!result) throw new NotFoundError();
+      return result;
+    },
+    operationName,
+    200,
+    validator
+  );
 }
 
 /**

@@ -2,7 +2,6 @@ export const prerender = false;
 
 import type { APIRoute } from 'astro';
 import { eq, count } from 'drizzle-orm';
-import { z } from 'zod';
 import { categories } from '../../../../db/schema';
 import { categoryCreateSchema, validateRequestSafe } from '../../../lib/validation';
 import {
