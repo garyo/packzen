@@ -306,7 +306,7 @@ export function AddModeLeftPanel(props: AddModeLeftPanelProps) {
   const tripTypes = [
     { id: 'overnight', label: 'Overnight' },
     { id: 'weekend', label: 'Weekend' },
-    { id: 'week', label: 'Week-Long' },
+    { id: 'week', label: 'Week-long' },
     { id: 'business', label: 'Business' },
     { id: 'beach', label: 'Beach' },
     { id: 'hiking', label: 'Hiking' },

@@ -5,36 +5,42 @@ categories:
   - name: 'Clothing'
     icon: '👕'
     sort_order: 1
+  - name: 'Undergarments'
+    icon: '🩲'
+    sort_order: 2
+  - name: 'Accessories'
+    icon: '👜'
+    sort_order: 3
   - name: 'Toiletries'
     icon: '🧴'
-    sort_order: 2
+    sort_order: 4
   - name: 'Electronics'
     icon: '🔌'
-    sort_order: 3
+    sort_order: 5
   - name: 'Entertainment'
     icon: '🎮'
-    sort_order: 4
+    sort_order: 6
   - name: 'Documents'
     icon: '📄'
-    sort_order: 5
+    sort_order: 7
   - name: 'Health'
     icon: '💊'
-    sort_order: 6
+    sort_order: 8
   - name: 'Beach/Pool'
     icon: '🏖️'
-    sort_order: 7
+    sort_order: 9
   - name: 'Outdoor'
     icon: '⛰️'
-    sort_order: 8
+    sort_order: 10
   - name: 'Baby'
     icon: '👶'
-    sort_order: 9
+    sort_order: 11
   - name: 'Children'
     icon: '🧒'
-    sort_order: 10
+    sort_order: 12
   - name: 'Miscellaneous'
     icon: '📦'
-    sort_order: 11
+    sort_order: 13
 
 trip_types:
   - id: 'overnight'
@@ -44,7 +50,7 @@ trip_types:
     name: 'Weekend'
     description: '3-4 nights'
   - id: 'week'
-    name: 'Week-Long'
+    name: 'Week-long'
     description: '5-7 nights'
   - id: 'beach'
     name: 'Beach Day'
@@ -76,15 +82,15 @@ items:
     default_quantity: 3
     trip_types: ['weekend', 'week', 'business', 'beach']
 
-  - name: 'Underwear'
-    description: 'Undergarments'
-    category: 'Clothing'
+  - name: 'Panties'
+    description: 'Underwear/panties'
+    category: 'Undergarments'
     default_quantity: 7
     trip_types: ['overnight', 'weekend', 'week', 'business', 'beach', 'hiking']
 
   - name: 'Socks'
     description: 'Pairs of socks'
-    category: 'Clothing'
+    category: 'Undergarments'
     default_quantity: 7
     trip_types: ['overnight', 'weekend', 'week', 'business', 'hiking']
 
@@ -120,13 +126,13 @@ items:
 
   - name: 'Bra'
     description: 'Undergarment bra'
-    category: 'Clothing'
+    category: 'Undergarments'
     default_quantity: 3
     trip_types: ['overnight', 'weekend', 'week', 'business', 'beach', 'hiking']
 
   - name: 'Scarf'
     description: 'Fashion or warm scarf'
-    category: 'Clothing'
+    category: 'Accessories'
     default_quantity: 1
     trip_types: ['week', 'business', 'ski', 'hiking']
 
@@ -154,9 +160,9 @@ items:
     default_quantity: 1
     trip_types: ['beach']
 
-  - name: 'Pajamas'
-    description: 'Sleepwear'
-    category: 'Clothing'
+  - name: 'Nightclothes/PJs'
+    description: 'Sleepwear and pajamas'
+    category: 'Undergarments'
     default_quantity: 2
     trip_types: ['overnight', 'weekend', 'week', 'business']
 
@@ -174,7 +180,7 @@ items:
 
   - name: 'Belt'
     description: 'Leather belt'
-    category: 'Clothing'
+    category: 'Accessories'
     default_quantity: 1
     trip_types: ['business', 'week']
 
@@ -196,9 +202,9 @@ items:
     default_quantity: 1
     trip_types: ['beach', 'weekend', 'week']
 
-  - name: 'Hat/Cap'
-    description: 'Sun protection hat'
-    category: 'Clothing'
+  - name: 'Hat'
+    description: 'Sun hat or cap'
+    category: 'Accessories'
     default_quantity: 1
     trip_types: ['beach', 'hiking', 'week']
 
@@ -214,8 +220,56 @@ items:
     default_quantity: 1
     trip_types: ['hiking', 'week']
 
+  # Undergarments (new items)
+  - name: 'Robe'
+    description: 'Bathrobe or dressing gown'
+    category: 'Undergarments'
+    default_quantity: 1
+    trip_types: ['overnight', 'weekend', 'week', 'business']
+
+  - name: 'Lingerie'
+    description: 'Intimate apparel'
+    category: 'Undergarments'
+    default_quantity: 2
+    trip_types: ['overnight', 'weekend', 'week']
+
+  - name: 'Stockings'
+    description: 'Sheer or opaque stockings'
+    category: 'Undergarments'
+    default_quantity: 3
+    trip_types: ['business', 'week']
+
+  # Accessories (new items)
+  - name: 'Handbag'
+    description: 'Everyday handbag or purse'
+    category: 'Accessories'
+    default_quantity: 1
+    trip_types: ['overnight', 'weekend', 'week', 'business']
+    is_container: true
+
+  - name: 'Shoulder bag'
+    description: 'Over-the-shoulder bag'
+    category: 'Accessories'
+    default_quantity: 1
+    trip_types: ['weekend', 'week', 'business', 'beach']
+    is_container: true
+
+  - name: 'Clutch'
+    description: 'Small evening clutch bag'
+    category: 'Accessories'
+    default_quantity: 1
+    trip_types: ['business', 'week']
+    is_container: true
+
+  - name: 'Jewelry box/bag'
+    description: 'Travel jewelry organizer'
+    category: 'Accessories'
+    default_quantity: 1
+    trip_types: ['weekend', 'week', 'business']
+    is_container: true
+
   # Toiletries
-  - name: 'Toilet Kit'
+  - name: 'Toilet kit'
     description: 'Zippered bag for toiletries'
     category: 'Toiletries'
     default_quantity: 1
@@ -1021,6 +1075,12 @@ items:
     default_quantity: 6
     trip_types: ['week', 'hiking']
 
+  - name: 'Gifts'
+    description: 'Gifts or souvenirs to bring'
+    category: 'Miscellaneous'
+    default_quantity: 1
+    trip_types: ['overnight', 'weekend', 'week', 'business', 'international']
+
   # Baby Items
   - name: 'Diapers'
     description: 'Disposable or cloth diapers'
@@ -1167,8 +1227,8 @@ items:
     default_quantity: 1
     trip_types: ['overnight', 'weekend', 'week']
 
-  - name: "Kids' tablets/games"
-    description: 'Electronic entertainment for kids'
+  - name: "Kids' games"
+    description: 'Entertainment for kids'
     category: 'Children'
     default_quantity: 1
     trip_types: ['overnight', 'weekend', 'week', 'business']
