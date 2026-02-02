@@ -1,4 +1,12 @@
-import { createSignal, createResource, createEffect, createMemo, For, Show } from 'solid-js';
+import {
+  createSignal,
+  createResource,
+  createEffect,
+  createMemo,
+  untrack,
+  For,
+  Show,
+} from 'solid-js';
 import { api, endpoints } from '../../lib/api';
 import type { Bag, Category, MasterItemWithCategory, TripItem } from '../../lib/types';
 import { Modal } from '../ui/Modal';
@@ -43,15 +51,15 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
     { initialValue: props.bags || [] } // Use provided bags as initial value
   );
 
-  // Set pre-selected values from props using createEffect for proper reactivity
+  // Set pre-selected values from props when bags/tripItems load.
+  // Use untrack for location() so user changes to the dropdown don't re-trigger this.
   createEffect(() => {
     const currentBags = bags();
-    const currentLocation = location();
 
     if (currentBags) {
       if (props.preSelectedBagId) {
         setLocation(`bag:${props.preSelectedBagId}`);
-      } else if (currentBags.length === 1 && !currentLocation) {
+      } else if (currentBags.length === 1 && !untrack(location)) {
         // Auto-select if there's only one bag
         setLocation(`bag:${currentBags[0].id}`);
       }
