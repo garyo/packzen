@@ -1,11 +1,10 @@
 /// <reference types="astro/client" />
-
-import type { BillingStatus } from './lib/billing';
+/// <reference types="@cloudflare/workers-types" />
 
 declare namespace App {
   interface Locals {
     userId: string;
-    billingStatus?: BillingStatus;
+    billingStatus?: import('./lib/billing').BillingStatus;
     runtime: {
       env: {
         DB: D1Database;

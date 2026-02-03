@@ -36,9 +36,17 @@ async function getCsrfToken(): Promise<string> {
       throw new Error(`Failed to fetch CSRF token (${response.status}): ${errorText}`);
     }
 
-    const data = await response.json();
-    csrfToken = data.token;
-    return csrfToken as string;
+    const data: unknown = await response.json();
+    if (
+      typeof data !== 'object' ||
+      data === null ||
+      !('token' in data) ||
+      typeof (data as Record<string, unknown>).token !== 'string'
+    ) {
+      throw new Error('Invalid CSRF token response');
+    }
+    csrfToken = (data as Record<string, string>).token;
+    return csrfToken;
   } catch (error) {
     console.error('Error fetching CSRF token:', error);
     throw error;
@@ -78,8 +86,14 @@ async function makeRequest<T>(
     });
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: response.statusText }));
-      const errorMessage = error.error || `Request failed with status ${response.status}`;
+      const errorBody: unknown = await response.json().catch(() => null);
+      const errorMessage =
+        (typeof errorBody === 'object' &&
+          errorBody !== null &&
+          'error' in errorBody &&
+          typeof (errorBody as Record<string, unknown>).error === 'string' &&
+          (errorBody as Record<string, string>).error) ||
+        `Request failed with status ${response.status}`;
 
       // Handle 401 errors by redirecting to sign-in
       if (response.status === 401 && !options.skipErrorHandling) {
@@ -108,7 +122,7 @@ async function makeRequest<T>(
       };
     }
 
-    const data = await response.json();
+    const data = (await response.json()) as T;
     return {
       success: true,
       data,

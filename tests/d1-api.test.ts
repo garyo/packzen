@@ -132,7 +132,7 @@ function buildApiContext({
 }: {
   db: D1Database;
   userId: string;
-  billingStatus?: { activePlan: 'free_user' | 'standard' | 'none' };
+  billingStatus?: import('../src/lib/billing').BillingStatus;
   request?: Request;
   params?: Record<string, string>;
 }): APIContext {
@@ -320,7 +320,7 @@ async function loadSnapshot(db: ReturnType<typeof drizzle>, userId: string): Pro
     .from(masterItems)
     .where(eq(masterItems.clerk_user_id, userId))
     .orderBy(asc(masterItems.name))
-    .all()) as (MasterItem & { category_name?: string | null })[];
+    .all()) as (MasterItem & { category_name: string | null })[];
 
   masterItemsList.forEach((item) => {
     item.category_name = item.category_id ? categoryNameById.get(item.category_id) || null : null;
@@ -618,7 +618,11 @@ test('Bag template API enforces free-plan limits and allows standard plan', asyn
   const userId = 'user_limit_test';
 
   // Seed up to limit - 1
-  const limit = getLimitsForPlan({ activePlan: 'free_user' }).maxBagTemplates;
+  const limit = getLimitsForPlan({
+    activePlan: 'free_user',
+    hasFreeUserPlan: true,
+    hasStandardPlan: false,
+  }).maxBagTemplates;
   for (let i = 0; i < limit; i++) {
     await db.insert(bagTemplates).values({
       clerk_user_id: userId,
@@ -641,15 +645,19 @@ test('Bag template API enforces free-plan limits and allows standard plan', asyn
     body: JSON.stringify(requestBody),
   });
 
-  const freeContext = buildApiContext({ db: d1, userId, request: postRequest.clone() });
+  const freeContext = buildApiContext({
+    db: d1,
+    userId,
+    request: postRequest.clone() as unknown as Request,
+  });
   const freeResponse = await bagTemplatesApi.POST!(freeContext);
   assert.equal(freeResponse.status, 403);
 
   const standardContext = buildApiContext({
     db: d1,
     userId,
-    request: postRequest.clone(),
-    billingStatus: { activePlan: 'standard' },
+    request: postRequest.clone() as unknown as Request,
+    billingStatus: { activePlan: 'standard', hasFreeUserPlan: false, hasStandardPlan: true },
   });
 
   const standardResponse = await bagTemplatesApi.POST!(standardContext);
@@ -667,7 +675,11 @@ test('Trip API enforces trip limits and returns stats', async () => {
   const d1 = await createTestDatabase();
   const db = drizzle(d1);
   const userId = 'trip_test_user';
-  const limit = getLimitsForPlan({ activePlan: 'free_user' }).maxTrips;
+  const limit = getLimitsForPlan({
+    activePlan: 'free_user',
+    hasFreeUserPlan: true,
+    hasStandardPlan: false,
+  }).maxTrips;
 
   const createTripRequest = (name: string) =>
     new Request('http://localhost/api/trips', {
@@ -698,7 +710,7 @@ test('Trip API enforces trip limits and returns stats', async () => {
   });
   const getResponse = await tripsApiIndex.GET!(getCtx);
   assert.equal(getResponse.status, 200);
-  const tripsData = await getResponse.json();
+  const tripsData = (await getResponse.json()) as Array<{ bag_count?: number }>;
   assert.equal(tripsData.length, limit);
   assert.ok(tripsData[0].bag_count !== undefined);
 });
@@ -721,7 +733,7 @@ test('Trip creation normalizes reversed date ranges', async () => {
   const ctx = buildApiContext({ db: d1, userId, request });
   const response = await tripsApiIndex.POST!(ctx);
   assert.equal(response.status, 201);
-  const createdTrip = await response.json();
+  const createdTrip = (await response.json()) as { start_date: string; end_date: string };
   assert.equal(createdTrip.start_date, '2026-05-01');
   assert.equal(createdTrip.end_date, '2026-05-10');
 });
@@ -758,7 +770,7 @@ test('Trip updates reorder dates when only one boundary is provided', async () =
   const { PATCH } = await import('../src/pages/api/trips/[tripId]/index');
   const patchResponse = await PATCH!(patchCtx);
   assert.equal(patchResponse.status, 200);
-  const updated = await patchResponse.json();
+  const updated = (await patchResponse.json()) as { start_date: string; end_date: string };
   assert.equal(updated.start_date, '2026-06-05');
   assert.equal(updated.end_date, '2026-07-10');
 });
@@ -813,7 +825,7 @@ test('Trip items API merges duplicates by default but can be overridden', async 
   });
   const firstResponse = await tripItemsApi.POST!(firstCtx);
   assert.equal(firstResponse.status, 201);
-  const firstItem = await firstResponse.json();
+  const firstItem = (await firstResponse.json()) as { id: string; quantity: number };
   assert.equal(firstItem.quantity, 1);
 
   const secondCtx = buildApiContext({
@@ -824,7 +836,7 @@ test('Trip items API merges duplicates by default but can be overridden', async 
   });
   const secondResponse = await tripItemsApi.POST!(secondCtx);
   assert.equal(secondResponse.status, 200);
-  const mergedItem = await secondResponse.json();
+  const mergedItem = (await secondResponse.json()) as { id: string; quantity: number };
   assert.equal(mergedItem.quantity, 3);
 
   const thirdCtx = buildApiContext({
@@ -835,7 +847,7 @@ test('Trip items API merges duplicates by default but can be overridden', async 
   });
   const thirdResponse = await tripItemsApi.POST!(thirdCtx);
   assert.equal(thirdResponse.status, 201);
-  const thirdItem = await thirdResponse.json();
+  const thirdItem = (await thirdResponse.json()) as { id: string };
   assert.notEqual(thirdItem.id, mergedItem.id);
 
   const items = await db.select().from(tripItems).where(eq(tripItems.trip_id, trip.id)).all();
@@ -887,7 +899,7 @@ test('Deleting a trip removes its bags and items', async () => {
   const { DELETE } = await import('../src/pages/api/trips/[tripId]/index');
   const deleteResponse = await DELETE!(deleteCtx);
   assert.equal(deleteResponse.status, 200);
-  const deleteResult = await deleteResponse.json();
+  const deleteResult = (await deleteResponse.json()) as { success: boolean };
   assert.equal(deleteResult.success, true);
 
   const remainingTrips = await db.select().from(trips).where(eq(trips.id, trip.id)).all();

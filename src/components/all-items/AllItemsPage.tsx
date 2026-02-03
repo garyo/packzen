@@ -87,12 +87,12 @@ export function AllItemsPage() {
         categoryId = existingCategory.id;
       } else {
         // Create new category
-        const response = await api.post(endpoints.categories, {
+        const response = await api.post<Category>(endpoints.categories, {
           name: item.category,
           icon: getCategoryIcon(item.category),
           sort_order: categories()?.length || 0,
         });
-        if (response.success) {
+        if (response.success && response.data) {
           categoryId = response.data.id;
           await refetchCategories();
         }

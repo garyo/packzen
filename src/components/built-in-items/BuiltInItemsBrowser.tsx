@@ -41,18 +41,18 @@ export function BuiltInItemsBrowser(props: BuiltInItemsBrowserProps) {
   const [keepOpen, setKeepOpen] = createSignal(false);
 
   // Load bags if adding to trip
-  const [bags] = createResource<Bag[]>(
+  const [bags] = createResource<Bag[], string>(
     () => props.tripId,
-    async (tripId) => {
+    async (tripId: string) => {
       const response = await api.get<Bag[]>(endpoints.tripBags(tripId));
       return response.success && response.data ? response.data : [];
     }
   );
 
   // Load trip items to get containers
-  const [tripItems] = createResource<TripItem[]>(
+  const [tripItems] = createResource<TripItem[], string>(
     () => props.tripId,
-    async (tripId) => {
+    async (tripId: string) => {
       const response = await api.get<TripItem[]>(endpoints.tripItems(tripId));
       return response.success && response.data ? response.data : [];
     }

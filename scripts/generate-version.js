@@ -58,7 +58,7 @@ export const VERSION_INFO = {
   commitHash: '${commitHash}',
   buildDate: '${buildDate}',
   isDev: ${isDev},
-} as const;
+};
 `;
 
 const outputPath = join(__dirname, '../src/lib/version.ts');

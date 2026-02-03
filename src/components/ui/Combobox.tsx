@@ -198,7 +198,7 @@ export function Combobox(props: ComboboxProps) {
         autocomplete="off"
         role="combobox"
         aria-autocomplete="list"
-        aria-expanded={shouldShowDropdown()}
+        aria-expanded={shouldShowDropdown() ? 'true' : 'false'}
         aria-controls="combobox-listbox"
         aria-activedescendant={
           highlightedIndex() >= 0 ? `combobox-item-${highlightedIndex()}` : undefined

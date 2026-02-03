@@ -335,7 +335,14 @@ export const DELETE: APIRoute = createDeleteHandler(async ({ db, userId, params,
   }
 
   const body = await request.json();
-  const { id } = body;
+  const id =
+    typeof body === 'object' && body !== null && 'id' in body && typeof body.id === 'string'
+      ? body.id
+      : null;
+
+  if (!id) {
+    return false;
+  }
 
   // Verify trip ownership
   const trip = await db

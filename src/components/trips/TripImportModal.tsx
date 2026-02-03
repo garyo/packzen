@@ -4,6 +4,7 @@ import { Button } from '../ui/Button';
 import { showToast } from '../ui/Toast';
 import { yamlToTrip } from '../../lib/yaml';
 import { api, endpoints } from '../../lib/api';
+import type { Bag } from '../../lib/types';
 
 interface TripImportModalProps {
   tripId: string;
@@ -67,7 +68,7 @@ export function TripImportModal(props: TripImportModalProps) {
           bagNameToId.set(bagData.name, existingBag.id);
         } else {
           // Create new bag
-          const createResponse = await api.post(endpoints.tripBags(props.tripId), {
+          const createResponse = await api.post<Bag>(endpoints.tripBags(props.tripId), {
             name: bagData.name,
             type: bagData.type,
             color: bagData.color,

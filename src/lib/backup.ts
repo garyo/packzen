@@ -55,7 +55,7 @@ export async function restoreBackupData(
       });
       categoryNameToId.set(normalize(category.name), existing.id);
     } else {
-      const response = await api.post(endpoints.categories, {
+      const response = await api.post<Category>(endpoints.categories, {
         name: category.name,
         icon: category.icon,
         sort_order: category.sort_order,
@@ -136,7 +136,7 @@ export async function restoreBackupData(
       });
       tripId = existingTrip.id;
     } else {
-      const tripResponse = await api.post(endpoints.trips, {
+      const tripResponse = await api.post<Trip>(endpoints.trips, {
         name: tripData.name,
         destination: tripData.destination,
         start_date: tripData.start_date,
@@ -173,7 +173,7 @@ export async function restoreBackupData(
         });
         rememberBag(bagData, existingBag.id);
       } else {
-        const bagResponse = await api.post(endpoints.tripBags(tripId), {
+        const bagResponse = await api.post<Bag>(endpoints.tripBags(tripId), {
           name: bagData.name,
           type: bagData.type,
           color: bagData.color,

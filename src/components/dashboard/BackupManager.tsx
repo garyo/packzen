@@ -114,7 +114,7 @@ export function BackupManager(props: BackupManagerProps) {
           });
           categoryNameToId.set(cat.name, existing.id);
         } else {
-          const response = await api.post(endpoints.categories, {
+          const response = await api.post<Category>(endpoints.categories, {
             name: cat.name,
             icon: cat.icon,
             sort_order: cat.sort_order,
@@ -199,7 +199,7 @@ export function BackupManager(props: BackupManagerProps) {
           });
           tripId = existingTrip.id;
         } else {
-          const tripResponse = await api.post(endpoints.trips, {
+          const tripResponse = await api.post<Trip>(endpoints.trips, {
             name: tripData.name,
             destination: tripData.destination,
             start_date: tripData.start_date,
@@ -226,7 +226,7 @@ export function BackupManager(props: BackupManagerProps) {
             });
             bagNameToId.set(bagData.name, existingBag.id);
           } else {
-            const bagResponse = await api.post(endpoints.tripBags(tripId), {
+            const bagResponse = await api.post<Bag>(endpoints.tripBags(tripId), {
               name: bagData.name,
               type: bagData.type,
               color: bagData.color,

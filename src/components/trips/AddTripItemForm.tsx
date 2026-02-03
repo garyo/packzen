@@ -39,10 +39,10 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
   let formRef: HTMLFormElement | undefined;
 
   // Use pre-loaded bags if available, otherwise fetch
-  const [bags] = createResource<Bag[]>(
+  const [bags] = createResource<Bag[], string>(
     () => (props.bags ? null : props.tripId), // Only fetch if bags not provided
-    async () => {
-      const response = await api.get<Bag[]>(endpoints.tripBags(props.tripId));
+    async (tripId) => {
+      const response = await api.get<Bag[]>(endpoints.tripBags(tripId));
       if (response.success && response.data) {
         return response.data;
       }

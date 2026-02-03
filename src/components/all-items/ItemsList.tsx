@@ -169,7 +169,7 @@ export function ItemsList(props: ItemsListProps) {
   // Pre-group and sort items by category for O(1) access
   const itemsByCategory = createMemo(() => {
     const items = props.items() || [];
-    const grouped = new Map<string | null, MasterItem[]>();
+    const grouped = new Map<string | null, MasterItemWithCategory[]>();
 
     items.forEach((item) => {
       const categoryId = item.category_id || null;

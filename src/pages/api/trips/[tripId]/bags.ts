@@ -124,7 +124,10 @@ export const DELETE: APIRoute = createDeleteHandler(async ({ db, userId, params,
   }
 
   const body = await request.json();
-  const { bag_id } = body;
+  const bag_id =
+    typeof body === 'object' && body !== null && 'bag_id' in body && typeof body.bag_id === 'string'
+      ? body.bag_id
+      : null;
 
   if (!bag_id) {
     return false;

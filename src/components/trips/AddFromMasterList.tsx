@@ -21,7 +21,7 @@ interface AddFromMasterListProps {
 }
 
 export function AddFromMasterList(props: AddFromMasterListProps) {
-  const [pendingItems, setPendingItems] = createSignal<Set<string>>(new Set());
+  const [pendingItems, setPendingItems] = createSignal<Set<string>>(new Set<string>());
   const [selectedBag, setSelectedBag] = createSignal<string | null>(null);
   const [selectedContainer, setSelectedContainer] = createSignal<string | null>(null);
   const [tripItemOverrides, setTripItemOverrides] = createSignal<Map<string, Partial<TripItem>>>(
@@ -41,7 +41,7 @@ export function AddFromMasterList(props: AddFromMasterListProps) {
   createEffect(() => {
     props.tripItems();
     setTripItemOverrides(new Map());
-    setRemovedTripItemIds(new Set());
+    setRemovedTripItemIds(new Set<string>());
   });
 
   const bagLookup = createMemo(() => {
@@ -353,7 +353,7 @@ export function AddFromMasterList(props: AddFromMasterListProps) {
                               )}
                               <p class="text-xs text-gray-500">Qty: {displayedQuantity()}</p>
                               <Show when={bagSummary()}>
-                                {(summary) => <p class="text-xs text-gray-500">In {summary}</p>}
+                                {(summary) => <p class="text-xs text-gray-500">In {summary()}</p>}
                               </Show>
                             </div>
                             <div class="flex items-center gap-2">
