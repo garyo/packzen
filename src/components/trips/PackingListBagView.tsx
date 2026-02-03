@@ -33,7 +33,8 @@ import { TripNotesPanel } from './TripNotesPanel';
 import { SwipeProvider, useSwipeContext } from './SwipeContext';
 import { getBagColorClass, getBagColorStyle } from '../../lib/color-utils';
 import { liveRectCollision, useAutoScroll, EscapeCancelHandler } from './drag-drop-utils';
-import { CheckIcon } from '../ui/Icons';
+import { CheckIcon, SwitchBagIcon } from '../ui/Icons';
+import { ReplaceBagModal } from './ReplaceBagModal';
 
 // Drop zone type identifiers
 // Simplified: D&D only moves items between locations (bags, containers), never changes category
@@ -217,6 +218,7 @@ function DraggableItem(props: {
 }
 
 interface PackingListBagViewProps {
+  tripId: string;
   items: Accessor<TripItem[] | undefined>;
   bags: Accessor<Bag[] | undefined>;
   categories: Accessor<Category[] | undefined>;
@@ -237,6 +239,8 @@ interface PackingListBagViewProps {
   // Drag-and-drop handlers
   onMoveItemToBag?: (itemId: string, bagId: string | null) => void;
   onMoveItemToContainer?: (itemId: string, containerId: string) => void;
+  // Replace bag callback
+  onBagReplaced?: () => void;
   // Trip notes props
   tripNotes?: string;
   showNotesPanel?: Accessor<boolean>;
@@ -249,6 +253,7 @@ function PackingListBagViewInner(props: PackingListBagViewProps) {
   const [openBagMenu, setOpenBagMenu] = createSignal<string | null>(null);
   const [openContainerMenu, setOpenContainerMenu] = createSignal<string | null>(null);
   const [activeItem, setActiveItem] = createSignal<TripItem | null>(null);
+  const [replacingBagId, setReplacingBagId] = createSignal<string | null>(null);
   const autoScroll = useAutoScroll();
   const swipeContext = useSwipeContext();
 
@@ -581,8 +586,24 @@ function PackingListBagViewInner(props: PackingListBagViewProps) {
                     <span class="text-sm text-gray-500 md:text-xs">
                       {packedItems()} / {totalItems()}
                     </span>
-                    {/* Add items button */}
+                    {/* Replace bag + Add items buttons */}
                     <Show when={bag.id !== null}>
+                      <button
+                        onClick={() => setReplacingBagId(bag.id as string)}
+                        class="flex h-7 w-7 items-center justify-center rounded-full text-gray-400 hover:bg-gray-200 hover:text-gray-600"
+                        title="Replace this bag"
+                      >
+                        <SwitchBagIcon class="h-4 w-4" />
+                      </button>
+                      <Show when={replacingBagId() === bag.id}>
+                        <ReplaceBagModal
+                          tripId={props.tripId}
+                          currentBag={bag}
+                          tripBags={props.bags()}
+                          onClose={() => setReplacingBagId(null)}
+                          onReplaced={() => props.onBagReplaced?.()}
+                        />
+                      </Show>
                       <div class="relative">
                         <button
                           onClick={() =>

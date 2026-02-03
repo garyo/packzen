@@ -189,6 +189,20 @@ export function NotesIcon(props: IconProps): JSX.Element {
   );
 }
 
+/** Switch/Replace icon (two curved arrows forming a cycle) */
+export function SwitchBagIcon(props: IconProps): JSX.Element {
+  return (
+    <svg class={props.class ?? 'h-4 w-4'} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="2"
+        d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5"
+      />
+    </svg>
+  );
+}
+
 /** Skip icon (circle with diagonal line / "not needed") */
 export function SkipIcon(props: IconProps): JSX.Element {
   return (

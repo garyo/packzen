@@ -1113,6 +1113,10 @@ export function PackingPage(props: PackingPageProps) {
               onRemoveFromTrip={handleRemoveFromTrip}
               onAddNewItem={() => setShowAddForm(true)}
               onManageBags={() => setShowBagManager(true)}
+              onBagReplaced={() => {
+                refetch();
+                refetchBags();
+              }}
             />
           </Show>
         </Show>
@@ -1170,6 +1174,7 @@ export function PackingPage(props: PackingPageProps) {
                       }
                     >
                       <PackingListBagView
+                        tripId={props.tripId}
                         items={visibleItems}
                         bags={bags}
                         categories={categories}
@@ -1192,6 +1197,10 @@ export function PackingPage(props: PackingPageProps) {
                         }
                         onMoveItemToBag={handleMoveItemToBag}
                         onMoveItemToContainer={handleMoveItemToContainer}
+                        onBagReplaced={() => {
+                          refetch();
+                          refetchBags();
+                        }}
                         tripNotes={trip()?.notes || ''}
                         showNotesPanel={showNotesPanel}
                         onToggleNotesPanel={() => setShowNotesPanel(!showNotesPanel())}

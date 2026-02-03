@@ -43,6 +43,7 @@ interface AddModeViewProps {
   onRemoveFromTrip?: (tripItemId: string) => Promise<void>;
   onAddNewItem?: () => void;
   onManageBags?: () => void;
+  onBagReplaced?: () => void;
 }
 
 // Drag data types for Add Mode
@@ -199,9 +200,11 @@ export function AddModeView(props: AddModeViewProps) {
             class="h-full overflow-y-auto rounded-lg border border-gray-200 bg-white p-1 shadow-sm md:p-4"
           >
             <AddModeBagCards
+              tripId={props.tripId}
               items={props.items}
               bags={props.bags}
               categories={props.categories}
+              onBagReplaced={props.onBagReplaced}
               selectedTarget={selectedTarget}
               onSelectTarget={setSelectedTarget}
             />

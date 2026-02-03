@@ -9,18 +9,23 @@ import { Show, For, createMemo, createSignal, type Accessor } from 'solid-js';
 import { createDroppable } from '@thisbeyond/solid-dnd';
 import type { TripItem, Bag, Category } from '../../lib/types';
 import type { AddModeBagDropData, SelectedTarget } from './AddModeView';
+import { SwitchBagIcon } from '../ui/Icons';
+import { ReplaceBagModal } from './ReplaceBagModal';
 
 interface AddModeBagCardsProps {
+  tripId: string;
   items: Accessor<TripItem[] | undefined>;
   bags: Accessor<Bag[] | undefined>;
   categories: Accessor<Category[] | undefined>;
   onManageBags?: () => void;
+  onBagReplaced?: () => void;
   // For click-to-add: selected target (bag or container) gets highlighted border
   selectedTarget?: Accessor<SelectedTarget | undefined>;
   onSelectTarget?: (target: SelectedTarget | undefined) => void;
 }
 
 interface BagCardProps {
+  tripId: string;
   bag: Bag | null; // null for "No Bag"
   bagId: string | null;
   items: Accessor<TripItem[]>; // Use accessor for reactivity
@@ -29,6 +34,8 @@ interface BagCardProps {
   containerId?: string;
   isExpanded: boolean;
   onToggleExpand: () => void;
+  onBagReplaced?: () => void;
+  allBags?: Accessor<Bag[] | undefined>;
   // For passing accordion state to nested containers
   expandedCardId?: Accessor<string | null>;
   onSetExpandedCardId?: (id: string) => void;
@@ -38,6 +45,8 @@ interface BagCardProps {
 }
 
 function DroppableBagCard(props: BagCardProps) {
+  const [showReplace, setShowReplace] = createSignal(false);
+
   const dropId = props.isContainer
     ? `add-mode-container-${props.containerId}`
     : `add-mode-bag-${props.bagId || 'none'}`;
@@ -201,6 +210,27 @@ function DroppableBagCard(props: BagCardProps) {
             <span class="flex-shrink-0 text-sm md:text-lg">📋</span>
           )}
           <span class="truncate text-xs font-semibold text-gray-900 md:text-base">{bagName()}</span>
+          <Show when={props.bag && !props.isContainer}>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowReplace(true);
+              }}
+              class="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full text-gray-400 hover:bg-gray-200 hover:text-gray-600 md:h-6 md:w-6"
+              title="Replace this bag"
+            >
+              <SwitchBagIcon class="h-3 w-3 md:h-3.5 md:w-3.5" />
+            </button>
+            <Show when={showReplace()}>
+              <ReplaceBagModal
+                tripId={props.tripId}
+                currentBag={props.bag!}
+                tripBags={props.allBags?.()}
+                onClose={() => setShowReplace(false)}
+                onReplaced={() => props.onBagReplaced?.()}
+              />
+            </Show>
+          </Show>
         </div>
         <span class="ml-1 flex-shrink-0 text-[10px] text-gray-500 md:text-sm">
           {packedItems()}/{totalItems()}
@@ -258,6 +288,7 @@ function DroppableBagCard(props: BagCardProps) {
               const containerId = `add-mode-container-${container.id}`;
               return (
                 <DroppableBagCard
+                  tripId={props.tripId}
                   bag={props.bag}
                   bagId={props.bagId}
                   items={props.items}
@@ -325,12 +356,15 @@ export function AddModeBagCards(props: AddModeBagCardsProps) {
           const cardId = `add-mode-bag-${bag.id}`;
           return (
             <DroppableBagCard
+              tripId={props.tripId}
               bag={bag}
               bagId={bag.id}
               items={allItems}
               containers={containersByBag().get(bag.id) || []}
               isExpanded={expandedCardId() === cardId}
               onToggleExpand={() => toggleExpand(cardId)}
+              onBagReplaced={props.onBagReplaced}
+              allBags={props.bags}
               expandedCardId={expandedCardId}
               onSetExpandedCardId={(id) => toggleExpand(id)}
               selectedTarget={props.selectedTarget}
@@ -345,6 +379,7 @@ export function AddModeBagCards(props: AddModeBagCardsProps) {
         const cardId = 'add-mode-bag-none';
         return (
           <DroppableBagCard
+            tripId={props.tripId}
             bag={null}
             bagId={null}
             items={allItems}
