@@ -117,6 +117,19 @@ export const tripItems = sqliteTable('trip_items', {
     .$defaultFn(() => new Date()),
 });
 
+// Change log table (for multi-device sync)
+export const changeLog = sqliteTable('change_log', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  clerk_user_id: text('clerk_user_id').notNull(),
+  entity_type: text('entity_type').notNull(),
+  entity_id: text('entity_id').notNull(),
+  parent_id: text('parent_id'),
+  action: text('action').notNull(),
+  data: text('data'),
+  source_id: text('source_id'),
+  created_at: integer('created_at').notNull(),
+});
+
 // Type exports for TypeScript
 export type Category = typeof categories.$inferSelect;
 export type NewCategory = typeof categories.$inferInsert;
@@ -135,3 +148,6 @@ export type NewBagTemplate = typeof bagTemplates.$inferInsert;
 
 export type TripItem = typeof tripItems.$inferSelect;
 export type NewTripItem = typeof tripItems.$inferInsert;
+
+export type ChangeLog = typeof changeLog.$inferSelect;
+export type NewChangeLog = typeof changeLog.$inferInsert;

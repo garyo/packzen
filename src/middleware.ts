@@ -25,6 +25,13 @@ export const onRequest = clerkMiddleware(async (auth, context, next) => {
 
   // Add user ID to locals for API routes to use
   context.locals.userId = authObject.userId;
+
+  // Fast path for SSE sync endpoint — skip billing check to avoid
+  // a getUser() call on every ~3s poll
+  if (context.url.pathname === '/api/sync/events') {
+    return next();
+  }
+
   const user = await clerkClient(context).users.getUser(authObject.userId);
   const metadata = user.publicMetadata;
 

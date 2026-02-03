@@ -14,6 +14,7 @@ import {
   handleApiError,
 } from '../../../lib/api-helpers';
 import { checkBagTemplateLimit } from '../../../lib/resource-limits';
+import { logChange, getSourceId } from '../../../lib/sync';
 
 export const GET: APIRoute = createGetHandler(async ({ db, userId }) => {
   return await db
@@ -60,6 +61,17 @@ export const POST: APIRoute = async (context) => {
       .returning()
       .get();
 
+    const sourceId = getSourceId(context.request);
+    logChange(
+      db,
+      userId,
+      'bagTemplate',
+      newTemplate.id,
+      null,
+      'create',
+      newTemplate,
+      sourceId
+    ).catch(() => {});
     return successResponse(newTemplate, 201);
   } catch (error) {
     return handleApiError(error, 'create bag template');

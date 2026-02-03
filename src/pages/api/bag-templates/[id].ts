@@ -9,7 +9,10 @@ import {
   createGetHandler,
   createPatchHandler,
   createDeleteHandler,
+  type SyncConfig,
 } from '../../../lib/api-helpers';
+
+const sync: SyncConfig = { entityType: 'bagTemplate' };
 
 export const GET: APIRoute = createGetHandler(async ({ db, userId, params }) => {
   const { id } = params;
@@ -60,18 +63,23 @@ export const PATCH: APIRoute = createPatchHandler<
       .get();
   },
   'update bag template',
-  (data) => validateRequestSafe(bagTemplateUpdateSchema, data)
+  (data) => validateRequestSafe(bagTemplateUpdateSchema, data),
+  sync
 );
 
-export const DELETE: APIRoute = createDeleteHandler(async ({ db, userId, params }) => {
-  const { id } = params;
-  if (!id) return false;
+export const DELETE: APIRoute = createDeleteHandler(
+  async ({ db, userId, params }) => {
+    const { id } = params;
+    if (!id) return false;
 
-  const deleted = await db
-    .delete(bagTemplates)
-    .where(and(eq(bagTemplates.id, id), eq(bagTemplates.clerk_user_id, userId)))
-    .returning()
-    .get();
+    const deleted = await db
+      .delete(bagTemplates)
+      .where(and(eq(bagTemplates.id, id), eq(bagTemplates.clerk_user_id, userId)))
+      .returning()
+      .get();
 
-  return !!deleted;
-}, 'delete bag template');
+    return deleted ? id : false;
+  },
+  'delete bag template',
+  sync
+);

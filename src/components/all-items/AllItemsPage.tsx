@@ -1,4 +1,4 @@
-import { createSignal, createResource, Show, onMount } from 'solid-js';
+import { createSignal, createResource, Show, onMount, onCleanup } from 'solid-js';
 import { authStore } from '../../stores/auth';
 import { api, endpoints } from '../../lib/api';
 import type {
@@ -15,6 +15,7 @@ import { AllItemsPageHeader } from './AllItemsPageHeader';
 import { AllItemsPageTabs } from './AllItemsPageTabs';
 import { BuiltInItemsBrowser } from '../built-in-items/BuiltInItemsBrowser';
 import { fetchWithErrorHandling } from '../../lib/resource-helpers';
+import { syncManager } from '../../lib/sync-manager';
 import { getCategoryIcon } from '../../lib/built-in-items';
 
 export function AllItemsPage() {
@@ -49,6 +50,25 @@ export function AllItemsPage() {
   // Initialize auth on mount
   onMount(async () => {
     await authStore.initAuth();
+
+    // Connect to SSE sync for multi-device updates
+    syncManager.connect();
+    onCleanup(() => syncManager.disconnect());
+
+    const unsubCategory = syncManager.on('category', () => {
+      refetchCategories();
+    });
+    onCleanup(unsubCategory);
+
+    const unsubMasterItem = syncManager.on('masterItem', () => {
+      refetchItems();
+    });
+    onCleanup(unsubMasterItem);
+
+    const unsubBagTemplate = syncManager.on('bagTemplate', () => {
+      refetchBagTemplates();
+    });
+    onCleanup(unsubBagTemplate);
   });
 
   const handleDeleteItem = async (id: string) => {

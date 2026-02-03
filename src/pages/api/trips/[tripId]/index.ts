@@ -9,7 +9,13 @@ import {
   createGetHandler,
   createPatchHandler,
   createDeleteHandler,
+  type SyncConfig,
 } from '../../../../lib/api-helpers';
+
+const sync: SyncConfig = {
+  entityType: 'trip',
+  entityId: (result) => result.id,
+};
 import { normalizeTripDates } from '../../../../lib/utils';
 
 export const GET: APIRoute = createGetHandler(async ({ db, userId, params }) => {
@@ -78,7 +84,8 @@ export const PATCH: APIRoute = createPatchHandler<
       .get();
   },
   'update trip',
-  (data) => validateRequestSafe(tripUpdateSchema, data)
+  (data) => validateRequestSafe(tripUpdateSchema, data),
+  sync
 );
 
 export const PUT: APIRoute = createPatchHandler<
@@ -109,20 +116,25 @@ export const PUT: APIRoute = createPatchHandler<
       .get();
   },
   'update trip (PUT)',
-  (data) => validateRequestSafe(tripUpdateSchema, data)
+  (data) => validateRequestSafe(tripUpdateSchema, data),
+  sync
 );
 
-export const DELETE: APIRoute = createDeleteHandler(async ({ db, userId, params, request }) => {
-  const { tripId } = params;
-  if (!tripId) {
-    return false;
-  }
+export const DELETE: APIRoute = createDeleteHandler(
+  async ({ db, userId, params, request }) => {
+    const { tripId } = params;
+    if (!tripId) {
+      return false;
+    }
 
-  const deleted = await db
-    .delete(trips)
-    .where(and(eq(trips.id, tripId), eq(trips.clerk_user_id, userId)))
-    .returning()
-    .get();
+    const deleted = await db
+      .delete(trips)
+      .where(and(eq(trips.id, tripId), eq(trips.clerk_user_id, userId)))
+      .returning()
+      .get();
 
-  return !!deleted;
-}, 'delete trip');
+    return deleted ? tripId : false;
+  },
+  'delete trip',
+  sync
+);

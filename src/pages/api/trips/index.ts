@@ -15,6 +15,7 @@ import {
 } from '../../../lib/api-helpers';
 import { checkTripLimit } from '../../../lib/resource-limits';
 import { normalizeTripDates } from '../../../lib/utils';
+import { logChange, getSourceId } from '../../../lib/sync';
 
 export const GET: APIRoute = createGetHandler(async ({ db, userId }) => {
   // Get all trips with bag and item statistics
@@ -81,6 +82,8 @@ export const POST: APIRoute = async (context) => {
       .returning()
       .get();
 
+    const sourceId = getSourceId(context.request);
+    logChange(db, userId, 'trip', newTrip.id, null, 'create', newTrip, sourceId).catch(() => {});
     return successResponse(newTrip, 201);
   } catch (error) {
     return handleApiError(error, 'create trip');

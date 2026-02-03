@@ -36,6 +36,7 @@ import { SelectModeActionBar } from './SelectModeActionBar';
 import { BuiltInItemsBrowser } from '../built-in-items/BuiltInItemsBrowser';
 import { builtInItems } from '../../lib/built-in-items';
 import { fetchWithErrorHandling, fetchSingleWithErrorHandling } from '../../lib/resource-helpers';
+import { syncManager } from '../../lib/sync-manager';
 import { tripToYAML, downloadYAML } from '../../lib/yaml';
 import { deleteTripWithConfirm } from '../../lib/trip-actions';
 import { TripForm } from './TripForm';
@@ -274,6 +275,41 @@ export function PackingPage(props: PackingPageProps) {
   onMount(async () => {
     await authStore.initAuth();
     fetchItems();
+
+    // Connect to SSE sync for multi-device updates
+    syncManager.connect();
+    onCleanup(() => syncManager.disconnect());
+
+    // Subscribe to trip item changes for this trip
+    const unsubTripItem = syncManager.on('tripItem', (change) => {
+      if (change.parentId !== props.tripId) return;
+      switch (change.action) {
+        case 'create':
+          addItemToStore(change.data);
+          break;
+        case 'update':
+          updateItemInStore(change.entityId, change.data);
+          break;
+        case 'delete':
+          deleteItemsFromStore([change.entityId]);
+          break;
+      }
+    });
+    onCleanup(unsubTripItem);
+
+    // Subscribe to bag changes for this trip
+    const unsubBag = syncManager.on('bag', (change) => {
+      if (change.parentId !== props.tripId) return;
+      refetchBags();
+    });
+    onCleanup(unsubBag);
+
+    // Subscribe to trip metadata changes
+    const unsubTrip = syncManager.on('trip', (change) => {
+      if (change.entityId !== props.tripId) return;
+      refetchTrip();
+    });
+    onCleanup(unsubTrip);
   });
 
   // Start in Add Mode if trip has no items (first time load only)

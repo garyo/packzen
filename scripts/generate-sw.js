@@ -96,6 +96,11 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(event.request.url);
 
+  // Pass through SSE sync requests — EventSource manages its own connection
+  if (url.pathname === '/api/sync/events') {
+    return;
+  }
+
   // Use cache-first for static assets (CSS, JS, images, fonts)
   const isStaticAsset = /\\.(css|js|png|jpg|jpeg|gif|svg|woff|woff2|ttf|eot)$/i.test(url.pathname);
 

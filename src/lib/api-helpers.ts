@@ -8,6 +8,7 @@ import type { APIContext } from 'astro';
 import type { D1Database } from '@cloudflare/workers-types';
 import { drizzle } from 'drizzle-orm/d1';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
+import { logChange, getSourceId } from './sync';
 
 /**
  * Get database connection from Astro locals
@@ -110,6 +111,15 @@ export function createGetHandler<T>(
   }, operationName);
 }
 
+/** Sync configuration for auto-logging changes from handler factories */
+export interface SyncConfig {
+  entityType: string;
+  /** Extract entity ID from the result object (defaults to result.id) */
+  entityId?: (result: any) => string;
+  /** Extract parent ID from route params */
+  parentId?: (params: Record<string, string | undefined>) => string | null;
+}
+
 /** Sentinel error for "resource not found" in handler wrappers */
 class NotFoundError extends Error {
   constructor() {
@@ -130,7 +140,10 @@ function createBodyHandler<TInput, TOutput>(
   }) => Promise<TOutput>,
   operationName: string,
   successStatus: number,
-  validator?: (data: unknown) => { success: true; data: TInput } | { success: false; error: string }
+  validator?: (
+    data: unknown
+  ) => { success: true; data: TInput } | { success: false; error: string },
+  sync?: SyncConfig
 ) {
   return async (context: APIContext): Promise<Response> => {
     try {
@@ -156,6 +169,17 @@ function createBodyHandler<TInput, TOutput>(
         params: context.params,
       });
 
+      // Log change for sync if configured
+      if (sync && result) {
+        const action = successStatus === 201 ? 'create' : 'update';
+        const entityId = sync.entityId ? sync.entityId(result) : (result as any).id;
+        const parentId = sync.parentId ? sync.parentId(context.params) : null;
+        const sourceId = getSourceId(context.request);
+        logChange(db, userId, sync.entityType, entityId, parentId, action, result, sourceId).catch(
+          () => {} // Non-critical — don't fail the request
+        );
+      }
+
       return successResponse(result, successStatus);
     } catch (error) {
       if (error instanceof NotFoundError) {
@@ -177,9 +201,12 @@ export function createPostHandler<TInput, TOutput>(
     params: Record<string, string | undefined>;
   }) => Promise<TOutput>,
   operationName: string,
-  validator?: (data: unknown) => { success: true; data: TInput } | { success: false; error: string }
+  validator?: (
+    data: unknown
+  ) => { success: true; data: TInput } | { success: false; error: string },
+  sync?: SyncConfig
 ) {
-  return createBodyHandler(handler, operationName, 201, validator);
+  return createBodyHandler(handler, operationName, 201, validator, sync);
 }
 
 /**
@@ -194,7 +221,10 @@ export function createPatchHandler<TInput, TOutput>(
     params: Record<string, string | undefined>;
   }) => Promise<TOutput | null>,
   operationName: string,
-  validator?: (data: unknown) => { success: true; data: TInput } | { success: false; error: string }
+  validator?: (
+    data: unknown
+  ) => { success: true; data: TInput } | { success: false; error: string },
+  sync?: SyncConfig
 ) {
   return createBodyHandler(
     async (ctx) => {
@@ -204,12 +234,16 @@ export function createPatchHandler<TInput, TOutput>(
     },
     operationName,
     200,
-    validator
+    validator,
+    sync
   );
 }
 
 /**
  * Create a DELETE handler (convenience wrapper)
+ *
+ * When sync is configured, the handler should return the deleted entity ID
+ * (string) instead of boolean, or false/null if not found.
  */
 export function createDeleteHandler(
   handler: (context: {
@@ -217,23 +251,34 @@ export function createDeleteHandler(
     userId: string;
     params: Record<string, string | undefined>;
     request: Request;
-  }) => Promise<boolean>,
-  operationName: string
+  }) => Promise<boolean | string>,
+  operationName: string,
+  sync?: SyncConfig
 ) {
   return async (context: APIContext): Promise<Response> => {
     try {
       const db = getDatabaseConnection(context.locals);
       const userId = getUserId(context.locals);
 
-      const success = await handler({
+      const result = await handler({
         db,
         userId,
         params: context.params,
         request: context.request,
       });
 
-      if (!success) {
+      if (!result) {
         return errorResponse('Resource not found', 404);
+      }
+
+      // Log change for sync if configured
+      if (sync) {
+        const entityId = typeof result === 'string' ? result : '';
+        const parentId = sync.parentId ? sync.parentId(context.params) : null;
+        const sourceId = getSourceId(context.request);
+        logChange(db, userId, sync.entityType, entityId, parentId, 'delete', null, sourceId).catch(
+          () => {} // Non-critical
+        );
       }
 
       return successResponse({ success: true });

@@ -10,7 +10,13 @@ import {
   createPostHandler,
   createPatchHandler,
   createDeleteHandler,
+  type SyncConfig,
 } from '../../../../lib/api-helpers';
+
+const sync: SyncConfig = {
+  entityType: 'bag',
+  parentId: (params) => params.tripId || null,
+};
 
 export const GET: APIRoute = createGetHandler(async ({ db, userId, params }) => {
   const { tripId } = params;
@@ -73,7 +79,8 @@ export const POST: APIRoute = createPostHandler<
       .get();
   },
   'create bag',
-  (data) => validateRequestSafe(bagCreateSchema, data)
+  (data) => validateRequestSafe(bagCreateSchema, data),
+  sync
 );
 
 export const PATCH: APIRoute = createPatchHandler<
@@ -114,41 +121,49 @@ export const PATCH: APIRoute = createPatchHandler<
       .get();
   },
   'update bag',
-  (data) => validateRequestSafe(bagUpdateSchema, data)
+  (data) => validateRequestSafe(bagUpdateSchema, data),
+  { ...sync, entityId: (result) => result.id || (result as any).bag_id }
 );
 
-export const DELETE: APIRoute = createDeleteHandler(async ({ db, userId, params, request }) => {
-  const { tripId } = params;
-  if (!tripId) {
-    return false;
-  }
+export const DELETE: APIRoute = createDeleteHandler(
+  async ({ db, userId, params, request }) => {
+    const { tripId } = params;
+    if (!tripId) {
+      return false;
+    }
 
-  const body = await request.json();
-  const bag_id =
-    typeof body === 'object' && body !== null && 'bag_id' in body && typeof body.bag_id === 'string'
-      ? body.bag_id
-      : null;
+    const body = await request.json();
+    const bag_id =
+      typeof body === 'object' &&
+      body !== null &&
+      'bag_id' in body &&
+      typeof body.bag_id === 'string'
+        ? body.bag_id
+        : null;
 
-  if (!bag_id) {
-    return false;
-  }
+    if (!bag_id) {
+      return false;
+    }
 
-  // Verify trip ownership
-  const trip = await db
-    .select()
-    .from(trips)
-    .where(and(eq(trips.id, tripId), eq(trips.clerk_user_id, userId)))
-    .get();
+    // Verify trip ownership
+    const trip = await db
+      .select()
+      .from(trips)
+      .where(and(eq(trips.id, tripId), eq(trips.clerk_user_id, userId)))
+      .get();
 
-  if (!trip) {
-    return false;
-  }
+    if (!trip) {
+      return false;
+    }
 
-  const deleted = await db
-    .delete(bags)
-    .where(and(eq(bags.id, bag_id), eq(bags.trip_id, tripId)))
-    .returning()
-    .get();
+    const deleted = await db
+      .delete(bags)
+      .where(and(eq(bags.id, bag_id), eq(bags.trip_id, tripId)))
+      .returning()
+      .get();
 
-  return !!deleted;
-}, 'delete bag');
+    return deleted ? bag_id : false;
+  },
+  'delete bag',
+  sync
+);

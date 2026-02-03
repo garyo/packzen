@@ -5,7 +5,9 @@ import { eq, and } from 'drizzle-orm';
 import { z } from 'zod';
 import { categories } from '../../../../db/schema';
 import { categoryUpdateSchema, validateRequestSafe } from '../../../lib/validation';
-import { createPatchHandler, createDeleteHandler } from '../../../lib/api-helpers';
+import { createPatchHandler, createDeleteHandler, type SyncConfig } from '../../../lib/api-helpers';
+
+const sync: SyncConfig = { entityType: 'category' };
 
 export const PATCH: APIRoute = createPatchHandler<
   z.infer<typeof categoryUpdateSchema>,
@@ -38,20 +40,25 @@ export const PATCH: APIRoute = createPatchHandler<
     return updated || null;
   },
   'update category',
-  (data) => validateRequestSafe(categoryUpdateSchema, data)
+  (data) => validateRequestSafe(categoryUpdateSchema, data),
+  sync
 );
 
-export const DELETE: APIRoute = createDeleteHandler(async ({ db, userId, params }) => {
-  const categoryId = params.id;
-  if (!categoryId) {
-    return false;
-  }
+export const DELETE: APIRoute = createDeleteHandler(
+  async ({ db, userId, params }) => {
+    const categoryId = params.id;
+    if (!categoryId) {
+      return false;
+    }
 
-  const deleted = await db
-    .delete(categories)
-    .where(and(eq(categories.id, categoryId), eq(categories.clerk_user_id, userId)))
-    .returning()
-    .get();
+    const deleted = await db
+      .delete(categories)
+      .where(and(eq(categories.id, categoryId), eq(categories.clerk_user_id, userId)))
+      .returning()
+      .get();
 
-  return !!deleted;
-}, 'delete category');
+    return deleted ? categoryId : false;
+  },
+  'delete category',
+  sync
+);

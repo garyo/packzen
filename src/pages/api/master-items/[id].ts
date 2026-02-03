@@ -15,6 +15,7 @@ import {
   handleApiError,
 } from '../../../lib/api-helpers';
 import { masterItemWithCategorySelect } from './index';
+import { logChange, getSourceId } from '../../../lib/sync';
 
 /** Fetch a master item with its category name by ID */
 function fetchMasterItemWithCategory(db: DrizzleD1Database, itemId: string) {
@@ -119,6 +120,10 @@ async function handleUpdate(context: Parameters<APIRoute>[0], partial: boolean):
       return errorResponse('Failed to fetch updated item', 500);
     }
 
+    const sourceId = getSourceId(context.request);
+    logChange(db, userId, 'masterItem', result.id, null, 'update', result, sourceId).catch(
+      () => {}
+    );
     return successResponse(result);
   } catch (error) {
     return handleApiError(error, partial ? 'update master item' : 'update master item (PUT)');
@@ -129,17 +134,21 @@ export const PATCH: APIRoute = async (context) => handleUpdate(context, true);
 
 export const PUT: APIRoute = async (context) => handleUpdate(context, false);
 
-export const DELETE: APIRoute = createDeleteHandler(async ({ db, userId, params }) => {
-  const { id } = params;
-  if (!id) {
-    return false;
-  }
+export const DELETE: APIRoute = createDeleteHandler(
+  async ({ db, userId, params }) => {
+    const { id } = params;
+    if (!id) {
+      return false;
+    }
 
-  const deleted = await db
-    .delete(masterItems)
-    .where(and(eq(masterItems.id, id), eq(masterItems.clerk_user_id, userId)))
-    .returning()
-    .get();
+    const deleted = await db
+      .delete(masterItems)
+      .where(and(eq(masterItems.id, id), eq(masterItems.clerk_user_id, userId)))
+      .returning()
+      .get();
 
-  return !!deleted;
-}, 'delete master item');
+    return deleted ? id : false;
+  },
+  'delete master item',
+  { entityType: 'masterItem' }
+);

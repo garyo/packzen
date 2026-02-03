@@ -14,6 +14,7 @@ import {
   handleApiError,
 } from '../../../lib/api-helpers';
 import { checkMasterItemLimit } from '../../../lib/resource-limits';
+import { logChange, getSourceId } from '../../../lib/sync';
 
 /** Shared select shape for master items joined with category name */
 export const masterItemWithCategorySelect = {
@@ -101,6 +102,10 @@ export const POST: APIRoute = async (context) => {
       return errorResponse('Failed to fetch created item', 500);
     }
 
+    const sourceId = getSourceId(context.request);
+    logChange(db, userId, 'masterItem', result.id, null, 'create', result, sourceId).catch(
+      () => {}
+    );
     return successResponse(result, 201);
   } catch (error) {
     return handleApiError(error, 'create master item');

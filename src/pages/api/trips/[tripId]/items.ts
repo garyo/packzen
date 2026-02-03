@@ -19,7 +19,14 @@ import {
   errorResponse,
   successResponse,
   handleApiError,
+  type SyncConfig,
 } from '../../../../lib/api-helpers';
+import { logChange, getSourceId } from '../../../../lib/sync';
+
+const sync: SyncConfig = {
+  entityType: 'tripItem',
+  parentId: (params) => params.tripId || null,
+};
 import { checkTripItemLimit } from '../../../../lib/resource-limits';
 
 export const GET: APIRoute = createGetHandler(async ({ db, userId, params }) => {
@@ -135,6 +142,17 @@ export const POST: APIRoute = async (context) => {
         .returning()
         .get();
 
+      const sourceId = getSourceId(context.request);
+      logChange(
+        db,
+        userId,
+        'tripItem',
+        updatedItem.id,
+        tripId,
+        'update',
+        updatedItem,
+        sourceId
+      ).catch(() => {});
       return successResponse(updatedItem, 200);
     }
 
@@ -191,6 +209,10 @@ export const POST: APIRoute = async (context) => {
       .returning()
       .get();
 
+    const sourceId = getSourceId(context.request);
+    logChange(db, userId, 'tripItem', newItem.id, tripId, 'create', newItem, sourceId).catch(
+      () => {}
+    );
     return successResponse(newItem, 201);
   } catch (error) {
     return handleApiError(error, 'create trip item');
@@ -325,41 +347,46 @@ export const PATCH: APIRoute = createPatchHandler<
       .get();
   },
   'update trip item',
-  (data) => validateRequestSafe(tripItemUpdateSchema, data)
+  (data) => validateRequestSafe(tripItemUpdateSchema, data),
+  sync
 );
 
-export const DELETE: APIRoute = createDeleteHandler(async ({ db, userId, params, request }) => {
-  const { tripId } = params;
-  if (!tripId) {
-    return false;
-  }
+export const DELETE: APIRoute = createDeleteHandler(
+  async ({ db, userId, params, request }) => {
+    const { tripId } = params;
+    if (!tripId) {
+      return false;
+    }
 
-  const body = await request.json();
-  const id =
-    typeof body === 'object' && body !== null && 'id' in body && typeof body.id === 'string'
-      ? body.id
-      : null;
+    const body = await request.json();
+    const id =
+      typeof body === 'object' && body !== null && 'id' in body && typeof body.id === 'string'
+        ? body.id
+        : null;
 
-  if (!id) {
-    return false;
-  }
+    if (!id) {
+      return false;
+    }
 
-  // Verify trip ownership
-  const trip = await db
-    .select()
-    .from(trips)
-    .where(and(eq(trips.id, tripId), eq(trips.clerk_user_id, userId)))
-    .get();
+    // Verify trip ownership
+    const trip = await db
+      .select()
+      .from(trips)
+      .where(and(eq(trips.id, tripId), eq(trips.clerk_user_id, userId)))
+      .get();
 
-  if (!trip) {
-    return false;
-  }
+    if (!trip) {
+      return false;
+    }
 
-  const deleted = await db
-    .delete(tripItems)
-    .where(and(eq(tripItems.id, id), eq(tripItems.trip_id, tripId)))
-    .returning()
-    .get();
+    const deleted = await db
+      .delete(tripItems)
+      .where(and(eq(tripItems.id, id), eq(tripItems.trip_id, tripId)))
+      .returning()
+      .get();
 
-  return !!deleted;
-}, 'delete trip item');
+    return deleted ? id : false;
+  },
+  'delete trip item',
+  sync
+);

@@ -4,6 +4,9 @@ import { getCsrfHeaderName } from './csrf';
 
 const API_BASE_URL = '/api';
 
+// Unique ID for this tab — used to filter out own changes in SSE sync
+export const sourceId = crypto.randomUUID();
+
 interface RequestOptions extends RequestInit {
   params?: Record<string, string>;
   skipErrorHandling?: boolean; // Allow callers to handle errors themselves
@@ -92,6 +95,7 @@ async function makeRequest<T>(
         'Content-Type': 'application/json',
         ...(token && { Authorization: `Bearer ${token}` }),
         ...(csrfTokenValue && { [getCsrfHeaderName()]: csrfTokenValue }),
+        ...(needsCsrf && { 'X-Source-ID': sourceId }),
         ...options.headers,
       },
     });

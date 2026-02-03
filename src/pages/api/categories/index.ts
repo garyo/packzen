@@ -14,6 +14,7 @@ import {
   handleApiError,
 } from '../../../lib/api-helpers';
 import { checkCategoryLimit } from '../../../lib/resource-limits';
+import { logChange, getSourceId } from '../../../lib/sync';
 
 export const GET: APIRoute = createGetHandler(async ({ db, userId }) => {
   return await db.select().from(categories).where(eq(categories.clerk_user_id, userId)).all();
@@ -56,6 +57,10 @@ export const POST: APIRoute = async (context) => {
       .returning()
       .get();
 
+    const sourceId = getSourceId(context.request);
+    logChange(db, userId, 'category', newCategory.id, null, 'create', newCategory, sourceId).catch(
+      () => {}
+    );
     return successResponse(newCategory, 201);
   } catch (error) {
     return handleApiError(error, 'create category');
