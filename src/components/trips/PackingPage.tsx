@@ -284,9 +284,11 @@ export function PackingPage(props: PackingPageProps) {
     const unsubTripItem = syncManager.on('tripItem', (change) => {
       if (change.parentId !== props.tripId) return;
       switch (change.action) {
-        case 'create':
-          addItemToStore(change.data);
+        case 'create': {
+          const exists = itemsState.data.some((i) => i.id === change.entityId);
+          if (!exists) addItemToStore(change.data);
           break;
+        }
         case 'update':
           updateItemInStore(change.entityId, change.data);
           break;

@@ -28,7 +28,7 @@ export const onRequest = clerkMiddleware(async (auth, context, next) => {
 
   // Fast path for SSE sync endpoint — skip billing check to avoid
   // a getUser() call on every ~3s poll
-  if (context.url.pathname === '/api/sync/events') {
+  if (context.url.pathname === '/api/sync/events' && context.request.method === 'GET') {
     return next();
   }
 

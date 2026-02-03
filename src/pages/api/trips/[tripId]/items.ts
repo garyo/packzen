@@ -143,16 +143,7 @@ export const POST: APIRoute = async (context) => {
         .get();
 
       const sourceId = getSourceId(context.request);
-      logChange(
-        db,
-        userId,
-        'tripItem',
-        updatedItem.id,
-        tripId,
-        'update',
-        updatedItem,
-        sourceId
-      ).catch(() => {});
+      logChange(db, userId, 'tripItem', updatedItem.id, tripId, 'update', updatedItem, sourceId);
       return successResponse(updatedItem, 200);
     }
 
@@ -210,9 +201,7 @@ export const POST: APIRoute = async (context) => {
       .get();
 
     const sourceId = getSourceId(context.request);
-    logChange(db, userId, 'tripItem', newItem.id, tripId, 'create', newItem, sourceId).catch(
-      () => {}
-    );
+    logChange(db, userId, 'tripItem', newItem.id, tripId, 'create', newItem, sourceId);
     return successResponse(newItem, 201);
   } catch (error) {
     return handleApiError(error, 'create trip item');

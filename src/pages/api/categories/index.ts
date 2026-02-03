@@ -58,9 +58,7 @@ export const POST: APIRoute = async (context) => {
       .get();
 
     const sourceId = getSourceId(context.request);
-    logChange(db, userId, 'category', newCategory.id, null, 'create', newCategory, sourceId).catch(
-      () => {}
-    );
+    logChange(db, userId, 'category', newCategory.id, null, 'create', newCategory, sourceId);
     return successResponse(newCategory, 201);
   } catch (error) {
     return handleApiError(error, 'create category');

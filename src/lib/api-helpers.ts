@@ -175,9 +175,7 @@ function createBodyHandler<TInput, TOutput>(
         const entityId = sync.entityId ? sync.entityId(result) : (result as any).id;
         const parentId = sync.parentId ? sync.parentId(context.params) : null;
         const sourceId = getSourceId(context.request);
-        logChange(db, userId, sync.entityType, entityId, parentId, action, result, sourceId).catch(
-          () => {} // Non-critical — don't fail the request
-        );
+        logChange(db, userId, sync.entityType, entityId, parentId, action, result, sourceId);
       }
 
       return successResponse(result, successStatus);
@@ -276,9 +274,7 @@ export function createDeleteHandler(
         const entityId = typeof result === 'string' ? result : '';
         const parentId = sync.parentId ? sync.parentId(context.params) : null;
         const sourceId = getSourceId(context.request);
-        logChange(db, userId, sync.entityType, entityId, parentId, 'delete', null, sourceId).catch(
-          () => {} // Non-critical
-        );
+        logChange(db, userId, sync.entityType, entityId, parentId, 'delete', null, sourceId);
       }
 
       return successResponse({ success: true });

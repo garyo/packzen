@@ -103,9 +103,7 @@ export const POST: APIRoute = async (context) => {
     }
 
     const sourceId = getSourceId(context.request);
-    logChange(db, userId, 'masterItem', result.id, null, 'create', result, sourceId).catch(
-      () => {}
-    );
+    logChange(db, userId, 'masterItem', result.id, null, 'create', result, sourceId);
     return successResponse(result, 201);
   } catch (error) {
     return handleApiError(error, 'create master item');

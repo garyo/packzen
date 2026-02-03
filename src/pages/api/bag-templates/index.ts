@@ -62,16 +62,7 @@ export const POST: APIRoute = async (context) => {
       .get();
 
     const sourceId = getSourceId(context.request);
-    logChange(
-      db,
-      userId,
-      'bagTemplate',
-      newTemplate.id,
-      null,
-      'create',
-      newTemplate,
-      sourceId
-    ).catch(() => {});
+    logChange(db, userId, 'bagTemplate', newTemplate.id, null, 'create', newTemplate, sourceId);
     return successResponse(newTemplate, 201);
   } catch (error) {
     return handleApiError(error, 'create bag template');

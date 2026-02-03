@@ -83,7 +83,7 @@ export const POST: APIRoute = async (context) => {
       .get();
 
     const sourceId = getSourceId(context.request);
-    logChange(db, userId, 'trip', newTrip.id, null, 'create', newTrip, sourceId).catch(() => {});
+    logChange(db, userId, 'trip', newTrip.id, null, 'create', newTrip, sourceId);
     return successResponse(newTrip, 201);
   } catch (error) {
     return handleApiError(error, 'create trip');

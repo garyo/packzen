@@ -121,9 +121,7 @@ async function handleUpdate(context: Parameters<APIRoute>[0], partial: boolean):
     }
 
     const sourceId = getSourceId(context.request);
-    logChange(db, userId, 'masterItem', result.id, null, 'update', result, sourceId).catch(
-      () => {}
-    );
+    logChange(db, userId, 'masterItem', result.id, null, 'update', result, sourceId);
     return successResponse(result);
   } catch (error) {
     return handleApiError(error, partial ? 'update master item' : 'update master item (PUT)');
