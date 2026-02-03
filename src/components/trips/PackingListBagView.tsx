@@ -93,10 +93,14 @@ function DroppableContainerSection(props: { containerId: string; children: any }
   );
 }
 
+// Nav item type for unified visibility-ordered list
+type NavItem =
+  | { type: 'bag'; id: string | null; name: string; color: string | null }
+  | { type: 'container'; id: string; name: string };
+
 // Wayfinding nav bar component - needs to be inside DragDropProvider to access context
 function WayfindingNavBar(props: {
-  bags: Array<{ id: string | null; name: string; color: string | null }>;
-  containers: TripItem[];
+  navItems: NavItem[];
   currentSection: () => string | null;
   activeItem: () => TripItem | null;
   onScrollToSection: (sectionId: string) => void;
@@ -127,40 +131,34 @@ function WayfindingNavBar(props: {
   return (
     <div class="sticky top-0 z-10 -mx-4 bg-gray-50/95 px-4 py-1.5 backdrop-blur-sm md:-mx-3 md:px-3">
       <div class="flex items-center gap-x-1 gap-y-0">
-        {/* Bags and containers - flex-wrap for overflow */}
+        {/* Bags and containers interleaved in visibility order */}
         <div class="flex flex-1 flex-wrap gap-x-1 gap-y-0">
-          {/* Bags */}
-          <For each={props.bags}>
-            {(bag) => {
-              const sectionId = bag.id ? `bag-section-${bag.id}` : 'bag-section-none';
-              const isHighlighted = () => highlightedNavItem() === sectionId;
-              return (
-                <button
-                  onClick={() => props.onScrollToSection(sectionId)}
-                  class={`flex items-center gap-1 px-1.5 py-0.5 text-xs ${
-                    isHighlighted()
-                      ? 'text-gray-900 underline decoration-2 underline-offset-2'
-                      : 'text-gray-500 hover:text-gray-900'
-                  }`}
-                  style="min-height: 16px"
-                >
-                  <Show when={bag.id !== null} fallback={<span class="text-[10px]">👕</span>}>
-                    <div
-                      class={`h-2 w-2 rounded-full border border-gray-300 ${getBagColorClass(bag.color)}`}
-                      style={getBagColorStyle(bag.color)}
-                    />
-                  </Show>
-                  <span class="max-w-[130px] truncate">{bag.name}</span>
-                </button>
-              );
-            }}
-          </For>
-          {/* Containers */}
-          <Show when={props.containers.length > 0}>
-            <span class="mx-1 self-center text-gray-300">|</span>
-            <For each={props.containers}>
-              {(container) => {
-                const sectionId = `container-section-${container.id}`;
+          <For each={props.navItems}>
+            {(navItem) => {
+              if (navItem.type === 'bag') {
+                const sectionId = navItem.id ? `bag-section-${navItem.id}` : 'bag-section-none';
+                const isHighlighted = () => highlightedNavItem() === sectionId;
+                return (
+                  <button
+                    onClick={() => props.onScrollToSection(sectionId)}
+                    class={`flex items-center gap-1 px-1.5 py-0.5 text-xs ${
+                      isHighlighted()
+                        ? 'text-gray-900 underline decoration-2 underline-offset-2'
+                        : 'text-gray-500 hover:text-gray-900'
+                    }`}
+                    style="min-height: 16px"
+                  >
+                    <Show when={navItem.id !== null} fallback={<span class="text-[10px]">👕</span>}>
+                      <div
+                        class={`h-2 w-2 rounded-full border border-gray-300 ${getBagColorClass(navItem.color)}`}
+                        style={getBagColorStyle(navItem.color)}
+                      />
+                    </Show>
+                    <span class="max-w-[130px] truncate">{navItem.name}</span>
+                  </button>
+                );
+              } else {
+                const sectionId = `container-section-${navItem.id}`;
                 const isHighlighted = () => highlightedNavItem() === sectionId;
                 return (
                   <button
@@ -173,12 +171,12 @@ function WayfindingNavBar(props: {
                     style="min-height: 16px"
                   >
                     <span class="text-[10px]">📦</span>
-                    <span class="max-w-[130px] truncate">{container.name}</span>
+                    <span class="max-w-[130px] truncate">{navItem.name}</span>
                   </button>
                 );
-              }}
-            </For>
-          </Show>
+              }
+            }}
+          </For>
         </div>
 
         {/* Trip Notes Button - at the far right */}
@@ -402,11 +400,6 @@ function PackingListBagViewInner(props: PackingListBagViewProps) {
     return [...itemsByBag().allBags].sort((a, b) => a.name.localeCompare(b.name));
   });
 
-  // Get all containers (even empty ones), sorted by name
-  const allContainers = () => {
-    return containerData().containers.sort((a, b) => a.name.localeCompare(b.name));
-  };
-
   const containersByBag = createMemo(() => {
     const map = new Map<string | null, TripItem[]>();
     containerData().containers.forEach((container) => {
@@ -417,6 +410,20 @@ function PackingListBagViewInner(props: PackingListBagViewProps) {
       map.get(key)!.push(container);
     });
     return map;
+  });
+
+  // Build nav items in visibility order: for each bag, followed by its containers
+  const navItems = createMemo((): NavItem[] => {
+    const items: NavItem[] = [];
+    const cByBag = containersByBag();
+    for (const bag of sortedBags()) {
+      items.push({ type: 'bag', id: bag.id, name: bag.name, color: bag.color });
+      const containers = cByBag.get(bag.id) || [];
+      for (const c of [...containers].sort((a, b) => a.name.localeCompare(b.name))) {
+        items.push({ type: 'container', id: c.id, name: c.name });
+      }
+    }
+    return items;
   });
 
   // Track current visible section for wayfinding nav bar
@@ -520,10 +527,9 @@ function PackingListBagViewInner(props: PackingListBagViewProps) {
       <EscapeCancelHandler onCancel={() => setActiveItem(null)} />
       <div class="space-y-6 md:space-y-3">
         {/* Sticky Wayfinding Nav Bar */}
-        <Show when={sortedBags().length > 1 || allContainers().length > 0}>
+        <Show when={navItems().length > 1}>
           <WayfindingNavBar
-            bags={sortedBags()}
-            containers={allContainers()}
+            navItems={navItems()}
             currentSection={currentSection}
             activeItem={activeItem}
             onScrollToSection={scrollToSection}
