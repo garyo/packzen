@@ -49,10 +49,11 @@ export function BackupManager(props: BackupManagerProps) {
       const categoriesList = props.categories() || [];
       const itemsList = props.masterItems() || [];
 
-      const bagTemplatesResponse = await api.get<BagTemplate[]>(endpoints.bagTemplates);
+      const [bagTemplatesResponse, tripsResponse] = await Promise.all([
+        api.get<BagTemplate[]>(endpoints.bagTemplates),
+        api.get<Trip[]>(endpoints.trips),
+      ]);
       const bagTemplatesList = bagTemplatesResponse.data || [];
-
-      const tripsResponse = await api.get<Trip[]>(endpoints.trips);
       const tripsList = tripsResponse.data || [];
 
       const tripsWithData = await Promise.all(
@@ -103,170 +104,185 @@ export function BackupManager(props: BackupManagerProps) {
 
       const categoryNameToId = new Map<string, string>();
 
-      // Import categories
-      for (const cat of backup.categories) {
-        const existing = props.categories()?.find((c) => c.name === cat.name);
-        if (existing) {
-          await api.patch(endpoints.category(existing.id), {
-            name: cat.name,
-            icon: cat.icon,
-            sort_order: cat.sort_order,
-          });
-          categoryNameToId.set(cat.name, existing.id);
-        } else {
-          const response = await api.post<Category>(endpoints.categories, {
-            name: cat.name,
-            icon: cat.icon,
-            sort_order: cat.sort_order,
-          });
-          if (response.data) {
-            categoryNameToId.set(cat.name, response.data.id);
+      // Phase 1: Import categories in parallel
+      await Promise.all(
+        backup.categories.map(async (cat) => {
+          const existing = props.categories()?.find((c) => c.name === cat.name);
+          if (existing) {
+            await api.patch(endpoints.category(existing.id), {
+              name: cat.name,
+              icon: cat.icon,
+              sort_order: cat.sort_order,
+            });
+            categoryNameToId.set(cat.name, existing.id);
+          } else {
+            const response = await api.post<Category>(endpoints.categories, {
+              name: cat.name,
+              icon: cat.icon,
+              sort_order: cat.sort_order,
+            });
+            if (response.data) {
+              categoryNameToId.set(cat.name, response.data.id);
+            }
           }
-        }
-      }
+        })
+      );
 
-      // Import master items
-      for (const item of backup.masterItems) {
-        const categoryId = item.category_name
-          ? categoryNameToId.get(item.category_name) || null
-          : null;
+      // Phase 2: Master items + bag templates in parallel
+      await Promise.all([
+        // Master items (depend on categoryNameToId from phase 1)
+        Promise.all(
+          backup.masterItems.map(async (item) => {
+            const categoryId = item.category_name
+              ? categoryNameToId.get(item.category_name) || null
+              : null;
+            const existing = props
+              .masterItems()
+              ?.find((i) => i.name.toLowerCase() === item.name.toLowerCase());
 
-        const existing = props
-          .masterItems()
-          ?.find((i) => i.name.toLowerCase() === item.name.toLowerCase());
+            if (existing) {
+              await api.patch(endpoints.masterItem(existing.id), {
+                name: item.name,
+                description: item.description,
+                category_id: categoryId,
+                default_quantity: item.default_quantity,
+              });
+            } else {
+              await api.post(endpoints.masterItems, {
+                name: item.name,
+                description: item.description,
+                category_id: categoryId,
+                default_quantity: item.default_quantity,
+              });
+            }
+          })
+        ),
+        // Bag templates (fully independent)
+        (async () => {
+          const bagTemplatesResponse = await api.get<BagTemplate[]>(endpoints.bagTemplates);
+          const existingBagTemplates = bagTemplatesResponse.data || [];
+          await Promise.all(
+            backup.bagTemplates.map(async (template) => {
+              const existingTemplate = existingBagTemplates.find(
+                (t) => t.name.toLowerCase() === template.name.toLowerCase()
+              );
+              if (existingTemplate) {
+                await api.patch(endpoints.bagTemplate(existingTemplate.id), {
+                  name: template.name,
+                  type: template.type,
+                  color: template.color,
+                  sort_order: template.sort_order,
+                });
+              } else {
+                await api.post(endpoints.bagTemplates, {
+                  name: template.name,
+                  type: template.type,
+                  color: template.color,
+                  sort_order: template.sort_order,
+                });
+              }
+            })
+          );
+        })(),
+      ]);
 
-        if (existing) {
-          await api.patch(endpoints.masterItem(existing.id), {
-            name: item.name,
-            description: item.description,
-            category_id: categoryId,
-            default_quantity: item.default_quantity,
-          });
-        } else {
-          await api.post(endpoints.masterItems, {
-            name: item.name,
-            description: item.description,
-            category_id: categoryId,
-            default_quantity: item.default_quantity,
-          });
-        }
-      }
-
-      // Import bag templates
-      const bagTemplatesResponse = await api.get<BagTemplate[]>(endpoints.bagTemplates);
-      const existingBagTemplates = bagTemplatesResponse.data || [];
-
-      for (const template of backup.bagTemplates) {
-        const existingTemplate = existingBagTemplates.find(
-          (t) => t.name.toLowerCase() === template.name.toLowerCase()
-        );
-
-        if (existingTemplate) {
-          await api.patch(endpoints.bagTemplate(existingTemplate.id), {
-            name: template.name,
-            type: template.type,
-            color: template.color,
-            sort_order: template.sort_order,
-          });
-        } else {
-          await api.post(endpoints.bagTemplates, {
-            name: template.name,
-            type: template.type,
-            color: template.color,
-            sort_order: template.sort_order,
-          });
-        }
-      }
-
-      // Import trips
+      // Phase 3: Import trips in parallel
       const tripsResponse = await api.get<Trip[]>(endpoints.trips);
       const existingTrips = tripsResponse.data || [];
 
-      for (const tripData of backup.trips) {
-        const existingTrip = existingTrips.find(
-          (t) => t.name.toLowerCase() === tripData.name.toLowerCase()
-        );
-
-        let tripId: string;
-
-        if (existingTrip) {
-          await api.patch(endpoints.trip(existingTrip.id), {
-            name: tripData.name,
-            destination: tripData.destination,
-            start_date: tripData.start_date,
-            end_date: tripData.end_date,
-            notes: tripData.notes,
-          });
-          tripId = existingTrip.id;
-        } else {
-          const tripResponse = await api.post<Trip>(endpoints.trips, {
-            name: tripData.name,
-            destination: tripData.destination,
-            start_date: tripData.start_date,
-            end_date: tripData.end_date,
-            notes: tripData.notes,
-          });
-          if (!tripResponse.data) continue;
-          tripId = tripResponse.data.id;
-        }
-
-        // Import bags
-        const bagsResponse = await api.get<Bag[]>(endpoints.tripBags(tripId));
-        const existingBags = bagsResponse.data || [];
-        const bagNameToId = new Map<string, string>();
-
-        for (const bagData of tripData.bags) {
-          const existingBag = existingBags.find((b) => b.name === bagData.name);
-          if (existingBag) {
-            await api.patch(endpoints.tripBags(tripId), {
-              bag_id: existingBag.id,
-              name: bagData.name,
-              type: bagData.type,
-              color: bagData.color,
-            });
-            bagNameToId.set(bagData.name, existingBag.id);
-          } else {
-            const bagResponse = await api.post<Bag>(endpoints.tripBags(tripId), {
-              name: bagData.name,
-              type: bagData.type,
-              color: bagData.color,
-              sort_order: bagData.sort_order,
-            });
-            if (bagResponse.data) {
-              bagNameToId.set(bagData.name, bagResponse.data.id);
-            }
-          }
-        }
-
-        // Import items
-        const itemsResponse = await api.get<TripItem[]>(endpoints.tripItems(tripId));
-        const existingItems = itemsResponse.data || [];
-
-        for (const itemData of tripData.items) {
-          const bagId = itemData.bag_name ? bagNameToId.get(itemData.bag_name) || null : null;
-          const existingItem = existingItems.find(
-            (i) => i.name.toLowerCase() === itemData.name.toLowerCase()
+      await Promise.all(
+        backup.trips.map(async (tripData) => {
+          const existingTrip = existingTrips.find(
+            (t) => t.name.toLowerCase() === tripData.name.toLowerCase()
           );
 
-          if (existingItem) {
-            await api.patch(endpoints.tripItems(tripId), {
-              id: existingItem.id,
-              name: itemData.name,
-              category_name: itemData.category_name,
-              quantity: itemData.quantity,
-              bag_id: bagId,
+          let tripId: string;
+
+          if (existingTrip) {
+            await api.patch(endpoints.trip(existingTrip.id), {
+              name: tripData.name,
+              destination: tripData.destination,
+              start_date: tripData.start_date,
+              end_date: tripData.end_date,
+              notes: tripData.notes,
             });
+            tripId = existingTrip.id;
           } else {
-            await api.post(endpoints.tripItems(tripId), {
-              name: itemData.name,
-              category_name: itemData.category_name,
-              quantity: itemData.quantity,
-              bag_id: bagId,
-              master_item_id: null,
+            const tripResponse = await api.post<Trip>(endpoints.trips, {
+              name: tripData.name,
+              destination: tripData.destination,
+              start_date: tripData.start_date,
+              end_date: tripData.end_date,
+              notes: tripData.notes,
             });
+            if (!tripResponse.data) return;
+            tripId = tripResponse.data.id;
           }
-        }
-      }
+
+          // Fetch existing bags and items in parallel
+          const [bagsResponse, itemsResponse] = await Promise.all([
+            api.get<Bag[]>(endpoints.tripBags(tripId)),
+            api.get<TripItem[]>(endpoints.tripItems(tripId)),
+          ]);
+          const existingBags = bagsResponse.data || [];
+          const bagNameToId = new Map<string, string>();
+
+          // Import bags in parallel
+          await Promise.all(
+            tripData.bags.map(async (bagData) => {
+              const existingBag = existingBags.find((b) => b.name === bagData.name);
+              if (existingBag) {
+                await api.patch(endpoints.tripBags(tripId), {
+                  bag_id: existingBag.id,
+                  name: bagData.name,
+                  type: bagData.type,
+                  color: bagData.color,
+                });
+                bagNameToId.set(bagData.name, existingBag.id);
+              } else {
+                const bagResponse = await api.post<Bag>(endpoints.tripBags(tripId), {
+                  name: bagData.name,
+                  type: bagData.type,
+                  color: bagData.color,
+                  sort_order: bagData.sort_order,
+                });
+                if (bagResponse.data) {
+                  bagNameToId.set(bagData.name, bagResponse.data.id);
+                }
+              }
+            })
+          );
+
+          // Import items in parallel (bags are done, so bag IDs available)
+          const existingItems = itemsResponse.data || [];
+          await Promise.all(
+            tripData.items.map(async (itemData) => {
+              const bagId = itemData.bag_name ? bagNameToId.get(itemData.bag_name) || null : null;
+              const existingItem = existingItems.find(
+                (i) => i.name.toLowerCase() === itemData.name.toLowerCase()
+              );
+
+              if (existingItem) {
+                await api.patch(endpoints.tripItems(tripId), {
+                  id: existingItem.id,
+                  name: itemData.name,
+                  category_name: itemData.category_name,
+                  quantity: itemData.quantity,
+                  bag_id: bagId,
+                });
+              } else {
+                await api.post(endpoints.tripItems(tripId), {
+                  name: itemData.name,
+                  category_name: itemData.category_name,
+                  quantity: itemData.quantity,
+                  bag_id: bagId,
+                  master_item_id: null,
+                });
+              }
+            })
+          );
+        })
+      );
 
       showToast('success', 'Backup restored successfully!');
       props.onBackupRestored();

@@ -49,73 +49,73 @@ export function TripImportModal(props: TripImportModalProps) {
         notes: tripData.trip.notes,
       });
 
-      // Get existing bags to create a mapping from names to IDs
-      const bagsResponse = await api.get<any[]>(endpoints.tripBags(props.tripId));
+      // Fetch existing bags and items in parallel
+      const [bagsResponse, itemsResponse] = await Promise.all([
+        api.get<Bag[]>(endpoints.tripBags(props.tripId)),
+        api.get<any[]>(endpoints.tripItems(props.tripId)),
+      ]);
       const existingBags = bagsResponse.data || [];
-
-      // Create or update bags
-      const bagNameToId = new Map<string, string>();
-      for (const bagData of tripData.bags) {
-        const existingBag = existingBags.find((b) => b.name === bagData.name);
-        if (existingBag) {
-          // Update existing bag
-          await api.patch(endpoints.tripBags(props.tripId), {
-            bag_id: existingBag.id,
-            name: bagData.name,
-            type: bagData.type,
-            color: bagData.color,
-          });
-          bagNameToId.set(bagData.name, existingBag.id);
-        } else {
-          // Create new bag
-          const createResponse = await api.post<Bag>(endpoints.tripBags(props.tripId), {
-            name: bagData.name,
-            type: bagData.type,
-            color: bagData.color,
-            sort_order: bagData.sort_order,
-          });
-          if (createResponse.data) {
-            bagNameToId.set(bagData.name, createResponse.data.id);
-          }
-        }
-      }
-
-      // Get existing items to check for duplicates
-      const itemsResponse = await api.get<any[]>(endpoints.tripItems(props.tripId));
       const existingItems = itemsResponse.data || [];
 
-      // Create or update items
-      let importedCount = 0;
-      for (const itemData of tripData.items) {
-        const bagId = itemData.bag_name ? bagNameToId.get(itemData.bag_name) || null : null;
-        const existingItem = existingItems.find(
-          (i) => i.name.toLowerCase() === itemData.name.toLowerCase()
-        );
+      // Create or update bags in parallel
+      const bagNameToId = new Map<string, string>();
+      await Promise.all(
+        tripData.bags.map(async (bagData) => {
+          const existingBag = existingBags.find((b) => b.name === bagData.name);
+          if (existingBag) {
+            await api.patch(endpoints.tripBags(props.tripId), {
+              bag_id: existingBag.id,
+              name: bagData.name,
+              type: bagData.type,
+              color: bagData.color,
+            });
+            bagNameToId.set(bagData.name, existingBag.id);
+          } else {
+            const createResponse = await api.post<Bag>(endpoints.tripBags(props.tripId), {
+              name: bagData.name,
+              type: bagData.type,
+              color: bagData.color,
+              sort_order: bagData.sort_order,
+            });
+            if (createResponse.data) {
+              bagNameToId.set(bagData.name, createResponse.data.id);
+            }
+          }
+        })
+      );
 
-        if (existingItem) {
-          // Update existing item
-          await api.patch(endpoints.tripItems(props.tripId), {
-            id: existingItem.id,
-            name: itemData.name,
-            category_name: itemData.category_name,
-            quantity: itemData.quantity,
-            bag_id: bagId,
-            is_packed: itemData.is_packed,
-            is_skipped: itemData.is_skipped,
-          });
-        } else {
-          // Create new item
-          await api.post(endpoints.tripItems(props.tripId), {
-            name: itemData.name,
-            category_name: itemData.category_name,
-            quantity: itemData.quantity,
-            bag_id: bagId,
-            master_item_id: null,
-            is_skipped: itemData.is_skipped,
-          });
-          importedCount++;
-        }
-      }
+      // Create or update items in parallel (bags are done, so bag IDs available)
+      let importedCount = 0;
+      await Promise.all(
+        tripData.items.map(async (itemData) => {
+          const bagId = itemData.bag_name ? bagNameToId.get(itemData.bag_name) || null : null;
+          const existingItem = existingItems.find(
+            (i) => i.name.toLowerCase() === itemData.name.toLowerCase()
+          );
+
+          if (existingItem) {
+            await api.patch(endpoints.tripItems(props.tripId), {
+              id: existingItem.id,
+              name: itemData.name,
+              category_name: itemData.category_name,
+              quantity: itemData.quantity,
+              bag_id: bagId,
+              is_packed: itemData.is_packed,
+              is_skipped: itemData.is_skipped,
+            });
+          } else {
+            await api.post(endpoints.tripItems(props.tripId), {
+              name: itemData.name,
+              category_name: itemData.category_name,
+              quantity: itemData.quantity,
+              bag_id: bagId,
+              master_item_id: null,
+              is_skipped: itemData.is_skipped,
+            });
+            importedCount++;
+          }
+        })
+      );
 
       showToast('success', `Trip imported successfully! ${importedCount} new items added.`);
       props.onImported();

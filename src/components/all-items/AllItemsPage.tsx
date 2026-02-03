@@ -73,60 +73,58 @@ export function AllItemsPage() {
   };
 
   const handleImportBuiltInItems = async (itemsToImport: SelectedBuiltInItem[]) => {
-    let created = 0;
-    let updated = 0;
+    // Phase 1: Ensure all needed categories exist (parallel creation of missing ones)
+    const categoryMap = new Map<string, string>();
+    categories()?.forEach((c) => categoryMap.set(c.name.toLowerCase(), c.id));
 
-    for (const item of itemsToImport) {
-      // 1. Check if category exists, create if needed
-      let categoryId: string | null = null;
-      const existingCategory = categories()?.find(
-        (c) => c.name.toLowerCase() === item.category.toLowerCase()
-      );
+    const uniqueCategories = [...new Set(itemsToImport.map((i) => i.category))];
+    const missingCategories = uniqueCategories.filter(
+      (name) => !categoryMap.has(name.toLowerCase())
+    );
 
-      if (existingCategory) {
-        categoryId = existingCategory.id;
-      } else {
-        // Create new category
+    const catResults = await Promise.all(
+      missingCategories.map(async (name) => {
         const response = await api.post<Category>(endpoints.categories, {
-          name: item.category,
-          icon: getCategoryIcon(item.category),
-          sort_order: categories()?.length || 0,
+          name,
+          icon: getCategoryIcon(name),
+          sort_order: (categories()?.length || 0) + missingCategories.indexOf(name),
         });
-        if (response.success && response.data) {
-          categoryId = response.data.id;
-          await refetchCategories();
-        }
-      }
+        return { name, id: response.success && response.data ? response.data.id : null };
+      })
+    );
+    catResults.forEach(({ name, id }) => {
+      if (id) categoryMap.set(name.toLowerCase(), id);
+    });
 
-      // 2. Check if item exists (case-insensitive name match)
-      const existingItem = items()?.find(
-        (i) => i.name.toLowerCase().trim() === item.name.toLowerCase().trim()
-      );
+    // Phase 2: Create/update all items in parallel
+    const results = await Promise.all(
+      itemsToImport.map(async (item) => {
+        const categoryId = categoryMap.get(item.category.toLowerCase()) || null;
+        const existingItem = items()?.find(
+          (i) => i.name.toLowerCase().trim() === item.name.toLowerCase().trim()
+        );
 
-      if (existingItem) {
-        // Update existing item
-        const response = await api.patch(endpoints.masterItem(existingItem.id), {
-          description: item.description,
-          category_id: categoryId,
-          default_quantity: item.quantity,
-        });
-        if (response.success) {
-          updated++;
+        if (existingItem) {
+          const response = await api.patch(endpoints.masterItem(existingItem.id), {
+            description: item.description,
+            category_id: categoryId,
+            default_quantity: item.quantity,
+          });
+          return response.success ? 'updated' : 'failed';
+        } else {
+          const response = await api.post(endpoints.masterItems, {
+            name: item.name,
+            description: item.description,
+            category_id: categoryId,
+            default_quantity: item.quantity,
+          });
+          return response.success ? 'created' : 'failed';
         }
-      } else {
-        // Create new item
-        const response = await api.post(endpoints.masterItems, {
-          name: item.name,
-          description: item.description,
-          category_id: categoryId,
-          default_quantity: item.quantity,
-        });
-        if (response.success) {
-          created++;
-        }
-      }
-    }
+      })
+    );
 
+    const created = results.filter((r) => r === 'created').length;
+    const updated = results.filter((r) => r === 'updated').length;
     const messages = [];
     if (created > 0) messages.push(`${created} created`);
     if (updated > 0) messages.push(`${updated} updated`);

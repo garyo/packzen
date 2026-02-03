@@ -9,48 +9,59 @@ interface RequestOptions extends RequestInit {
   skipErrorHandling?: boolean; // Allow callers to handle errors themselves
 }
 
-// CSRF token cache
+// CSRF token cache with request deduplication
 let csrfToken: string | null = null;
+let csrfTokenPromise: Promise<string> | null = null;
 
 /**
- * Fetch CSRF token from the server
- * Caches the token for subsequent requests
+ * Fetch CSRF token from the server.
+ * Caches the token and deduplicates concurrent requests so parallel
+ * API calls share a single fetch.
  */
 async function getCsrfToken(): Promise<string> {
   if (csrfToken) {
     return csrfToken;
   }
-
-  try {
-    const sessionToken = await getSessionToken();
-
-    const response = await fetch('/api/csrf-token', {
-      credentials: 'same-origin',
-      headers: {
-        Authorization: `Bearer ${sessionToken}`,
-      },
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => 'Unknown error');
-      throw new Error(`Failed to fetch CSRF token (${response.status}): ${errorText}`);
-    }
-
-    const data: unknown = await response.json();
-    if (
-      typeof data !== 'object' ||
-      data === null ||
-      !('token' in data) ||
-      typeof (data as Record<string, unknown>).token !== 'string'
-    ) {
-      throw new Error('Invalid CSRF token response');
-    }
-    csrfToken = (data as Record<string, string>).token;
-    return csrfToken;
-  } catch (error) {
-    console.error('Error fetching CSRF token:', error);
-    throw error;
+  if (csrfTokenPromise) {
+    return csrfTokenPromise;
   }
+
+  csrfTokenPromise = (async () => {
+    try {
+      const sessionToken = await getSessionToken();
+
+      const response = await fetch('/api/csrf-token', {
+        credentials: 'same-origin',
+        headers: {
+          Authorization: `Bearer ${sessionToken}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => 'Unknown error');
+        throw new Error(`Failed to fetch CSRF token (${response.status}): ${errorText}`);
+      }
+
+      const data: unknown = await response.json();
+      if (
+        typeof data !== 'object' ||
+        data === null ||
+        !('token' in data) ||
+        typeof (data as Record<string, unknown>).token !== 'string'
+      ) {
+        throw new Error('Invalid CSRF token response');
+      }
+      csrfToken = (data as Record<string, string>).token;
+      return csrfToken;
+    } catch (error) {
+      console.error('Error fetching CSRF token:', error);
+      throw error;
+    } finally {
+      csrfTokenPromise = null;
+    }
+  })();
+
+  return csrfTokenPromise;
 }
 
 async function makeRequest<T>(
@@ -108,8 +119,9 @@ async function makeRequest<T>(
 
       // Handle 403 CSRF errors by refreshing token and retrying once
       if (response.status === 403 && errorMessage.includes('CSRF') && !options.skipErrorHandling) {
-        // Clear cached token and retry once
+        // Clear cached token and in-flight promise, then retry once
         csrfToken = null;
+        csrfTokenPromise = null;
         console.warn('CSRF token validation failed, refreshing token and retrying...');
         // Retry the request with a fresh token
         return makeRequest<T>(endpoint, { ...options, skipErrorHandling: true });

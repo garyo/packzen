@@ -55,31 +55,35 @@ export function NewTripImportModal(props: NewTripImportModalProps) {
 
       const newTripId = tripResponse.data.id;
 
-      // Create bags and map names to IDs
+      // Create bags in parallel and map names to IDs
       const bagNameToId = new Map<string, string>();
-      for (const bagData of tripData.bags) {
-        const createResponse = await api.post<Bag>(endpoints.tripBags(newTripId), {
-          name: bagData.name,
-          type: bagData.type,
-          color: bagData.color,
-          sort_order: bagData.sort_order,
-        });
-        if (createResponse.data) {
-          bagNameToId.set(bagData.name, createResponse.data.id);
-        }
-      }
+      await Promise.all(
+        tripData.bags.map(async (bagData) => {
+          const createResponse = await api.post<Bag>(endpoints.tripBags(newTripId), {
+            name: bagData.name,
+            type: bagData.type,
+            color: bagData.color,
+            sort_order: bagData.sort_order,
+          });
+          if (createResponse.data) {
+            bagNameToId.set(bagData.name, createResponse.data.id);
+          }
+        })
+      );
 
-      // Create items
-      for (const itemData of tripData.items) {
-        const bagId = itemData.bag_name ? bagNameToId.get(itemData.bag_name) || null : null;
-        await api.post(endpoints.tripItems(newTripId), {
-          name: itemData.name,
-          category_name: itemData.category_name,
-          quantity: itemData.quantity,
-          bag_id: bagId,
-          master_item_id: null,
-        });
-      }
+      // Create items in parallel (bags are done, so bag IDs available)
+      await Promise.all(
+        tripData.items.map(async (itemData) => {
+          const bagId = itemData.bag_name ? bagNameToId.get(itemData.bag_name) || null : null;
+          await api.post(endpoints.tripItems(newTripId), {
+            name: itemData.name,
+            category_name: itemData.category_name,
+            quantity: itemData.quantity,
+            bag_id: bagId,
+            master_item_id: null,
+          });
+        })
+      );
 
       showToast('success', `Trip "${tripData.trip.name}" imported successfully!`);
       props.onImported();

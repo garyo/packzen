@@ -14,10 +14,11 @@ export async function exportBackupData(
   categories: Category[],
   masterItems: MasterItem[]
 ): Promise<{ yaml: string; filename: string }> {
-  const bagTemplatesResponse = await api.get<BagTemplate[]>(endpoints.bagTemplates);
+  const [bagTemplatesResponse, tripsResponse] = await Promise.all([
+    api.get<BagTemplate[]>(endpoints.bagTemplates),
+    api.get<Trip[]>(endpoints.trips),
+  ]);
   const bagTemplatesList = bagTemplatesResponse.data || [];
-
-  const tripsResponse = await api.get<Trip[]>(endpoints.trips);
   const tripsList = tripsResponse.data || [];
 
   const tripsWithData: TripWithData[] = await Promise.all(
@@ -45,218 +46,255 @@ export async function restoreBackupData(
   const backup = yamlToFullBackup(yamlText);
   const categoryNameToId = new Map<string, string>();
 
-  for (const category of backup.categories) {
-    const existing = currentCategories.find((c) => normalize(c.name) === normalize(category.name));
-    if (existing) {
-      await api.patch(endpoints.category(existing.id), {
-        name: category.name,
-        icon: category.icon,
-        sort_order: category.sort_order,
-      });
-      categoryNameToId.set(normalize(category.name), existing.id);
-    } else {
-      const response = await api.post<Category>(endpoints.categories, {
-        name: category.name,
-        icon: category.icon,
-        sort_order: category.sort_order,
-      });
-      if (response.data) {
-        categoryNameToId.set(normalize(category.name), response.data.id);
+  // Phase 1: Categories (must complete before master items, since items reference category IDs)
+  await Promise.all(
+    backup.categories.map(async (category) => {
+      const existing = currentCategories.find(
+        (c) => normalize(c.name) === normalize(category.name)
+      );
+      if (existing) {
+        await api.patch(endpoints.category(existing.id), {
+          name: category.name,
+          icon: category.icon,
+          sort_order: category.sort_order,
+        });
+        categoryNameToId.set(normalize(category.name), existing.id);
+      } else {
+        const response = await api.post<Category>(endpoints.categories, {
+          name: category.name,
+          icon: category.icon,
+          sort_order: category.sort_order,
+        });
+        if (response.data) {
+          categoryNameToId.set(normalize(category.name), response.data.id);
+        }
       }
-    }
-  }
+    })
+  );
 
-  for (const item of backup.masterItems) {
-    const categoryId = item.category_name
-      ? categoryNameToId.get(normalize(item.category_name)) || null
-      : null;
-    const existing = currentMasterItems.find((i) => normalize(i.name) === normalize(item.name));
+  // Phase 2: Master items + bag templates (independent, run in parallel)
+  await Promise.all([
+    // Master items (depend on categoryNameToId from phase 1)
+    Promise.all(
+      backup.masterItems.map(async (item) => {
+        const categoryId = item.category_name
+          ? categoryNameToId.get(normalize(item.category_name)) || null
+          : null;
+        const existing = currentMasterItems.find((i) => normalize(i.name) === normalize(item.name));
 
-    if (existing) {
-      await api.patch(endpoints.masterItem(existing.id), {
-        name: item.name,
-        description: item.description,
-        category_id: categoryId,
-        default_quantity: item.default_quantity,
-        is_container: item.is_container,
-      });
-    } else {
-      await api.post(endpoints.masterItems, {
-        name: item.name,
-        description: item.description,
-        category_id: categoryId,
-        default_quantity: item.default_quantity,
-        is_container: item.is_container,
-      });
-    }
-  }
+        if (existing) {
+          await api.patch(endpoints.masterItem(existing.id), {
+            name: item.name,
+            description: item.description,
+            category_id: categoryId,
+            default_quantity: item.default_quantity,
+            is_container: item.is_container,
+          });
+        } else {
+          await api.post(endpoints.masterItems, {
+            name: item.name,
+            description: item.description,
+            category_id: categoryId,
+            default_quantity: item.default_quantity,
+            is_container: item.is_container,
+          });
+        }
+      })
+    ),
+    // Bag templates (fully independent)
+    (async () => {
+      const bagTemplatesResponse = await api.get<BagTemplate[]>(endpoints.bagTemplates);
+      const existingBagTemplates = bagTemplatesResponse.data || [];
 
-  const bagTemplatesResponse = await api.get<BagTemplate[]>(endpoints.bagTemplates);
-  const existingBagTemplates = bagTemplatesResponse.data || [];
+      await Promise.all(
+        backup.bagTemplates.map(async (template) => {
+          const existingTemplate = existingBagTemplates.find(
+            (t) => normalize(t.name) === normalize(template.name)
+          );
 
-  for (const template of backup.bagTemplates) {
-    const existingTemplate = existingBagTemplates.find(
-      (t) => normalize(t.name) === normalize(template.name)
-    );
+          if (existingTemplate) {
+            await api.patch(endpoints.bagTemplate(existingTemplate.id), {
+              name: template.name,
+              type: template.type,
+              color: template.color,
+              sort_order: template.sort_order,
+            });
+          } else {
+            await api.post(endpoints.bagTemplates, {
+              name: template.name,
+              type: template.type,
+              color: template.color,
+              sort_order: template.sort_order,
+            });
+          }
+        })
+      );
+    })(),
+  ]);
 
-    if (existingTemplate) {
-      await api.patch(endpoints.bagTemplate(existingTemplate.id), {
-        name: template.name,
-        type: template.type,
-        color: template.color,
-        sort_order: template.sort_order,
-      });
-    } else {
-      await api.post(endpoints.bagTemplates, {
-        name: template.name,
-        type: template.type,
-        color: template.color,
-        sort_order: template.sort_order,
-      });
-    }
-  }
-
+  // Phase 3: Trips (each trip is sequential internally, but trips are independent)
   const tripsResponse = await api.get<Trip[]>(endpoints.trips);
   const existingTrips = tripsResponse.data || [];
 
-  for (const tripData of backup.trips) {
-    const existingTrip =
-      existingTrips.find((t) => t.id === tripData.source_id) ||
-      existingTrips.find((t) => normalize(t.name) === normalize(tripData.name));
+  await Promise.all(
+    backup.trips.map(async (tripData) => {
+      const existingTrip =
+        existingTrips.find((t) => t.id === tripData.source_id) ||
+        existingTrips.find((t) => normalize(t.name) === normalize(tripData.name));
 
-    let tripId: string;
+      let tripId: string;
 
-    if (existingTrip) {
-      await api.patch(endpoints.trip(existingTrip.id), {
-        name: tripData.name,
-        destination: tripData.destination,
-        start_date: tripData.start_date,
-        end_date: tripData.end_date,
-        notes: tripData.notes,
-      });
-      tripId = existingTrip.id;
-    } else {
-      const tripResponse = await api.post<Trip>(endpoints.trips, {
-        name: tripData.name,
-        destination: tripData.destination,
-        start_date: tripData.start_date,
-        end_date: tripData.end_date,
-        notes: tripData.notes,
-      });
-      if (!tripResponse.data) continue;
-      tripId = tripResponse.data.id;
-    }
-
-    const bagsResponse = await api.get<Bag[]>(endpoints.tripBags(tripId));
-    const existingBags = bagsResponse.data || [];
-    const bagNameToId = new Map<string, string>();
-    const bagSourceMap = new Map<string, string>();
-
-    const rememberBag = (bagData: (typeof tripData.bags)[number], id: string) => {
-      bagNameToId.set(normalize(bagData.name), id);
-      if (bagData.source_id) {
-        bagSourceMap.set(bagData.source_id, id);
-      }
-    };
-
-    for (const bagData of tripData.bags) {
-      const existingBag =
-        (bagData.source_id && existingBags.find((b) => b.id === bagData.source_id)) ||
-        existingBags.find((b) => normalize(b.name) === normalize(bagData.name));
-
-      if (existingBag) {
-        await api.patch(endpoints.tripBags(tripId), {
-          bag_id: existingBag.id,
-          name: bagData.name,
-          type: bagData.type,
-          color: bagData.color,
+      if (existingTrip) {
+        await api.patch(endpoints.trip(existingTrip.id), {
+          name: tripData.name,
+          destination: tripData.destination,
+          start_date: tripData.start_date,
+          end_date: tripData.end_date,
+          notes: tripData.notes,
         });
-        rememberBag(bagData, existingBag.id);
+        tripId = existingTrip.id;
       } else {
-        const bagResponse = await api.post<Bag>(endpoints.tripBags(tripId), {
-          name: bagData.name,
-          type: bagData.type,
-          color: bagData.color,
-          sort_order: bagData.sort_order,
+        const tripResponse = await api.post<Trip>(endpoints.trips, {
+          name: tripData.name,
+          destination: tripData.destination,
+          start_date: tripData.start_date,
+          end_date: tripData.end_date,
+          notes: tripData.notes,
         });
-        if (bagResponse.data) {
-          rememberBag(bagData, bagResponse.data.id);
+        if (!tripResponse.data) return;
+        tripId = tripResponse.data.id;
+      }
+
+      // Fetch existing bags/items in parallel
+      const [bagsResponse, itemsResponse] = await Promise.all([
+        api.get<Bag[]>(endpoints.tripBags(tripId)),
+        api.get<TripItem[]>(endpoints.tripItems(tripId)),
+      ]);
+      const existingBags = bagsResponse.data || [];
+      const bagNameToId = new Map<string, string>();
+      const bagSourceMap = new Map<string, string>();
+
+      const rememberBag = (bagData: (typeof tripData.bags)[number], id: string) => {
+        bagNameToId.set(normalize(bagData.name), id);
+        if (bagData.source_id) {
+          bagSourceMap.set(bagData.source_id, id);
         }
-      }
-    }
+      };
 
-    const itemsResponse = await api.get<TripItem[]>(endpoints.tripItems(tripId));
-    const existingItems = itemsResponse.data || [];
-    const itemSourceMap = new Map<string, string>();
-    const createdItems: Array<{ backupItem: (typeof tripData.items)[number]; newId: string }> = [];
+      // Restore bags in parallel
+      await Promise.all(
+        tripData.bags.map(async (bagData) => {
+          const existingBag =
+            (bagData.source_id && existingBags.find((b) => b.id === bagData.source_id)) ||
+            existingBags.find((b) => normalize(b.name) === normalize(bagData.name));
 
-    const getItemKey = (item: (typeof tripData.items)[number]) =>
-      `${normalize(item.name)}|${normalize(item.category_name)}|${normalize(item.bag_name)}`;
+          if (existingBag) {
+            await api.patch(endpoints.tripBags(tripId), {
+              bag_id: existingBag.id,
+              name: bagData.name,
+              type: bagData.type,
+              color: bagData.color,
+            });
+            rememberBag(bagData, existingBag.id);
+          } else {
+            const bagResponse = await api.post<Bag>(endpoints.tripBags(tripId), {
+              name: bagData.name,
+              type: bagData.type,
+              color: bagData.color,
+              sort_order: bagData.sort_order,
+            });
+            if (bagResponse.data) {
+              rememberBag(bagData, bagResponse.data.id);
+            }
+          }
+        })
+      );
 
-    for (const itemData of tripData.items) {
-      const bagId =
-        (itemData.bag_source_id && bagSourceMap.get(itemData.bag_source_id)) ||
-        (itemData.bag_name ? bagNameToId.get(normalize(itemData.bag_name)) || null : null);
+      // Restore items in parallel (bags are done, so bag IDs are available)
+      const existingItems = itemsResponse.data || [];
+      const itemSourceMap = new Map<string, string>();
+      const createdItems: Array<{
+        backupItem: (typeof tripData.items)[number];
+        newId: string;
+      }> = [];
 
-      const existingItem =
-        (itemData.source_id && existingItems.find((i) => i.id === itemData.source_id)) ||
-        existingItems.find(
-          (i) =>
-            normalize(i.name) === normalize(itemData.name) &&
-            (i.bag_id || null) === (bagId || null) &&
-            normalize(i.category_name) === normalize(itemData.category_name)
-        );
+      const getItemKey = (item: (typeof tripData.items)[number]) =>
+        `${normalize(item.name)}|${normalize(item.category_name)}|${normalize(item.bag_name)}`;
 
-      if (existingItem) {
-        await api.patch(endpoints.tripItems(tripId), {
-          id: existingItem.id,
-          name: itemData.name,
-          category_name: itemData.category_name,
-          quantity: itemData.quantity,
-          bag_id: bagId,
-          is_packed: itemData.is_packed,
-          is_container: itemData.is_container,
-          notes: itemData.notes,
-        });
-        itemSourceMap.set(itemData.source_id || getItemKey(itemData), existingItem.id);
-        continue;
-      }
+      await Promise.all(
+        tripData.items.map(async (itemData) => {
+          const bagId =
+            (itemData.bag_source_id && bagSourceMap.get(itemData.bag_source_id)) ||
+            (itemData.bag_name ? bagNameToId.get(normalize(itemData.bag_name)) || null : null);
 
-      const createResponse = await api.post<TripItem>(endpoints.tripItems(tripId), {
-        name: itemData.name,
-        category_name: itemData.category_name,
-        quantity: itemData.quantity,
-        bag_id: bagId,
-        master_item_id: null,
-        container_item_id: null,
-        is_container: itemData.is_container || false,
-        is_packed: itemData.is_packed,
-        notes: itemData.notes,
-        merge_duplicates: false,
-      });
+          const existingItem =
+            (itemData.source_id && existingItems.find((i) => i.id === itemData.source_id)) ||
+            existingItems.find(
+              (i) =>
+                normalize(i.name) === normalize(itemData.name) &&
+                (i.bag_id || null) === (bagId || null) &&
+                normalize(i.category_name) === normalize(itemData.category_name)
+            );
 
-      if (createResponse.data) {
-        createdItems.push({ backupItem: itemData, newId: createResponse.data.id });
-        itemSourceMap.set(itemData.source_id || getItemKey(itemData), createResponse.data.id);
-      }
-    }
+          if (existingItem) {
+            await api.patch(endpoints.tripItems(tripId), {
+              id: existingItem.id,
+              name: itemData.name,
+              category_name: itemData.category_name,
+              quantity: itemData.quantity,
+              bag_id: bagId,
+              is_packed: itemData.is_packed,
+              is_container: itemData.is_container,
+              notes: itemData.notes,
+            });
+            itemSourceMap.set(itemData.source_id || getItemKey(itemData), existingItem.id);
+            return;
+          }
 
-    for (const { backupItem, newId } of createdItems) {
-      const parentId =
-        (backupItem.container_source_id && itemSourceMap.get(backupItem.container_source_id)) ||
-        (backupItem.container_name
-          ? itemSourceMap.get(
-              tripData.items.find((i) => normalize(i.name) === normalize(backupItem.container_name))
-                ?.source_id || ''
-            )
-          : undefined);
+          const createResponse = await api.post<TripItem>(endpoints.tripItems(tripId), {
+            name: itemData.name,
+            category_name: itemData.category_name,
+            quantity: itemData.quantity,
+            bag_id: bagId,
+            master_item_id: null,
+            container_item_id: null,
+            is_container: itemData.is_container || false,
+            is_packed: itemData.is_packed,
+            notes: itemData.notes,
+            merge_duplicates: false,
+          });
 
-      if (parentId) {
-        await api.patch(endpoints.tripItems(tripId), {
-          id: newId,
-          container_item_id: parentId,
-        });
-      }
-    }
-  }
+          if (createResponse.data) {
+            createdItems.push({ backupItem: itemData, newId: createResponse.data.id });
+            itemSourceMap.set(itemData.source_id || getItemKey(itemData), createResponse.data.id);
+          }
+        })
+      );
+
+      // Link containers in parallel (all items exist now)
+      await Promise.all(
+        createdItems
+          .filter(({ backupItem }) => backupItem.container_source_id || backupItem.container_name)
+          .map(async ({ backupItem, newId }) => {
+            const parentId =
+              (backupItem.container_source_id &&
+                itemSourceMap.get(backupItem.container_source_id)) ||
+              (backupItem.container_name
+                ? itemSourceMap.get(
+                    tripData.items.find(
+                      (i) => normalize(i.name) === normalize(backupItem.container_name)
+                    )?.source_id || ''
+                  )
+                : undefined);
+
+            if (parentId) {
+              await api.patch(endpoints.tripItems(tripId), {
+                id: newId,
+                container_item_id: parentId,
+              });
+            }
+          })
+      );
+    })
+  );
 }
