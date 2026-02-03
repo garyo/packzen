@@ -7,7 +7,7 @@
  * URLs in notes are clickable when in view mode.
  */
 
-import { createSignal, onCleanup, onMount, Show } from 'solid-js';
+import { createSignal, createEffect, onCleanup, onMount, Show } from 'solid-js';
 
 // Convert URLs in text to clickable links
 function linkifyText(text: string) {
@@ -41,10 +41,17 @@ interface TripNotesPanelProps {
 }
 
 export function TripNotesPanel(props: TripNotesPanelProps) {
-  // Initialize from props once - don't sync afterwards to avoid overwriting user input
   const [localNotes, setLocalNotes] = createSignal(props.notes || '');
   const [isSaving, setIsSaving] = createSignal(false);
   const [isEditing, setIsEditing] = createSignal(!props.notes); // Start in edit mode if no notes
+
+  // Sync from props when not actively editing (e.g. from SSE sync)
+  createEffect(() => {
+    const incoming = props.notes || '';
+    if (!isEditing()) {
+      setLocalNotes(incoming);
+    }
+  });
   let saveTimeoutId: ReturnType<typeof setTimeout> | null = null;
   let textareaRef: HTMLTextAreaElement | undefined;
   let panelRef: HTMLDivElement | undefined;
