@@ -7,7 +7,7 @@
     "dev": "npm run version:generate:dev && npm run sw:generate && astro dev",
     "build": "npm run validate:data && npm run version:generate && npm run sw:generate && astro build",
     "preview": "astro preview",
-    "test": "node --import tsx --test tests/d1-api.test.ts",
+    "test": "node --import tsx --test tests/d1-api.test.ts tests/backup.test.ts",
     "astro": "astro",
     "version:generate": "node scripts/generate-version.js",
     "version:generate:dev": "NODE_ENV=development node scripts/generate-version.js",
