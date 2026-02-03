@@ -228,11 +228,11 @@ interface PackingListBagViewProps {
   onEditItem: (item: TripItem) => void;
   onToggleItemSelection: (itemId: string) => void;
   // Add item callbacks for bags and containers
-  onAddToBag?: (bagId: string) => void;
+  onAddToBag?: (bagId: string | null) => void;
   onAddToContainer?: (containerId: string) => void;
-  onAddFromMasterToBag?: (bagId: string) => void;
+  onAddFromMasterToBag?: (bagId: string | null) => void;
   onAddFromMasterToContainer?: (containerId: string) => void;
-  onBrowseTemplatesToBag?: (bagId: string) => void;
+  onBrowseTemplatesToBag?: (bagId: string | null) => void;
   onBrowseTemplatesToContainer?: (containerId: string) => void;
   // Drag-and-drop handlers
   onMoveItemToBag?: (itemId: string, bagId: string | null) => void;
@@ -592,7 +592,7 @@ function PackingListBagViewInner(props: PackingListBagViewProps) {
                     <span class="text-sm text-gray-500 md:text-xs">
                       {packedItems()} / {totalItems()}
                     </span>
-                    {/* Replace bag + Add items buttons */}
+                    {/* Replace bag button - only for real bags */}
                     <Show when={bag.id !== null}>
                       <button
                         onClick={() => setReplacingBagId(bag.id as string)}
@@ -610,61 +610,67 @@ function PackingListBagViewInner(props: PackingListBagViewProps) {
                           onReplaced={() => props.onBagReplaced?.()}
                         />
                       </Show>
-                      <div class="relative">
-                        <button
-                          onClick={() =>
-                            setOpenBagMenu(openBagMenu() === bag.id ? null : (bag.id as string))
-                          }
-                          class="flex h-7 w-7 items-center justify-center rounded-full bg-blue-500 text-white hover:bg-blue-600"
-                          title="Add items to this bag"
-                        >
-                          <svg
-                            class="h-4 w-4"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                          >
-                            <path
-                              stroke-linecap="round"
-                              stroke-linejoin="round"
-                              stroke-width="2"
-                              d="M12 4v16m8-8H4"
-                            />
-                          </svg>
-                        </button>
-                        <Show when={openBagMenu() === bag.id}>
-                          <div class="absolute top-full right-0 z-20 mt-1 w-48 rounded-lg border border-gray-200 bg-white shadow-lg">
-                            <button
-                              onClick={() => {
-                                props.onAddToBag?.(bag.id as string);
-                                setOpenBagMenu(null);
-                              }}
-                              class="w-full px-4 py-2 text-left text-sm font-bold hover:bg-gray-100"
-                            >
-                              ✏️ New Item
-                            </button>
-                            <button
-                              onClick={() => {
-                                props.onAddFromMasterToBag?.(bag.id as string);
-                                setOpenBagMenu(null);
-                              }}
-                              class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
-                            >
-                              📋 From My Saved Items
-                            </button>
-                            <button
-                              onClick={() => {
-                                props.onBrowseTemplatesToBag?.(bag.id as string);
-                                setOpenBagMenu(null);
-                              }}
-                              class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
-                            >
-                              📚 From Templates
-                            </button>
-                          </div>
-                        </Show>
-                      </div>
                     </Show>
+                    {/* Add items button - all bags including Wearing/No Bag */}
+                    {(() => {
+                      const menuKey = bag.id ?? '__wearing__';
+                      return (
+                        <div class="relative">
+                          <button
+                            onClick={() =>
+                              setOpenBagMenu(openBagMenu() === menuKey ? null : menuKey)
+                            }
+                            class="flex h-7 w-7 items-center justify-center rounded-full bg-blue-500 text-white hover:bg-blue-600"
+                            title="Add items to this bag"
+                          >
+                            <svg
+                              class="h-4 w-4"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M12 4v16m8-8H4"
+                              />
+                            </svg>
+                          </button>
+                          <Show when={openBagMenu() === menuKey}>
+                            <div class="absolute top-full right-0 z-20 mt-1 w-48 rounded-lg border border-gray-200 bg-white shadow-lg">
+                              <button
+                                onClick={() => {
+                                  props.onAddToBag?.(bag.id);
+                                  setOpenBagMenu(null);
+                                }}
+                                class="w-full px-4 py-2 text-left text-sm font-bold hover:bg-gray-100"
+                              >
+                                ✏️ New Item
+                              </button>
+                              <button
+                                onClick={() => {
+                                  props.onAddFromMasterToBag?.(bag.id);
+                                  setOpenBagMenu(null);
+                                }}
+                                class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
+                              >
+                                📋 From My Saved Items
+                              </button>
+                              <button
+                                onClick={() => {
+                                  props.onBrowseTemplatesToBag?.(bag.id);
+                                  setOpenBagMenu(null);
+                                }}
+                                class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
+                              >
+                                📚 From Templates
+                              </button>
+                            </div>
+                          </Show>
+                        </div>
+                      );
+                    })()}
                   </div>
                   {/* Show "All packed" summary if filtering and everything is packed */}
                   <Show

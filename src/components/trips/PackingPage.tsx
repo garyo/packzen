@@ -1185,13 +1185,13 @@ export function PackingPage(props: PackingPageProps) {
                         onToggleSkipped={handleToggleSkipped}
                         onEditItem={openEditItem}
                         onToggleItemSelection={toggleItemSelection}
-                        onAddToBag={(bagId) => openAddForm(bagId)}
+                        onAddToBag={(bagId) => openAddForm(bagId ?? undefined)}
                         onAddToContainer={(containerId) => openAddForm(undefined, containerId)}
-                        onAddFromMasterToBag={(bagId) => openAddFromMaster(bagId)}
+                        onAddFromMasterToBag={(bagId) => openAddFromMaster(bagId ?? undefined)}
                         onAddFromMasterToContainer={(containerId) =>
                           openAddFromMaster(undefined, containerId)
                         }
-                        onBrowseTemplatesToBag={(bagId) => openBrowseTemplates(bagId)}
+                        onBrowseTemplatesToBag={(bagId) => openBrowseTemplates(bagId ?? undefined)}
                         onBrowseTemplatesToContainer={(containerId) =>
                           openBrowseTemplates(undefined, containerId)
                         }
