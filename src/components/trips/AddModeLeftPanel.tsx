@@ -65,16 +65,14 @@ function DraggableSourceItem(props: DraggableItemProps) {
         when={!props.isInTrip}
         fallback={
           props.onRemove && props.tripItemId ? (
-            <div
-              role="button"
-              tabindex="0"
-              class="flex h-5 w-7 cursor-pointer items-center justify-center rounded text-gray-400 hover:bg-red-100 hover:text-red-600"
+            <button
+              type="button"
+              class="btn-compact flex h-5 w-7 cursor-pointer items-center justify-center rounded text-gray-400 hover:bg-red-100 hover:text-red-600"
               onClick={() => props.onRemove!(props.tripItemId!)}
-              onKeyDown={(e) => e.key === 'Enter' && props.onRemove!(props.tripItemId!)}
               title="Remove from trip"
             >
               <TrashIcon class="h-4 w-4" />
-            </div>
+            </button>
           ) : (
             <div class="h-6 w-6" /> // Spacer when no remove handler
           )

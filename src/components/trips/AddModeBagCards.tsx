@@ -172,7 +172,6 @@ function DroppableBagCard(props: BagCardProps) {
         handleSelect();
       }}
       onKeyDown={(e) => {
-        // Support keyboard activation
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
           handleSelect();

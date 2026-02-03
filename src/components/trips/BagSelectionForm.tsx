@@ -182,8 +182,7 @@ export function BagSelectionForm(props: BagSelectionFormProps) {
                   id="save-to-my-bags"
                   checked={saveToMyBags()}
                   onChange={(e) => setSaveToMyBags(e.currentTarget.checked)}
-                  class="h-3.5 w-3.5 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
-                  style="min-height: 25px; min-width: 25px"
+                  class="btn-compact h-3.5 w-3.5 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
                 />
                 <label
                   for="save-to-my-bags"
@@ -203,12 +202,11 @@ export function BagSelectionForm(props: BagSelectionFormProps) {
                     <button
                       type="button"
                       onClick={() => setNewBagColor(color.value)}
-                      class={`h-4 w-4 rounded-full border border-gray-300 ${color.class} ${
+                      class={`btn-compact h-10 w-10 rounded-full border border-gray-300 ${color.class} ${
                         newBagColor() === color.value
                           ? 'ring-2 ring-blue-500 ring-offset-2'
                           : 'hover:scale-110'
                       } transition-transform`}
-                      style="min-height: 40px; min-width: 40px"
                       title={color.label}
                     />
                   )}

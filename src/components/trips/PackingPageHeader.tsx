@@ -164,17 +164,14 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
                     </Show>
                     <Show when={props.unpackedCount() > 0 && props.viewMode() === 'pack'}>
                       {' · '}
-                      <a
-                        href="#"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          props.onToggleShowUnpackedOnly();
-                        }}
-                        class="text-blue-600 hover:text-blue-800 hover:underline"
+                      <button
+                        type="button"
+                        onClick={props.onToggleShowUnpackedOnly}
+                        class="btn-compact text-blue-600 hover:text-blue-800 hover:underline"
                         title="Click to show only unpacked items"
                       >
                         {props.unpackedCount()} left to pack
-                      </a>
+                      </button>
                     </Show>
                   </p>
                 }

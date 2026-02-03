@@ -141,12 +141,11 @@ function WayfindingNavBar(props: {
                 return (
                   <button
                     onClick={() => props.onScrollToSection(sectionId)}
-                    class={`flex items-center gap-1 px-1.5 py-0.5 text-xs ${
+                    class={`btn-compact flex items-center gap-1 px-1.5 py-0.5 text-xs ${
                       isHighlighted()
                         ? 'text-gray-900 underline decoration-2 underline-offset-2'
                         : 'text-gray-500 hover:text-gray-900'
                     }`}
-                    style="min-height: 16px"
                   >
                     <Show when={navItem.id !== null} fallback={<span class="text-[10px]">👕</span>}>
                       <div
@@ -163,12 +162,11 @@ function WayfindingNavBar(props: {
                 return (
                   <button
                     onClick={() => props.onScrollToSection(sectionId)}
-                    class={`flex items-center gap-1 px-1.5 py-0.5 text-xs ${
+                    class={`btn-compact flex items-center gap-1 px-1.5 py-0.5 text-xs ${
                       isHighlighted()
                         ? 'text-gray-900 underline decoration-2 underline-offset-2'
                         : 'text-gray-500 hover:text-gray-900'
                     }`}
-                    style="min-height: 16px"
                   >
                     <span class="text-[10px]">📦</span>
                     <span class="max-w-[130px] truncate">{navItem.name}</span>

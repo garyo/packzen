@@ -49,7 +49,7 @@ export function PackingItemCard(props: PackingItemCardProps) {
 
   // Quantity popover state
   const [showQuantityPopover, setShowQuantityPopover] = createSignal(false);
-  let quantityPillRef: HTMLSpanElement | undefined;
+  let quantityPillRef: HTMLButtonElement | undefined;
   let quantityPopoverRef: HTMLDivElement | undefined;
 
   // Click-outside to close popover
@@ -217,7 +217,8 @@ export function PackingItemCard(props: PackingItemCardProps) {
           </Show>
           <Show when={props.onUpdateQuantity || props.item.quantity > 1}>
             <div class="relative flex-shrink-0">
-              <span
+              <button
+                type="button"
                 ref={quantityPillRef}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -225,14 +226,14 @@ export function PackingItemCard(props: PackingItemCardProps) {
                     setShowQuantityPopover(!showQuantityPopover());
                   }
                 }}
-                class={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                class={`btn-compact rounded-full px-2 py-0.5 text-xs font-medium ${
                   props.onUpdateQuantity
                     ? 'cursor-pointer bg-gray-100 text-gray-600 hover:bg-gray-200'
                     : 'bg-gray-100 text-gray-600'
                 }`}
               >
                 ×{props.item.quantity}
-              </span>
+              </button>
               <Show when={showQuantityPopover()}>
                 <div
                   ref={quantityPopoverRef}
