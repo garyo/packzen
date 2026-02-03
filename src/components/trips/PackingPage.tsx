@@ -337,6 +337,24 @@ export function PackingPage(props: PackingPageProps) {
   const handleTogglePacked = (item: TripItem) => handleToggleField(item, 'is_packed', 'packed');
   const handleToggleSkipped = (item: TripItem) => handleToggleField(item, 'is_skipped', 'skipped');
 
+  async function handleUpdateQuantity(item: TripItem, quantity: number) {
+    const originalQuantity = item.quantity;
+    updateItemInStore(item.id, { quantity });
+    try {
+      const response = await api.patch(endpoints.tripItems(props.tripId), {
+        id: item.id,
+        quantity,
+      });
+      if (!response.success) {
+        showToast('error', response.error || 'Failed to update quantity');
+        updateItemInStore(item.id, { quantity: originalQuantity });
+      }
+    } catch {
+      showToast('error', 'Failed to update quantity');
+      updateItemInStore(item.id, { quantity: originalQuantity });
+    }
+  }
+
   const handleAddItem = () => {
     setShowAddForm(true);
   };
@@ -1170,6 +1188,7 @@ export function PackingPage(props: PackingPageProps) {
                           onToggleItemSelection={toggleItemSelection}
                           onMoveItemToBag={handleMoveItemToBag}
                           onMoveItemToContainer={handleMoveItemToContainer}
+                          onUpdateQuantity={handleUpdateQuantity}
                         />
                       }
                     >
@@ -1185,6 +1204,7 @@ export function PackingPage(props: PackingPageProps) {
                         onToggleSkipped={handleToggleSkipped}
                         onEditItem={openEditItem}
                         onToggleItemSelection={toggleItemSelection}
+                        onUpdateQuantity={handleUpdateQuantity}
                         onAddToBag={(bagId) => openAddForm(bagId ?? undefined)}
                         onAddToContainer={(containerId) => openAddForm(undefined, containerId)}
                         onAddFromMasterToBag={(bagId) => openAddFromMaster(bagId ?? undefined)}

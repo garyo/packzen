@@ -138,6 +138,8 @@ interface PackingListCategoryViewProps {
   onToggleSkipped: (item: TripItem) => void;
   onEditItem: (item: TripItem) => void;
   onToggleItemSelection: (itemId: string) => void;
+  // Quantity update
+  onUpdateQuantity?: (item: TripItem, quantity: number) => void;
   // Drag-and-drop handlers - only moves between locations, keeps category
   onMoveItemToBag?: (itemId: string, bagId: string | null) => void;
   onMoveItemToContainer?: (itemId: string, containerId: string) => void;
@@ -258,11 +260,6 @@ function PackingListCategoryViewInner(props: PackingListCategoryViewProps) {
   });
 
   // Create lookup maps for O(1) access
-  const bagLookup = createMemo(() => {
-    const bags = props.bags() || [];
-    return new Map(bags.map((b) => [b.id, b]));
-  });
-
   const categoryLookup = createMemo(() => {
     const categories = props.categories() || [];
     return new Map(categories.map((c) => [c.name, c]));
@@ -432,13 +429,16 @@ function PackingListCategoryViewInner(props: PackingListCategoryViewProps) {
                                               item={item}
                                               selectMode={props.selectMode()}
                                               isSelected={props.selectedItems().has(item.id)}
-                                              bag={bag()}
-                                              showBagInfo={true}
                                               onTogglePacked={() => props.onTogglePacked(item)}
                                               onToggleSkipped={() => props.onToggleSkipped(item)}
                                               onEdit={() => props.onEditItem(item)}
                                               onToggleSelection={() =>
                                                 props.onToggleItemSelection(item.id)
+                                              }
+                                              onUpdateQuantity={
+                                                props.onUpdateQuantity
+                                                  ? (qty) => props.onUpdateQuantity!(item, qty)
+                                                  : undefined
                                               }
                                               dragActivators={dragProps.dragActivators}
                                               isDragging={dragProps.isDragging}
@@ -546,12 +546,16 @@ function PackingListCategoryViewInner(props: PackingListCategoryViewProps) {
                                             item={item}
                                             selectMode={props.selectMode()}
                                             isSelected={props.selectedItems().has(item.id)}
-                                            showBagInfo={false}
                                             onTogglePacked={() => props.onTogglePacked(item)}
                                             onToggleSkipped={() => props.onToggleSkipped(item)}
                                             onEdit={() => props.onEditItem(item)}
                                             onToggleSelection={() =>
                                               props.onToggleItemSelection(item.id)
+                                            }
+                                            onUpdateQuantity={
+                                              props.onUpdateQuantity
+                                                ? (qty) => props.onUpdateQuantity!(item, qty)
+                                                : undefined
                                             }
                                             dragActivators={dragProps.dragActivators}
                                             isDragging={dragProps.isDragging}

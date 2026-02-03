@@ -8,7 +8,7 @@
  * On desktop (md: breakpoint and up): action buttons always visible
  */
 
-import { Show, createSignal, onMount, onCleanup, type Accessor } from 'solid-js';
+import { Show, createSignal, createEffect, onMount, onCleanup, type Accessor } from 'solid-js';
 import type { TripItem, Bag } from '../../lib/types';
 import { DragHandleIcon, EditIcon, SkipIcon } from '../ui/Icons';
 import { SwipeToReveal } from '../ui/SwipeToReveal';
@@ -28,6 +28,8 @@ interface PackingItemCardProps {
   onToggleSkipped: () => void;
   onEdit: () => void;
   onToggleSelection: () => void;
+  // Quantity update
+  onUpdateQuantity?: (quantity: number) => void;
   // Container-specific props
   containerContentsCount?: number; // Number of items inside (if this is a container)
   containerPackedCount?: number; // Number of packed items inside (if this is a container)
@@ -44,6 +46,28 @@ export function PackingItemCard(props: PackingItemCardProps) {
   const isContainer = () => props.item.is_container;
   const hasContents = () =>
     isContainer() && props.containerContentsCount !== undefined && props.containerContentsCount > 0;
+
+  // Quantity popover state
+  const [showQuantityPopover, setShowQuantityPopover] = createSignal(false);
+  let quantityPillRef: HTMLSpanElement | undefined;
+  let quantityPopoverRef: HTMLDivElement | undefined;
+
+  // Click-outside to close popover
+  createEffect(() => {
+    if (!showQuantityPopover()) return;
+    const handler = (e: MouseEvent) => {
+      if (
+        quantityPillRef &&
+        !quantityPillRef.contains(e.target as Node) &&
+        quantityPopoverRef &&
+        !quantityPopoverRef.contains(e.target as Node)
+      ) {
+        setShowQuantityPopover(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    onCleanup(() => document.removeEventListener('mousedown', handler));
+  });
 
   // Detect mobile vs desktop for swipe behavior
   // Check on initial render (before mount) to avoid flash of wrong UI
@@ -179,11 +203,6 @@ export function PackingItemCard(props: PackingItemCardProps) {
                 Skipped
               </span>
             </Show>
-            <Show when={props.item.notes}>
-              <span class="ml-2 text-xs font-normal text-gray-500 not-italic">
-                {props.item.notes}
-              </span>
-            </Show>
           </div>
           <Show when={hasContents()}>
             <span
@@ -196,13 +215,63 @@ export function PackingItemCard(props: PackingItemCardProps) {
               {props.containerPackedCount}/{props.containerContentsCount}
             </span>
           </Show>
+          <Show when={props.onUpdateQuantity || props.item.quantity > 1}>
+            <div class="relative flex-shrink-0">
+              <span
+                ref={quantityPillRef}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (props.onUpdateQuantity) {
+                    setShowQuantityPopover(!showQuantityPopover());
+                  }
+                }}
+                class={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                  props.onUpdateQuantity
+                    ? 'cursor-pointer bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    : 'bg-gray-100 text-gray-600'
+                }`}
+              >
+                ×{props.item.quantity}
+              </span>
+              <Show when={showQuantityPopover()}>
+                <div
+                  ref={quantityPopoverRef}
+                  class="absolute top-full right-0 z-30 mt-1 flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-2 py-1.5 shadow-lg"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <button
+                    onClick={() => {
+                      if (props.item.quantity > 1) {
+                        props.onUpdateQuantity?.(props.item.quantity - 1);
+                      }
+                    }}
+                    disabled={props.item.quantity <= 1}
+                    class="flex h-7 w-7 items-center justify-center rounded-full bg-gray-100 text-sm font-bold text-gray-700 hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    -
+                  </button>
+                  <span class="min-w-[1.5rem] text-center text-sm font-semibold">
+                    {props.item.quantity}
+                  </span>
+                  <button
+                    onClick={() => {
+                      props.onUpdateQuantity?.(props.item.quantity + 1);
+                    }}
+                    class="flex h-7 w-7 items-center justify-center rounded-full bg-gray-100 text-sm font-bold text-gray-700 hover:bg-gray-200"
+                  >
+                    +
+                  </button>
+                </div>
+              </Show>
+            </div>
+          </Show>
         </div>
         <div class="mt-1 flex gap-3 text-sm text-gray-500 md:mt-0.5 md:gap-2 md:text-xs">
           {props.showBagInfo && props.bag && <span>👜 {props.bag.name}</span>}
           {props.showCategoryInfo && props.item.category_name && (
             <span>📁 {props.item.category_name}</span>
           )}
-          {props.item.quantity > 1 && <span>×{props.item.quantity}</span>}
+          {props.item.notes && <span class="text-gray-400">{props.item.notes}</span>}
           <Show when={hasContents() && props.onContainerClick}>
             <span class="text-blue-600">view contents →</span>
           </Show>
