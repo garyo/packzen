@@ -1,4 +1,5 @@
 import { sourceId } from './api';
+import { getSessionToken } from './clerk';
 
 export interface SyncChange {
   entityType: string;
@@ -10,51 +11,93 @@ export interface SyncChange {
 
 export type SyncHandler = (change: SyncChange) => void;
 
-// After this many consecutive connection failures (without any successful
-// open), stop polling. This prevents a 401 loop if the session expires.
+const POLL_INTERVAL = 3000;
 const MAX_CONSECUTIVE_ERRORS = 5;
 
 class SyncManager {
-  private es: EventSource | null = null;
+  private timerId: ReturnType<typeof setTimeout> | null = null;
   private handlers = new Map<string, Set<SyncHandler>>();
-  private consecutiveFailures = 0;
+  private lastEventId = 0;
+  private consecutiveErrors = 0;
+  private active = false;
 
   connect() {
-    if (this.es) return;
-    this.consecutiveFailures = 0;
-    this.es = new EventSource(`/api/sync/events?sourceId=${sourceId}`);
-
-    // 'open' fires each time EventSource successfully connects (including
-    // auto-reconnects). Reset the failure counter on success.
-    this.es.addEventListener('open', () => {
-      this.consecutiveFailures = 0;
-    });
-
-    this.es.addEventListener('sync', (e: MessageEvent) => {
-      try {
-        const change: SyncChange = JSON.parse(e.data);
-        const handlers = this.handlers.get(change.entityType);
-        handlers?.forEach((h) => h(change));
-      } catch {
-        // Malformed event — ignore
-      }
-    });
-
-    // EventSource fires an error on every poll cycle close (expected for
-    // this short-lived SSE pattern) AND on actual failures (401, network).
-    // We count failures that occur without a preceding 'open', and stop
-    // after MAX_CONSECUTIVE_ERRORS to avoid a 401 polling loop.
-    this.es.addEventListener('error', () => {
-      this.consecutiveFailures++;
-      if (this.consecutiveFailures >= MAX_CONSECUTIVE_ERRORS) {
-        this.disconnect();
-      }
-    });
+    if (this.active) return;
+    this.active = true;
+    this.consecutiveErrors = 0;
+    this.poll();
   }
 
   disconnect() {
-    this.es?.close();
-    this.es = null;
+    this.active = false;
+    if (this.timerId) {
+      clearTimeout(this.timerId);
+      this.timerId = null;
+    }
+  }
+
+  private async poll() {
+    if (!this.active) return;
+
+    try {
+      const token = await getSessionToken();
+      const url = `/api/sync/events?sourceId=${sourceId}`;
+
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      if (this.lastEventId) headers['Last-Event-ID'] = String(this.lastEventId);
+
+      const res = await fetch(url, { headers, credentials: 'same-origin' });
+
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+
+      this.consecutiveErrors = 0;
+      const text = await res.text();
+      this.processEvents(text);
+    } catch {
+      this.consecutiveErrors++;
+      if (this.consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+        this.disconnect();
+        return;
+      }
+    }
+
+    // Schedule next poll
+    if (this.active) {
+      this.timerId = setTimeout(() => this.poll(), POLL_INTERVAL);
+    }
+  }
+
+  private processEvents(text: string) {
+    // Parse SSE format: blocks separated by double newlines
+    const blocks = text.split('\n\n');
+    for (const block of blocks) {
+      let id: string | undefined;
+      let data: string | undefined;
+      let event: string | undefined;
+
+      for (const line of block.split('\n')) {
+        if (line.startsWith('id: ')) id = line.slice(4);
+        else if (line.startsWith('data: ')) data = line.slice(6);
+        else if (line.startsWith('event: ')) event = line.slice(7);
+      }
+
+      if (id) {
+        this.lastEventId = parseInt(id, 10);
+      }
+
+      if (event === 'sync' && data) {
+        try {
+          const change: SyncChange = JSON.parse(data);
+          const handlers = this.handlers.get(change.entityType);
+          handlers?.forEach((h) => h(change));
+        } catch {
+          // Malformed event — ignore
+        }
+      }
+    }
   }
 
   /**
