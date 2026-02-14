@@ -5,7 +5,7 @@
  * Extracted from AllItemsPage for better separation of concerns
  */
 
-import { createSignal, createResource, createMemo, For, Show, type Accessor } from 'solid-js';
+import { createSignal, createMemo, For, Show, type Accessor } from 'solid-js';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
 import { Combobox, type ComboboxItem } from '../ui/Combobox';
@@ -20,7 +20,8 @@ interface ItemsListProps {
   items: Accessor<MasterItemWithCategory[] | undefined>;
   categories: Accessor<Category[] | undefined>;
   onDeleteItem: (id: string) => void;
-  onItemSaved?: () => void;
+  onItemUpdated: (item: MasterItemWithCategory) => void;
+  onItemAdded: () => void;
 }
 
 export function ItemsList(props: ItemsListProps) {
@@ -113,7 +114,7 @@ export function ItemsList(props: ItemsListProps) {
       setNewCategoryId('');
       setNewQuantity(1);
       setNewIsContainer(false);
-      props.onItemSaved?.();
+      props.onItemAdded();
     } else {
       showToast('error', response.error || 'Failed to add item');
     }
@@ -145,22 +146,34 @@ export function ItemsList(props: ItemsListProps) {
       return;
     }
 
-    setUpdating(true);
+    const itemId = editingItemId()!;
+    const originalItem = props.items()?.find((i) => i.id === itemId);
+    if (!originalItem) return;
 
-    const response = await api.put(endpoints.masterItem(editingItemId()!), {
+    const patchData = {
       name: editName().trim(),
       description: editDescription().trim() || null,
       category_id: editCategoryId() || null,
       default_quantity: editQuantity(),
       is_container: editIsContainer(),
-    });
+    };
+
+    setUpdating(true);
+
+    const response = await api.put(endpoints.masterItem(itemId), patchData);
 
     setUpdating(false);
 
     if (response.success) {
       showToast('success', 'Item updated');
+      const category = props.categories()?.find((c) => c.id === patchData.category_id);
+      const updatedItem: MasterItemWithCategory = {
+        ...originalItem,
+        ...patchData,
+        category_name: category?.name || null,
+      };
       cancelEdit();
-      props.onItemSaved?.();
+      props.onItemUpdated(updatedItem);
     } else {
       showToast('error', response.error || 'Failed to update item');
     }

@@ -30,7 +30,9 @@ export function AllItemsPage() {
   });
 
   // Fetch all items
-  const [items, { refetch: refetchItems }] = createResource<MasterItemWithCategory[]>(async () => {
+  const [items, { refetch: refetchItems, mutate: mutateItems }] = createResource<
+    MasterItemWithCategory[]
+  >(async () => {
     return fetchWithErrorHandling(
       () => api.get<MasterItemWithCategory[]>(endpoints.masterItems),
       'Failed to load items'
@@ -77,10 +79,19 @@ export function AllItemsPage() {
     const response = await api.delete(endpoints.masterItem(id));
     if (response.success) {
       showToast('success', 'Item deleted successfully');
-      refetchItems();
+      mutateItems((prev) => prev?.filter((item) => item.id !== id));
     } else {
       showToast('error', response.error || 'Failed to delete item');
     }
+  };
+
+  const handleItemUpdated = (updatedItem: MasterItemWithCategory) => {
+    mutateItems((prev) => prev?.map((item) => (item.id === updatedItem.id ? updatedItem : item)));
+  };
+
+  const handleItemAdded = () => {
+    // New items need a full refetch since we don't have the server-generated id/category data
+    refetchItems();
   };
 
   const handleDataChanged = () => {
@@ -184,7 +195,8 @@ export function AllItemsPage() {
               categories={categories}
               bagTemplates={bagTemplates}
               onDeleteItem={handleDeleteItem}
-              onItemSaved={refetchItems}
+              onItemUpdated={handleItemUpdated}
+              onItemAdded={handleItemAdded}
               onCategoriesSaved={handleDataChanged}
               onBagTemplatesSaved={handleBagTemplatesChanged}
             />

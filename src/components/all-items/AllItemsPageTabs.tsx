@@ -10,7 +10,8 @@ interface AllItemsPageTabsProps {
   categories: Accessor<Category[] | undefined>;
   bagTemplates: Accessor<BagTemplate[] | undefined>;
   onDeleteItem: (id: string) => void;
-  onItemSaved: () => void;
+  onItemUpdated: (item: MasterItemWithCategory) => void;
+  onItemAdded: () => void;
   onCategoriesSaved: () => void;
   onBagTemplatesSaved: () => void;
 }
@@ -50,7 +51,8 @@ export function AllItemsPageTabs(props: AllItemsPageTabsProps) {
           items={props.items}
           categories={props.categories}
           onDeleteItem={props.onDeleteItem}
-          onItemSaved={props.onItemSaved}
+          onItemUpdated={props.onItemUpdated}
+          onItemAdded={props.onItemAdded}
         />
       </TabPanel>
 
