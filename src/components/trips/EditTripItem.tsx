@@ -313,29 +313,27 @@ export function EditTripItem(props: EditTripItemProps) {
           </label>
         </div>
 
-        {/* Combined Bag/Container location (only show if not a container itself) */}
-        <Show when={!isContainer()}>
-          <div>
-            <label class="mb-1 block text-sm font-medium text-gray-700">Inside Bag/Container</label>
-            <select
-              value={location()}
-              onChange={(e) => setLocation(e.target.value)}
-              class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">No bag</option>
-              <For each={bags()}>
-                {(bag) => <option value={`bag:${bag.id}`}>{bag.name}</option>}
+        {/* Bag/Container location selector */}
+        <div>
+          <label class="mb-1 block text-sm font-medium text-gray-700">
+            {isContainer() ? 'Inside Bag' : 'Inside Bag/Container'}
+          </label>
+          <select
+            value={location()}
+            onChange={(e) => setLocation(e.target.value)}
+            class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">No bag</option>
+            <For each={bags()}>{(bag) => <option value={`bag:${bag.id}`}>{bag.name}</option>}</For>
+            <Show when={!isContainer() && availableContainers().length > 0}>
+              <For each={availableContainers()}>
+                {(container) => (
+                  <option value={`container:${container.id}`}>📦 {container.name}</option>
+                )}
               </For>
-              <Show when={availableContainers().length > 0}>
-                <For each={availableContainers()}>
-                  {(container) => (
-                    <option value={`container:${container.id}`}>📦 {container.name}</option>
-                  )}
-                </For>
-              </Show>
-            </select>
-          </div>
-        </Show>
+            </Show>
+          </select>
+        </div>
 
         {/* Notes field */}
         <div>
