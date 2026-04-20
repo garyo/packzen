@@ -1,17 +1,13 @@
 /**
  * PackingItemCard Component
  *
- * Reusable item card for packing lists
- * Extracted from PackingPage to reduce code duplication
- *
- * On mobile: action buttons hidden by default, revealed via swipe gesture
- * On desktop (md: breakpoint and up): action buttons always visible
+ * Reusable item card for packing lists.
  */
 
-import { Show, createSignal, createEffect, onMount, onCleanup, type Accessor } from 'solid-js';
+import { Show, createSignal, createEffect, onCleanup } from 'solid-js';
+import { Portal } from 'solid-js/web';
 import type { TripItem, Bag } from '../../lib/types';
 import { DragHandleIcon, EditIcon, SkipIcon } from '../ui/Icons';
-import { SwipeToReveal } from '../ui/SwipeToReveal';
 
 // Type for drag activators from solid-dnd
 type DragActivators = Record<string, (event: any) => void>;
@@ -37,9 +33,6 @@ interface PackingItemCardProps {
   // Drag-and-drop props
   dragActivators?: DragActivators; // Event handlers for drag handle
   isDragging?: boolean; // Whether this item is currently being dragged
-  // Swipe-to-reveal props (for mobile)
-  revealedItemId?: Accessor<string | null>;
-  onRevealChange?: (itemId: string | null) => void;
 }
 
 export function PackingItemCard(props: PackingItemCardProps) {
@@ -49,13 +42,28 @@ export function PackingItemCard(props: PackingItemCardProps) {
 
   // Quantity popover state
   const [showQuantityPopover, setShowQuantityPopover] = createSignal(false);
+  const [popoverPos, setPopoverPos] = createSignal({ top: 0, right: 0 });
   let quantityPillRef: HTMLButtonElement | undefined;
   let quantityPopoverRef: HTMLDivElement | undefined;
 
-  // Click-outside to close popover
+  const updatePopoverPos = () => {
+    if (!quantityPillRef) return;
+    const rect = quantityPillRef.getBoundingClientRect();
+    setPopoverPos({
+      top: rect.bottom + 4,
+      right: window.innerWidth - rect.right,
+    });
+  };
+
+  const openQuantityPopover = () => {
+    updatePopoverPos();
+    setShowQuantityPopover(true);
+  };
+
+  // Click-outside to close popover; also close on scroll/resize to avoid stale position
   createEffect(() => {
     if (!showQuantityPopover()) return;
-    const handler = (e: MouseEvent) => {
+    const close = (e: MouseEvent) => {
       if (
         quantityPillRef &&
         !quantityPillRef.contains(e.target as Node) &&
@@ -65,42 +73,26 @@ export function PackingItemCard(props: PackingItemCardProps) {
         setShowQuantityPopover(false);
       }
     };
-    document.addEventListener('mousedown', handler);
-    onCleanup(() => document.removeEventListener('mousedown', handler));
+    const closeOnScroll = () => setShowQuantityPopover(false);
+    document.addEventListener('mousedown', close);
+    window.addEventListener('scroll', closeOnScroll, true);
+    window.addEventListener('resize', closeOnScroll);
+    onCleanup(() => {
+      document.removeEventListener('mousedown', close);
+      window.removeEventListener('scroll', closeOnScroll, true);
+      window.removeEventListener('resize', closeOnScroll);
+    });
   });
 
-  // Detect mobile vs desktop for swipe behavior
-  // Check on initial render (before mount) to avoid flash of wrong UI
-  const [isMobile, setIsMobile] = createSignal(
-    typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches
-  );
-  onMount(() => {
-    const mediaQuery = window.matchMedia('(max-width: 767px)');
-    setIsMobile(mediaQuery.matches);
-    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
-    mediaQuery.addEventListener('change', handler);
-    onCleanup(() => mediaQuery.removeEventListener('change', handler));
-  });
-
-  // Check if swipe is enabled (mobile + swipe context provided + not in select mode)
-  // Note: Swipe works alongside drag-drop - drag uses the handle, swipe uses the card content
-  const swipeEnabled = () =>
-    isMobile() &&
-    props.revealedItemId !== undefined &&
-    props.onRevealChange !== undefined &&
-    !props.selectMode;
-
-  // Action buttons component (reused in both layouts)
+  // Action buttons (always visible on both mobile and desktop)
   const ActionButtons = () => (
     <div class="flex items-center">
       <button
         onClick={(e) => {
           e.stopPropagation();
           props.onToggleSkipped();
-          // Close swipe actions after action
-          props.onRevealChange?.(null);
         }}
-        class={`p-2 transition-colors ${props.item.is_skipped ? 'text-orange-500 hover:text-orange-600' : 'text-gray-400 hover:text-orange-500'}`}
+        class={`p-1.5 transition-colors md:p-2 ${props.item.is_skipped ? 'text-orange-500 hover:text-orange-600' : 'text-gray-400 hover:text-orange-500'}`}
         aria-label={props.item.is_skipped ? 'Unskip item' : 'Skip item'}
         title={
           props.item.is_skipped ? 'Unskip (need this item)' : 'Skip (not needed for this trip)'
@@ -112,43 +104,11 @@ export function PackingItemCard(props: PackingItemCardProps) {
         onClick={(e) => {
           e.stopPropagation();
           props.onEdit();
-          // Close swipe actions after action
-          props.onRevealChange?.(null);
         }}
-        class="p-2 text-gray-400 transition-colors hover:text-blue-600"
+        class="p-1.5 text-gray-400 transition-colors hover:text-blue-600 md:p-2"
         aria-label="Edit item"
       >
         <EditIcon class="h-5 w-5" />
-      </button>
-    </div>
-  );
-
-  // Swipe action buttons (styled for revealed panel)
-  const SwipeActions = () => (
-    <div class="flex h-full items-stretch">
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          props.onToggleSkipped();
-          props.onRevealChange?.(null);
-        }}
-        class={`flex w-[60px] items-center justify-center transition-colors ${
-          props.item.is_skipped ? 'bg-green-500 text-white' : 'bg-orange-500 text-white'
-        }`}
-        aria-label={props.item.is_skipped ? 'Unskip item' : 'Skip item'}
-      >
-        <SkipIcon class="h-6 w-6" />
-      </button>
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          props.onEdit();
-          props.onRevealChange?.(null);
-        }}
-        class="flex w-[60px] items-center justify-center bg-blue-500 text-white transition-colors"
-        aria-label="Edit item"
-      >
-        <EditIcon class="h-6 w-6" />
       </button>
     </div>
   );
@@ -216,28 +176,36 @@ export function PackingItemCard(props: PackingItemCardProps) {
             </span>
           </Show>
           <Show when={props.onUpdateQuantity || props.item.quantity > 1}>
-            <div class="relative flex-shrink-0">
-              <button
-                type="button"
-                ref={quantityPillRef}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (props.onUpdateQuantity) {
-                    setShowQuantityPopover(!showQuantityPopover());
+            <button
+              type="button"
+              ref={quantityPillRef}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (props.onUpdateQuantity) {
+                  if (showQuantityPopover()) {
+                    setShowQuantityPopover(false);
+                  } else {
+                    openQuantityPopover();
                   }
-                }}
-                class={`btn-compact rounded-full px-2 py-0.5 text-xs font-medium ${
-                  props.onUpdateQuantity
-                    ? 'cursor-pointer bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    : 'bg-gray-100 text-gray-600'
-                }`}
-              >
-                ×{props.item.quantity}
-              </button>
-              <Show when={showQuantityPopover()}>
+                }
+              }}
+              class={`btn-compact flex-shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
+                props.onUpdateQuantity
+                  ? 'cursor-pointer bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  : 'bg-gray-100 text-gray-600'
+              }`}
+            >
+              ×{props.item.quantity}
+            </button>
+            <Show when={showQuantityPopover()}>
+              <Portal>
                 <div
                   ref={quantityPopoverRef}
-                  class="absolute top-full right-0 z-30 mt-1 flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-2 py-1.5 shadow-lg"
+                  class="fixed z-50 flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-2 py-1.5 shadow-lg"
+                  style={{
+                    top: `${popoverPos().top}px`,
+                    right: `${popoverPos().right}px`,
+                  }}
                   onClick={(e) => e.stopPropagation()}
                 >
                   <button
@@ -263,8 +231,8 @@ export function PackingItemCard(props: PackingItemCardProps) {
                     +
                   </button>
                 </div>
-              </Show>
-            </div>
+              </Portal>
+            </Show>
           </Show>
         </div>
         <div class="mt-1 flex gap-3 text-sm text-gray-500 md:mt-0.5 md:gap-2 md:text-xs">
@@ -278,15 +246,7 @@ export function PackingItemCard(props: PackingItemCardProps) {
           </Show>
         </div>
       </div>
-      {/* Desktop: always show buttons. Mobile without swipe: show buttons. Mobile with swipe: hide buttons (revealed by swipe) */}
-      <Show
-        when={props.selectMode}
-        fallback={
-          <Show when={!swipeEnabled()}>
-            <ActionButtons />
-          </Show>
-        }
-      >
+      <Show when={props.selectMode} fallback={<ActionButtons />}>
         <input
           type="checkbox"
           id={`select-checkbox-${props.item.id}`}
@@ -300,18 +260,5 @@ export function PackingItemCard(props: PackingItemCardProps) {
     </div>
   );
 
-  // Render with or without swipe wrapper
-  return (
-    <Show when={swipeEnabled()} fallback={<CardContent />}>
-      <SwipeToReveal
-        itemId={props.item.id}
-        revealedItemId={props.revealedItemId!}
-        onRevealChange={props.onRevealChange!}
-        actionsWidth={120}
-        actions={<SwipeActions />}
-      >
-        <CardContent />
-      </SwipeToReveal>
-    </Show>
-  );
+  return <CardContent />;
 }

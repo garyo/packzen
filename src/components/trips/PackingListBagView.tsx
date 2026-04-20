@@ -30,7 +30,6 @@ import type { TripItem, Bag, Category } from '../../lib/types';
 import { PackingItemCard } from './PackingItemCard';
 import { TripNotesButton } from './TripNotesButton';
 import { TripNotesPanel } from './TripNotesPanel';
-import { SwipeProvider, useSwipeContext } from './SwipeContext';
 import { getBagColorClass, getBagColorStyle } from '../../lib/color-utils';
 import { liveRectCollision, useAutoScroll, EscapeCancelHandler } from './drag-drop-utils';
 import { CheckIcon, SwitchBagIcon } from '../ui/Icons';
@@ -253,10 +252,6 @@ function PackingListBagViewInner(props: PackingListBagViewProps) {
   const [activeItem, setActiveItem] = createSignal<TripItem | null>(null);
   const [replacingBagId, setReplacingBagId] = createSignal<string | null>(null);
   const autoScroll = useAutoScroll();
-  const swipeContext = useSwipeContext();
-
-  // Close revealed item when drag starts
-  const closeSwipeOnDrag = () => swipeContext.closeAll();
 
   // Handle drag end - dispatch to appropriate handler
   // Simplified: D&D only moves items between locations (bags, containers), never changes category
@@ -285,7 +280,6 @@ function PackingListBagViewInner(props: PackingListBagViewProps) {
     const dragData = event.draggable.data as DragData;
     setActiveItem(dragData.item);
     autoScroll.start();
-    closeSwipeOnDrag(); // Close any revealed swipe actions when starting drag
   };
 
   // Get all container items and their contents
@@ -771,8 +765,6 @@ function PackingListBagViewInner(props: PackingListBagViewProps) {
                                               }
                                               dragActivators={dragProps.dragActivators}
                                               isDragging={dragProps.isDragging}
-                                              revealedItemId={swipeContext.revealedItemId}
-                                              onRevealChange={swipeContext.setRevealedItemId}
                                             />
                                           )}
                                         </DraggableItem>
@@ -993,10 +985,6 @@ function PackingListBagViewInner(props: PackingListBagViewProps) {
                                                       }
                                                       dragActivators={dragProps.dragActivators}
                                                       isDragging={dragProps.isDragging}
-                                                      revealedItemId={swipeContext.revealedItemId}
-                                                      onRevealChange={
-                                                        swipeContext.setRevealedItemId
-                                                      }
                                                     />
                                                   )}
                                                 </DraggableItem>
@@ -1050,11 +1038,6 @@ function PackingListBagViewInner(props: PackingListBagViewProps) {
   );
 }
 
-// Export wrapper that provides swipe context
 export function PackingListBagView(props: PackingListBagViewProps) {
-  return (
-    <SwipeProvider>
-      <PackingListBagViewInner {...props} />
-    </SwipeProvider>
-  );
+  return <PackingListBagViewInner {...props} />;
 }
