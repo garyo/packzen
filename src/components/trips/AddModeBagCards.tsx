@@ -179,12 +179,12 @@ function DroppableBagCard(props: BagCardProps) {
       }}
     >
       {/* Header */}
-      <div class="flex items-start justify-between gap-1 md:items-center md:gap-2">
-        <div class="flex min-w-0 flex-1 items-start gap-1 md:items-center md:gap-2">
+      <div class="flex items-center justify-between gap-1 md:gap-2">
+        <div class="flex min-w-0 flex-1 items-center gap-1 md:gap-2">
           {/* Disclosure triangle */}
           <button
             type="button"
-            class="flex h-4 w-4 flex-shrink-0 items-center justify-center pt-0.5 text-gray-400 hover:text-gray-600 md:h-5 md:w-5 md:pt-0"
+            class="flex h-4 w-4 flex-shrink-0 items-center justify-center text-gray-400 hover:text-gray-600 md:h-5 md:w-5"
             onClick={(e) => {
               e.stopPropagation();
               props.onToggleExpand();
@@ -202,13 +202,14 @@ function DroppableBagCard(props: BagCardProps) {
             <span class="flex-shrink-0 text-sm md:text-lg">📦</span>
           ) : props.bag ? (
             <div
-              class="mt-1 h-2.5 w-2.5 flex-shrink-0 rounded-full md:mt-0 md:h-4 md:w-4"
+              class="h-2.5 w-2.5 flex-shrink-0 rounded-full md:h-4 md:w-4"
               style={{ 'background-color': bagColor() }}
             />
           ) : (
             <span class="flex-shrink-0 text-sm md:text-lg">📋</span>
           )}
-          <span class="min-w-0 flex-1 text-sm leading-tight font-semibold break-words text-gray-900 md:truncate md:text-base md:leading-normal">
+          {/* Desktop: bag name inline with icons */}
+          <span class="hidden min-w-0 flex-1 truncate text-base leading-normal font-semibold text-gray-900 md:inline">
             {bagName()}
           </span>
           <Show when={props.bag && !props.isContainer}>
@@ -233,9 +234,14 @@ function DroppableBagCard(props: BagCardProps) {
             </Show>
           </Show>
         </div>
-        <span class="flex-shrink-0 pt-0.5 text-[10px] text-gray-500 md:pt-0 md:text-sm">
+        <span class="flex-shrink-0 text-[10px] text-gray-500 md:text-sm">
           {packedItems()}/{totalItems()}
         </span>
+      </div>
+
+      {/* Mobile: bag name on its own full-width row below the icons */}
+      <div class="mt-0.5 text-sm leading-tight font-semibold break-words text-gray-900 md:hidden">
+        {bagName()}
       </div>
 
       {/* Category Summary - hidden on mobile */}
