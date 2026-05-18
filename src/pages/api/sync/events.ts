@@ -1,17 +1,40 @@
 export const prerender = false;
 
 import type { APIRoute } from 'astro';
-import { gt, eq, and, asc, sql } from 'drizzle-orm';
+import { gt, eq, and, asc, sql, max } from 'drizzle-orm';
 import { changeLog } from '../../../../db/schema';
 import { getDatabaseConnection, getUserId } from '../../../lib/api-helpers';
+
+const sseResponse = (body: string) =>
+  new Response(body, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+    },
+  });
 
 export const GET: APIRoute = async (context) => {
   const db = getDatabaseConnection(context.locals);
   const userId = getUserId(context.locals);
 
-  // Last-Event-ID header (sent automatically by EventSource on reconnect)
+  // Last-Event-ID header (sent automatically by EventSource on reconnect).
+  // Absent header = first poll of a fresh tab: don't replay history. Return
+  // the current max id as a checkpoint so subsequent polls only pick up
+  // changes from this point forward. The initial GET /trip-items already
+  // reflects all prior changes.
   const lastEventIdHeader = context.request.headers.get('Last-Event-ID');
-  const parsed = lastEventIdHeader ? parseInt(lastEventIdHeader, 10) : 0;
+  if (lastEventIdHeader === null) {
+    const row = await db
+      .select({ maxId: max(changeLog.id) })
+      .from(changeLog)
+      .where(eq(changeLog.clerk_user_id, userId))
+      .get();
+    const maxId = row?.maxId ?? 0;
+    const body = maxId > 0 ? `retry: 3000\n\nid: ${maxId}\n\n` : 'retry: 3000\n\n:heartbeat\n\n';
+    return sseResponse(body);
+  }
+
+  const parsed = parseInt(lastEventIdHeader, 10);
   const lastEventId = Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
 
   // Source ID from query param (to filter out own changes)
@@ -55,10 +78,5 @@ export const GET: APIRoute = async (context) => {
     }
   }
 
-  return new Response(body, {
-    headers: {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-    },
-  });
+  return sseResponse(body);
 };
