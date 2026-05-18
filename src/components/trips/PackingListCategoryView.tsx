@@ -407,7 +407,7 @@ function PackingListCategoryViewInner(props: PackingListCategoryViewProps) {
                               <Show when={!allBagPacked()}>
                                 <div
                                   class="grid gap-2 md:gap-1.5"
-                                  style="grid-template-columns: repeat(auto-fill, minmax(320px, 400px))"
+                                  style="grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr))"
                                 >
                                   <For each={itemsToShow()}>
                                     {(item) => {
@@ -524,7 +524,7 @@ function PackingListCategoryViewInner(props: PackingListCategoryViewProps) {
                               <Show when={!allContainerPacked()}>
                                 <div
                                   class="grid gap-2 md:gap-1.5"
-                                  style="grid-template-columns: repeat(auto-fill, minmax(320px, 400px))"
+                                  style="grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr))"
                                 >
                                   <For each={itemsToShow()}>
                                     {(item) => (

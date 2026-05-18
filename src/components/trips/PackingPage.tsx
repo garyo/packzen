@@ -1179,7 +1179,7 @@ export function PackingPage(props: PackingPageProps) {
 
         {/* Pack Mode View */}
         <Show when={viewMode() === 'pack'}>
-          <div class="container mx-auto px-4 py-6 pb-20 md:px-3 md:py-3 md:pb-16">
+          <div class="container mx-auto px-2 py-6 pb-20 md:px-3 md:py-3 md:pb-16">
             <Show when={!itemsState.loading} fallback={<LoadingSpinner text="Loading items..." />}>
               <Show
                 when={!itemsState.error}

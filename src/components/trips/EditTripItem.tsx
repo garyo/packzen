@@ -238,12 +238,32 @@ export function EditTripItem(props: EditTripItemProps) {
 
         <div>
           <label class="mb-1 block text-sm font-medium text-gray-700">Quantity</label>
-          <Input
-            type="number"
-            min="1"
-            value={quantity()}
-            onInput={(e) => setQuantity(parseInt(e.currentTarget.value) || 1)}
-          />
+          <div class="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setQuantity(Math.max(1, quantity() - 1))}
+              disabled={quantity() <= 1}
+              class="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-300 bg-white text-lg font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+              aria-label="Decrease quantity"
+            >
+              −
+            </button>
+            <Input
+              type="number"
+              min="1"
+              value={quantity()}
+              onInput={(e) => setQuantity(parseInt(e.currentTarget.value) || 1)}
+              class="w-20 text-center"
+            />
+            <button
+              type="button"
+              onClick={() => setQuantity(quantity() + 1)}
+              class="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-300 bg-white text-lg font-semibold text-gray-700 hover:bg-gray-50"
+              aria-label="Increase quantity"
+            >
+              +
+            </button>
+          </div>
         </div>
 
         <div>

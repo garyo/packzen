@@ -4,8 +4,7 @@
  * Reusable item card for packing lists.
  */
 
-import { Show, createSignal, createEffect, onCleanup } from 'solid-js';
-import { Portal } from 'solid-js/web';
+import { Show } from 'solid-js';
 import type { TripItem, Bag } from '../../lib/types';
 import { DragHandleIcon, EditIcon, SkipIcon } from '../ui/Icons';
 
@@ -40,59 +39,15 @@ export function PackingItemCard(props: PackingItemCardProps) {
   const hasContents = () =>
     isContainer() && props.containerContentsCount !== undefined && props.containerContentsCount > 0;
 
-  // Quantity popover state
-  const [showQuantityPopover, setShowQuantityPopover] = createSignal(false);
-  const [popoverPos, setPopoverPos] = createSignal({ top: 0, right: 0 });
-  let quantityPillRef: HTMLButtonElement | undefined;
-  let quantityPopoverRef: HTMLDivElement | undefined;
-
-  const updatePopoverPos = () => {
-    if (!quantityPillRef) return;
-    const rect = quantityPillRef.getBoundingClientRect();
-    setPopoverPos({
-      top: rect.bottom + 4,
-      right: window.innerWidth - rect.right,
-    });
-  };
-
-  const openQuantityPopover = () => {
-    updatePopoverPos();
-    setShowQuantityPopover(true);
-  };
-
-  // Click-outside to close popover; also close on scroll/resize to avoid stale position
-  createEffect(() => {
-    if (!showQuantityPopover()) return;
-    const close = (e: MouseEvent) => {
-      if (
-        quantityPillRef &&
-        !quantityPillRef.contains(e.target as Node) &&
-        quantityPopoverRef &&
-        !quantityPopoverRef.contains(e.target as Node)
-      ) {
-        setShowQuantityPopover(false);
-      }
-    };
-    const closeOnScroll = () => setShowQuantityPopover(false);
-    document.addEventListener('mousedown', close);
-    window.addEventListener('scroll', closeOnScroll, true);
-    window.addEventListener('resize', closeOnScroll);
-    onCleanup(() => {
-      document.removeEventListener('mousedown', close);
-      window.removeEventListener('scroll', closeOnScroll, true);
-      window.removeEventListener('resize', closeOnScroll);
-    });
-  });
-
   // Action buttons (always visible on both mobile and desktop)
   const ActionButtons = () => (
-    <div class="flex items-center">
+    <div class="flex flex-shrink-0 items-center">
       <button
         onClick={(e) => {
           e.stopPropagation();
           props.onToggleSkipped();
         }}
-        class={`p-1.5 transition-colors md:p-2 ${props.item.is_skipped ? 'text-orange-500 hover:text-orange-600' : 'text-gray-400 hover:text-orange-500'}`}
+        class={`btn-compact p-1.5 transition-colors md:p-2 ${props.item.is_skipped ? 'text-orange-500 hover:text-orange-600' : 'text-gray-400 hover:text-orange-500'}`}
         aria-label={props.item.is_skipped ? 'Unskip item' : 'Skip item'}
         title={
           props.item.is_skipped ? 'Unskip (need this item)' : 'Skip (not needed for this trip)'
@@ -105,7 +60,7 @@ export function PackingItemCard(props: PackingItemCardProps) {
           e.stopPropagation();
           props.onEdit();
         }}
-        class="p-1.5 text-gray-400 transition-colors hover:text-blue-600 md:p-2"
+        class="btn-compact p-1.5 text-gray-400 transition-colors hover:text-blue-600 md:p-2"
         aria-label="Edit item"
       >
         <EditIcon class="h-5 w-5" />
@@ -118,14 +73,14 @@ export function PackingItemCard(props: PackingItemCardProps) {
     <div
       id={`trip-item-${props.item.id}`}
       data-trip-item-id={props.item.id}
-      class={`flex items-center gap-4 rounded-lg p-4 shadow-sm md:gap-2 md:p-2 ${
+      class={`flex items-center gap-2 rounded-lg p-3 shadow-sm md:p-2 ${
         isContainer() ? 'border border-blue-200 bg-blue-50' : 'bg-white'
       } ${props.item.is_skipped ? 'bg-gray-100 opacity-50' : ''} ${props.item.is_packed && !props.item.is_skipped ? 'opacity-60' : ''} ${props.selectMode && props.isSelected ? 'ring-2 ring-blue-500' : ''} ${props.isDragging ? 'opacity-50' : ''}`}
     >
       {/* Drag handle - only shown when drag is enabled */}
       <Show when={props.dragActivators}>
         <div
-          class="flex cursor-grab items-center justify-center text-gray-400 hover:text-gray-600 active:cursor-grabbing"
+          class="hidden cursor-grab items-center justify-center text-gray-400 hover:text-gray-600 active:cursor-grabbing md:flex"
           style={{ 'touch-action': 'none' }}
           {...props.dragActivators}
         >
@@ -148,10 +103,15 @@ export function PackingItemCard(props: PackingItemCardProps) {
         class={`min-w-0 flex-1 ${hasContents() && props.onContainerClick ? 'cursor-pointer' : ''}`}
         onClick={() => hasContents() && props.onContainerClick?.()}
       >
-        <div class="flex min-w-0 items-center gap-2">
+        <div class="flex min-w-0 items-center gap-1.5">
           <Show when={isContainer()}>
             <span class="flex-shrink-0 text-lg md:text-base" title="Container (sub-bag)">
               {props.categoryIcon || '📦'}
+            </span>
+          </Show>
+          <Show when={props.onUpdateQuantity || props.item.quantity > 1}>
+            <span class="flex-shrink-0 rounded bg-gray-100 px-1 text-xs font-medium text-gray-500">
+              {props.item.quantity}×
             </span>
           </Show>
           <div
@@ -174,65 +134,6 @@ export function PackingItemCard(props: PackingItemCardProps) {
             >
               {props.containerPackedCount}/{props.containerContentsCount}
             </span>
-          </Show>
-          <Show when={props.onUpdateQuantity || props.item.quantity > 1}>
-            <button
-              type="button"
-              ref={quantityPillRef}
-              onClick={(e) => {
-                e.stopPropagation();
-                if (props.onUpdateQuantity) {
-                  if (showQuantityPopover()) {
-                    setShowQuantityPopover(false);
-                  } else {
-                    openQuantityPopover();
-                  }
-                }
-              }}
-              class={`btn-compact flex-shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
-                props.onUpdateQuantity
-                  ? 'cursor-pointer bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  : 'bg-gray-100 text-gray-600'
-              }`}
-            >
-              ×{props.item.quantity}
-            </button>
-            <Show when={showQuantityPopover()}>
-              <Portal>
-                <div
-                  ref={quantityPopoverRef}
-                  class="fixed z-50 flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-2 py-1.5 shadow-lg"
-                  style={{
-                    top: `${popoverPos().top}px`,
-                    right: `${popoverPos().right}px`,
-                  }}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <button
-                    onClick={() => {
-                      if (props.item.quantity > 1) {
-                        props.onUpdateQuantity?.(props.item.quantity - 1);
-                      }
-                    }}
-                    disabled={props.item.quantity <= 1}
-                    class="flex h-7 w-7 items-center justify-center rounded-full bg-gray-100 text-sm font-bold text-gray-700 hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    -
-                  </button>
-                  <span class="min-w-[1.5rem] text-center text-sm font-semibold">
-                    {props.item.quantity}
-                  </span>
-                  <button
-                    onClick={() => {
-                      props.onUpdateQuantity?.(props.item.quantity + 1);
-                    }}
-                    class="flex h-7 w-7 items-center justify-center rounded-full bg-gray-100 text-sm font-bold text-gray-700 hover:bg-gray-200"
-                  >
-                    +
-                  </button>
-                </div>
-              </Portal>
-            </Show>
           </Show>
         </div>
         <div class="mt-1 flex gap-3 text-sm text-gray-500 md:mt-0.5 md:gap-2 md:text-xs">
