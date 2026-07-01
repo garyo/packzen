@@ -215,4 +215,7 @@ export const endpoints = {
 
   // User
   deleteAccount: `${API_BASE_URL}/user/delete-account`,
+
+  // Analytics beacon
+  analytics: `${API_BASE_URL}/analytics`,
 };

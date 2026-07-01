@@ -1,5 +1,4 @@
 import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
-import { sql } from 'drizzle-orm';
 
 // Categories table
 export const categories = sqliteTable('categories', {
@@ -130,6 +129,19 @@ export const changeLog = sqliteTable('change_log', {
   created_at: integer('created_at').notNull(),
 });
 
+// Analytics events table (append-only product analytics / activation funnel)
+export const analyticsEvents = sqliteTable('analytics_events', {
+  id: text('id')
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  clerk_user_id: text('clerk_user_id'),
+  event: text('event').notNull(),
+  props: text('props'), // JSON-stringified small object
+  created_at: integer('created_at', { mode: 'timestamp' })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
 // Type exports for TypeScript
 export type Category = typeof categories.$inferSelect;
 export type NewCategory = typeof categories.$inferInsert;
@@ -151,3 +163,6 @@ export type NewTripItem = typeof tripItems.$inferInsert;
 
 export type ChangeLog = typeof changeLog.$inferSelect;
 export type NewChangeLog = typeof changeLog.$inferInsert;
+
+export type AnalyticsEvent = typeof analyticsEvents.$inferSelect;
+export type NewAnalyticsEvent = typeof analyticsEvents.$inferInsert;

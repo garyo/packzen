@@ -24,6 +24,7 @@ import {
   type SyncConfig,
 } from '../../../../lib/api-helpers';
 import { logChange, getSourceId } from '../../../../lib/sync';
+import { logEvent } from '../../../../lib/analytics';
 
 const sync: SyncConfig = {
   entityType: 'tripItem',
@@ -210,6 +211,7 @@ export const POST: APIRoute = async (context) => {
 
     const sourceId = getSourceId(context.request);
     logChange(db, userId, 'tripItem', newItem.id, tripId, 'create', newItem, sourceId);
+    void logEvent(db, 'items_added', { userId, props: { tripId, count: 1, source: 'single' } });
     return successResponse(newItem, 201);
   } catch (error) {
     return handleApiError(error, 'create trip item');
@@ -302,6 +304,11 @@ async function handleBatchCreate(
   for (const row of inserted) {
     logChange(db, userId, 'tripItem', row.id, tripId, 'create', row, sourceId);
   }
+
+  void logEvent(db, 'items_added', {
+    userId,
+    props: { tripId, count: inserted.length, source: 'batch' },
+  });
 
   return successResponse(inserted, 201);
 }
@@ -426,12 +433,19 @@ export const PATCH: APIRoute = createPatchHandler<
     if (is_container !== undefined) updates.is_container = is_container;
     if (notes !== undefined) updates.notes = notes;
 
-    return await db
+    const updated = await db
       .update(tripItems)
       .set(updates)
       .where(and(eq(tripItems.id, id), eq(tripItems.trip_id, tripId)))
       .returning()
       .get();
+
+    // Funnel event: item being marked packed.
+    if (is_packed === true) {
+      void logEvent(db, 'item_packed', { userId, props: { tripId } });
+    }
+
+    return updated;
   },
   'update trip item',
   (data) => validateRequestSafe(tripItemUpdateSchema, data),

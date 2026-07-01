@@ -5,7 +5,7 @@
  * Supports both bag-first and category-first sorting
  */
 
-import { createResource, Show, For, createSignal } from 'solid-js';
+import { createResource, Show, For, createSignal, onMount } from 'solid-js';
 import { api, endpoints } from '../../lib/api';
 import type { Trip, TripItem, Category, Bag } from '../../lib/types';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
@@ -19,7 +19,15 @@ interface TripPrintViewProps {
 }
 
 export function TripPrintView(props: TripPrintViewProps) {
-  const [twoColumn, setTwoColumn] = createSignal((props.initialColumns || 1) === 2);
+  const [twoColumn] = createSignal((props.initialColumns || 1) === 2);
+
+  // Best-effort analytics beacon: record that the print/checklist view loaded.
+  onMount(() => {
+    void api.post(endpoints.analytics, {
+      event: 'list_printed',
+      props: { tripId: props.tripId },
+    });
+  });
 
   const [trip] = createResource<Trip | null>(async () => {
     return fetchSingleWithErrorHandling(
