@@ -22,6 +22,7 @@ interface PackingItemCardProps {
   onTogglePacked: () => void;
   onToggleSkipped: () => void;
   onEdit: () => void;
+  onMoveToBag?: () => void; // Open the mobile move-to-bag picker
   onToggleSelection: () => void;
   // Quantity update
   onUpdateQuantity?: (quantity: number) => void;
@@ -42,6 +43,19 @@ export function PackingItemCard(props: PackingItemCardProps) {
   // Action buttons (always visible on both mobile and desktop)
   const ActionButtons = () => (
     <div class="flex flex-shrink-0 items-center">
+      <Show when={props.onMoveToBag}>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            props.onMoveToBag!();
+          }}
+          class="btn-compact p-1.5 text-gray-400 transition-colors hover:text-blue-600 md:hidden"
+          aria-label="Move to bag"
+          title="Move to a bag"
+        >
+          <span class="text-xl leading-none">👜</span>
+        </button>
+      </Show>
       <button
         onClick={(e) => {
           e.stopPropagation();

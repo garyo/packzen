@@ -21,6 +21,7 @@ import type {
 } from '../../lib/types';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
 import { EmptyState } from '../ui/EmptyState';
+import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Toast, showToast } from '../ui/Toast';
 import { getPackingProgress, isSmallScreen } from '../../lib/utils';
@@ -61,6 +62,7 @@ export function PackingPage(props: PackingPageProps) {
   const [viewMode, setViewMode] = createSignal<'pack' | 'add'>('pack');
   const [showUnpackedOnly, setShowUnpackedOnly] = createSignal(false);
   const [showNotesPanel, setShowNotesPanel] = createSignal(false);
+  const [movingItem, setMovingItem] = createSignal<TripItem | null>(null);
   const [searchQuery, setSearchQuery] = createSignal('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = createSignal('');
   const [pendingScrollItemId, setPendingScrollItemId] = createSignal<string | null>(null);
@@ -1322,6 +1324,7 @@ export function PackingPage(props: PackingPageProps) {
                           onEditItem={openEditItem}
                           onToggleItemSelection={toggleItemSelection}
                           onMoveItemToBag={handleMoveItemToBag}
+                          onRequestMoveItem={setMovingItem}
                           onMoveItemToContainer={handleMoveItemToContainer}
                           onUpdateQuantity={handleUpdateQuantity}
                         />
@@ -1351,6 +1354,7 @@ export function PackingPage(props: PackingPageProps) {
                           openBrowseTemplates(undefined, containerId)
                         }
                         onMoveItemToBag={handleMoveItemToBag}
+                        onRequestMoveItem={setMovingItem}
                         onMoveItemToContainer={handleMoveItemToContainer}
                         onBagReplaced={() => {
                           refetch();
@@ -1389,6 +1393,44 @@ export function PackingPage(props: PackingPageProps) {
       </Show>
 
       {/* Edit Item Modal */}
+      <Show when={movingItem()}>
+        <Modal title="Move to bag" size="small" onClose={() => setMovingItem(null)}>
+          <div class="space-y-2">
+            <For each={bags() || []}>
+              {(bag) => (
+                <button
+                  onClick={() => {
+                    handleMoveItemToBag(movingItem()!.id, bag.id);
+                    setMovingItem(null);
+                  }}
+                  class="flex w-full items-center gap-3 rounded-lg border border-gray-200 px-4 py-3 text-left hover:bg-gray-50"
+                  classList={{ 'border-blue-400 bg-blue-50': movingItem()?.bag_id === bag.id }}
+                >
+                  <span class="text-lg">👜</span>
+                  <span class="min-w-0 flex-1 truncate font-medium text-gray-900">{bag.name}</span>
+                  <Show when={movingItem()?.bag_id === bag.id}>
+                    <span class="text-xs text-blue-600">current</span>
+                  </Show>
+                </button>
+              )}
+            </For>
+            <button
+              onClick={() => {
+                handleMoveItemToBag(movingItem()!.id, null);
+                setMovingItem(null);
+              }}
+              class="flex w-full items-center gap-3 rounded-lg border border-gray-200 px-4 py-3 text-left hover:bg-gray-50"
+              classList={{ 'border-blue-400 bg-blue-50': !movingItem()?.bag_id }}
+            >
+              <span class="text-lg">🧺</span>
+              <span class="min-w-0 flex-1 font-medium text-gray-900">
+                No bag (wearing / carry-on)
+              </span>
+            </button>
+          </div>
+        </Modal>
+      </Show>
+
       <Show when={editingItem()}>
         <EditTripItem
           tripId={props.tripId}

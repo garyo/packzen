@@ -233,6 +233,7 @@ interface PackingListBagViewProps {
   onBrowseTemplatesToContainer?: (containerId: string) => void;
   // Drag-and-drop handlers
   onMoveItemToBag?: (itemId: string, bagId: string | null) => void;
+  onRequestMoveItem?: (item: TripItem) => void;
   onMoveItemToContainer?: (itemId: string, containerId: string) => void;
   // Quantity update
   onUpdateQuantity?: (item: TripItem, quantity: number) => void;
@@ -739,6 +740,7 @@ function PackingListBagViewInner(props: PackingListBagViewProps) {
                                               onTogglePacked={() => props.onTogglePacked(item)}
                                               onToggleSkipped={() => props.onToggleSkipped(item)}
                                               onEdit={() => props.onEditItem(item)}
+                                              onMoveToBag={() => props.onRequestMoveItem?.(item)}
                                               onToggleSelection={() =>
                                                 props.onToggleItemSelection(item.id)
                                               }
@@ -974,6 +976,9 @@ function PackingListBagViewInner(props: PackingListBagViewProps) {
                                                         props.onToggleSkipped(item)
                                                       }
                                                       onEdit={() => props.onEditItem(item)}
+                                                      onMoveToBag={() =>
+                                                        props.onRequestMoveItem?.(item)
+                                                      }
                                                       onToggleSelection={() =>
                                                         props.onToggleItemSelection(item.id)
                                                       }

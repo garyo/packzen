@@ -141,6 +141,7 @@ interface PackingListCategoryViewProps {
   onUpdateQuantity?: (item: TripItem, quantity: number) => void;
   // Drag-and-drop handlers - only moves between locations, keeps category
   onMoveItemToBag?: (itemId: string, bagId: string | null) => void;
+  onRequestMoveItem?: (item: TripItem) => void;
   onMoveItemToContainer?: (itemId: string, containerId: string) => void;
 }
 
@@ -426,6 +427,7 @@ function PackingListCategoryViewInner(props: PackingListCategoryViewProps) {
                                               onTogglePacked={() => props.onTogglePacked(item)}
                                               onToggleSkipped={() => props.onToggleSkipped(item)}
                                               onEdit={() => props.onEditItem(item)}
+                                              onMoveToBag={() => props.onRequestMoveItem?.(item)}
                                               onToggleSelection={() =>
                                                 props.onToggleItemSelection(item.id)
                                               }
@@ -541,6 +543,7 @@ function PackingListCategoryViewInner(props: PackingListCategoryViewProps) {
                                             onTogglePacked={() => props.onTogglePacked(item)}
                                             onToggleSkipped={() => props.onToggleSkipped(item)}
                                             onEdit={() => props.onEditItem(item)}
+                                            onMoveToBag={() => props.onRequestMoveItem?.(item)}
                                             onToggleSelection={() =>
                                               props.onToggleItemSelection(item.id)
                                             }
