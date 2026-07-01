@@ -18,6 +18,7 @@ import type {
   Category,
   SelectedBuiltInItem,
   MasterItemWithCategory,
+  BuiltInItem,
 } from '../../lib/types';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
 import { EmptyState } from '../ui/EmptyState';
@@ -1025,32 +1026,59 @@ export function PackingPage(props: PackingPageProps) {
     if (addingStarter()) return;
 
     const existingNames = new Set((items() ?? []).map((i) => i.name.toLowerCase()));
-    const payload = getStarterItems(tripTypeId)
-      .filter((item) => !existingNames.has(item.name.toLowerCase()))
-      .map((item) => ({
+    const starter = getStarterItems(tripTypeId).filter(
+      (item) => !existingNames.has(item.name.toLowerCase())
+    );
+
+    if (starter.length === 0) {
+      showToast('info', 'Those items are already on your list');
+      return;
+    }
+
+    // Group toiletries into a "Toilet Kit" container so the starter list arrives
+    // organized. The container is left unbagged — one tap of the bag button drops
+    // the whole kit into a bag. Only runs on an empty trip, so no collision risk.
+    const TOILETRY_CATEGORY = 'Toiletries';
+    const isToiletry = (item: BuiltInItem) =>
+      item.category === TOILETRY_CATEGORY && !item.is_container;
+    const hasToiletries = starter.some(isToiletry);
+
+    setAddingStarter(tripTypeId);
+    try {
+      // Create the container first so its generated id can nest the toiletries.
+      let toiletKitId: string | null = null;
+      if (hasToiletries) {
+        const containerRes = await api.post<TripItem>(endpoints.tripItems(props.tripId), {
+          name: 'Toilet Kit',
+          category_name: TOILETRY_CATEGORY,
+          is_container: true,
+          bag_id: null,
+        });
+        if (containerRes.success && containerRes.data) {
+          toiletKitId = containerRes.data.id;
+          addItemToStore(containerRes.data);
+        }
+      }
+
+      const payload = starter.map((item) => ({
         name: item.name,
         category_name: item.category,
         quantity: item.default_quantity,
         notes: item.description,
         is_container: item.is_container || false,
         bag_id: null,
+        container_item_id: toiletKitId && isToiletry(item) ? toiletKitId : null,
         master_item_id: null,
       }));
 
-    if (payload.length === 0) {
-      showToast('info', 'Those items are already on your list');
-      return;
-    }
-
-    setAddingStarter(tripTypeId);
-    try {
       const response = await api.post<TripItem[]>(endpoints.tripItems(props.tripId), {
         items: payload,
       });
 
       if (response.success && response.data) {
         response.data.forEach((item) => addItemToStore(item));
-        showToast('success', `Added ${response.data.length} items`);
+        const total = response.data.length + (toiletKitId ? 1 : 0);
+        showToast('success', `Added ${total} items`);
       } else {
         showToast('error', (response as { error?: string }).error || 'Failed to add items');
       }
@@ -1324,7 +1352,7 @@ export function PackingPage(props: PackingPageProps) {
                           onEditItem={openEditItem}
                           onToggleItemSelection={toggleItemSelection}
                           onMoveItemToBag={handleMoveItemToBag}
-                          onRequestMoveItem={setMovingItem}
+                          onRequestMoveItem={(bags()?.length ?? 0) > 0 ? setMovingItem : undefined}
                           onMoveItemToContainer={handleMoveItemToContainer}
                           onUpdateQuantity={handleUpdateQuantity}
                         />
@@ -1354,7 +1382,7 @@ export function PackingPage(props: PackingPageProps) {
                           openBrowseTemplates(undefined, containerId)
                         }
                         onMoveItemToBag={handleMoveItemToBag}
-                        onRequestMoveItem={setMovingItem}
+                        onRequestMoveItem={(bags()?.length ?? 0) > 0 ? setMovingItem : undefined}
                         onMoveItemToContainer={handleMoveItemToContainer}
                         onBagReplaced={() => {
                           refetch();

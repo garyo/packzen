@@ -427,7 +427,11 @@ function PackingListCategoryViewInner(props: PackingListCategoryViewProps) {
                                               onTogglePacked={() => props.onTogglePacked(item)}
                                               onToggleSkipped={() => props.onToggleSkipped(item)}
                                               onEdit={() => props.onEditItem(item)}
-                                              onMoveToBag={() => props.onRequestMoveItem?.(item)}
+                                              onMoveToBag={
+                                                props.onRequestMoveItem
+                                                  ? () => props.onRequestMoveItem!(item)
+                                                  : undefined
+                                              }
                                               onToggleSelection={() =>
                                                 props.onToggleItemSelection(item.id)
                                               }
@@ -543,7 +547,11 @@ function PackingListCategoryViewInner(props: PackingListCategoryViewProps) {
                                             onTogglePacked={() => props.onTogglePacked(item)}
                                             onToggleSkipped={() => props.onToggleSkipped(item)}
                                             onEdit={() => props.onEditItem(item)}
-                                            onMoveToBag={() => props.onRequestMoveItem?.(item)}
+                                            onMoveToBag={
+                                              props.onRequestMoveItem
+                                                ? () => props.onRequestMoveItem!(item)
+                                                : undefined
+                                            }
                                             onToggleSelection={() =>
                                               props.onToggleItemSelection(item.id)
                                             }
