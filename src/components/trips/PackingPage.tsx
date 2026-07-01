@@ -64,6 +64,9 @@ export function PackingPage(props: PackingPageProps) {
   const [showUnpackedOnly, setShowUnpackedOnly] = createSignal(false);
   const [showNotesPanel, setShowNotesPanel] = createSignal(false);
   const [movingItem, setMovingItem] = createSignal<TripItem | null>(null);
+  // The move-to-bag button is only useful when there's somewhere to move to.
+  const hasMoveTargets = () =>
+    (bags()?.length ?? 0) > 0 || (items() ?? []).some((i) => i.is_container);
   const [searchQuery, setSearchQuery] = createSignal('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = createSignal('');
   const [pendingScrollItemId, setPendingScrollItemId] = createSignal<string | null>(null);
@@ -1352,7 +1355,7 @@ export function PackingPage(props: PackingPageProps) {
                           onEditItem={openEditItem}
                           onToggleItemSelection={toggleItemSelection}
                           onMoveItemToBag={handleMoveItemToBag}
-                          onRequestMoveItem={(bags()?.length ?? 0) > 0 ? setMovingItem : undefined}
+                          onRequestMoveItem={hasMoveTargets() ? setMovingItem : undefined}
                           onMoveItemToContainer={handleMoveItemToContainer}
                           onUpdateQuantity={handleUpdateQuantity}
                         />
@@ -1382,7 +1385,7 @@ export function PackingPage(props: PackingPageProps) {
                           openBrowseTemplates(undefined, containerId)
                         }
                         onMoveItemToBag={handleMoveItemToBag}
-                        onRequestMoveItem={(bags()?.length ?? 0) > 0 ? setMovingItem : undefined}
+                        onRequestMoveItem={hasMoveTargets() ? setMovingItem : undefined}
                         onMoveItemToContainer={handleMoveItemToContainer}
                         onBagReplaced={() => {
                           refetch();
@@ -1422,7 +1425,7 @@ export function PackingPage(props: PackingPageProps) {
 
       {/* Edit Item Modal */}
       <Show when={movingItem()}>
-        <Modal title="Move to bag" size="small" onClose={() => setMovingItem(null)}>
+        <Modal title="Move item" size="small" onClose={() => setMovingItem(null)}>
           <div class="space-y-2">
             <For each={bags() || []}>
               {(bag) => (
@@ -1442,13 +1445,44 @@ export function PackingPage(props: PackingPageProps) {
                 </button>
               )}
             </For>
+            {/* Containers as destinations (a container can't be nested in another) */}
+            <Show when={!movingItem()?.is_container}>
+              <For
+                each={(items() ?? []).filter((i) => i.is_container && i.id !== movingItem()?.id)}
+              >
+                {(container) => (
+                  <button
+                    onClick={() => {
+                      handleMoveItemToContainer(movingItem()!.id, container.id);
+                      setMovingItem(null);
+                    }}
+                    class="flex w-full items-center gap-3 rounded-lg border border-gray-200 px-4 py-3 text-left hover:bg-gray-50"
+                    classList={{
+                      'border-blue-400 bg-blue-50':
+                        movingItem()?.container_item_id === container.id,
+                    }}
+                  >
+                    <span class="text-lg">📦</span>
+                    <span class="min-w-0 flex-1 truncate font-medium text-gray-900">
+                      {container.name}
+                    </span>
+                    <Show when={movingItem()?.container_item_id === container.id}>
+                      <span class="text-xs text-blue-600">current</span>
+                    </Show>
+                  </button>
+                )}
+              </For>
+            </Show>
             <button
               onClick={() => {
                 handleMoveItemToBag(movingItem()!.id, null);
                 setMovingItem(null);
               }}
               class="flex w-full items-center gap-3 rounded-lg border border-gray-200 px-4 py-3 text-left hover:bg-gray-50"
-              classList={{ 'border-blue-400 bg-blue-50': !movingItem()?.bag_id }}
+              classList={{
+                'border-blue-400 bg-blue-50':
+                  !movingItem()?.bag_id && !movingItem()?.container_item_id,
+              }}
             >
               <span class="text-lg">🧺</span>
               <span class="min-w-0 flex-1 font-medium text-gray-900">
