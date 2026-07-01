@@ -368,6 +368,41 @@ export const DELETE: APIRoute = createDeleteHandler(
       return false;
     }
 
+    // Look up the item first so we know whether it's a container that needs to
+    // cascade-delete its children (otherwise the children become orphaned rows
+    // pointing at a deleted container, which the list views hide but the header
+    // still counts).
+    const item = await db
+      .select()
+      .from(tripItems)
+      .where(and(eq(tripItems.id, id), eq(tripItems.trip_id, tripId)))
+      .get();
+
+    if (!item) {
+      return false;
+    }
+
+    if (item.is_container) {
+      // Find children so we can both delete them and emit per-child sync events.
+      const children = await db
+        .select({ id: tripItems.id })
+        .from(tripItems)
+        .where(and(eq(tripItems.container_item_id, id), eq(tripItems.trip_id, tripId)))
+        .all();
+
+      if (children.length > 0) {
+        await db
+          .delete(tripItems)
+          .where(and(eq(tripItems.container_item_id, id), eq(tripItems.trip_id, tripId)))
+          .run();
+
+        const sourceId = getSourceId(request);
+        for (const child of children) {
+          logChange(db, userId, 'tripItem', child.id, tripId, 'delete', null, sourceId);
+        }
+      }
+    }
+
     const deleted = await db
       .delete(tripItems)
       .where(and(eq(tripItems.id, id), eq(tripItems.trip_id, tripId)))

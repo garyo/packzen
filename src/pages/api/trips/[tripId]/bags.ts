@@ -3,7 +3,7 @@ export const prerender = false;
 import type { APIRoute } from 'astro';
 import { eq, and, asc } from 'drizzle-orm';
 import { z } from 'zod';
-import { bags, trips } from '../../../../../db/schema';
+import { bags, trips, tripItems } from '../../../../../db/schema';
 import { bagCreateSchema, bagUpdateSchema, validateRequestSafe } from '../../../../lib/validation';
 import {
   createGetHandler,
@@ -162,7 +162,22 @@ export const DELETE: APIRoute = createDeleteHandler(
       .returning()
       .get();
 
-    return deleted ? bag_id : false;
+    if (!deleted) {
+      return false;
+    }
+
+    // Unassign items that were in this bag so they remain visible (under
+    // "Wearing / No Bag") instead of disappearing with a dangling bag_id.
+    // Affected items aren't individually synced here; PackingPage refetches
+    // items + bags after bag manager actions, and other devices pick up the
+    // change on their next refetch.
+    await db
+      .update(tripItems)
+      .set({ bag_id: null, updated_at: new Date() })
+      .where(and(eq(tripItems.bag_id, bag_id), eq(tripItems.trip_id, tripId)))
+      .run();
+
+    return bag_id;
   },
   'delete bag',
   sync

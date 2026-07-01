@@ -413,18 +413,23 @@ export function PackingPage(props: PackingPageProps) {
   };
 
   const handleEditItemDeleted = (deletedItemId: string, movedItemIds?: string[]) => {
-    // If items were moved out of a container, update them first (before deleting container)
     if (movedItemIds && movedItemIds.length > 0) {
+      // "Keep Items": children were reparented out of the container first.
       const deletedItem = items()?.find((i) => i.id === deletedItemId);
       const inheritedBagId = deletedItem?.bag_id || null;
       updateItemsInStore(movedItemIds, {
         container_item_id: null,
         bag_id: inheritedBagId,
       });
+      deleteItemsFromStore([deletedItemId]);
+    } else {
+      // "Delete All" (or plain delete): the server cascade-deleted any children
+      // of this container, so remove them from the store along with the item.
+      const childIds = (items() ?? [])
+        .filter((i) => i.container_item_id === deletedItemId)
+        .map((i) => i.id);
+      deleteItemsFromStore([deletedItemId, ...childIds]);
     }
-
-    // Remove the deleted item from store
-    deleteItemsFromStore([deletedItemId]);
   };
 
   // Open add modals with pre-selected bag or container
@@ -1107,9 +1112,21 @@ export function PackingPage(props: PackingPageProps) {
     }
   };
 
-  const packedCount = () => items()?.filter((i) => i.is_packed).length || 0;
-  const skippedCount = () => items()?.filter((i) => i.is_skipped).length || 0;
-  const totalCount = () => items()?.length || 0;
+  // Header counts must reflect only items that are actually rendered somewhere.
+  // An item is renderable unless it's a container-orphan: it points at a
+  // container_item_id that no longer exists (or no longer is a container).
+  // Such orphans are hidden by both list views, so counting them would show a
+  // phantom "N unpacked" with nothing to pack. Items with a dangling bag_id are
+  // still rendered (Category view), so they stay counted.
+  const renderableItems = createMemo(() => {
+    const all = items() ?? [];
+    const containerIds = new Set(all.filter((i) => i.is_container).map((i) => i.id));
+    return all.filter((i) => !i.container_item_id || containerIds.has(i.container_item_id));
+  });
+
+  const packedCount = () => renderableItems().filter((i) => i.is_packed).length;
+  const skippedCount = () => renderableItems().filter((i) => i.is_skipped).length;
+  const totalCount = () => renderableItems().length;
   const unpackedCount = () => totalCount() - packedCount() - skippedCount();
   const progress = () => getPackingProgress(packedCount(), totalCount() - skippedCount());
 

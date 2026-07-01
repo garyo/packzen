@@ -436,6 +436,102 @@ test('deleteAllUserData removes all user artifacts', async () => {
   remainingCounts.forEach((row) => assert.equal(row?.count ?? 0, 0));
 });
 
+test('Deleting a container cascade-deletes its children', async () => {
+  const d1 = await createTestDatabase();
+  const db = drizzle(d1);
+  const userId = 'cascade_delete_user';
+
+  const trip = await db
+    .insert(trips)
+    .values({ clerk_user_id: userId, name: 'Cascade Trip' })
+    .returning()
+    .get();
+
+  const container = await db
+    .insert(tripItems)
+    .values({ trip_id: trip.id, name: 'Toiletry Kit', is_container: true })
+    .returning()
+    .get();
+
+  const child = await db
+    .insert(tripItems)
+    .values({ trip_id: trip.id, name: 'Toothbrush', container_item_id: container.id })
+    .returning()
+    .get();
+
+  const unrelated = await db
+    .insert(tripItems)
+    .values({ trip_id: trip.id, name: 'Guidebook' })
+    .returning()
+    .get();
+
+  const deleteCtx = buildApiContext({
+    db: d1,
+    userId,
+    request: new Request(`http://localhost/api/trips/${trip.id}/items`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: container.id }),
+    }),
+    params: { tripId: trip.id },
+  });
+
+  const deleteResponse = await tripItemsApi.DELETE!(deleteCtx);
+  assert.equal(deleteResponse.status, 200);
+
+  const remaining = await db.select().from(tripItems).where(eq(tripItems.trip_id, trip.id)).all();
+  const remainingIds = remaining.map((i) => i.id);
+  assert.ok(!remainingIds.includes(container.id), 'container should be deleted');
+  assert.ok(!remainingIds.includes(child.id), 'child should be cascade-deleted');
+  assert.ok(remainingIds.includes(unrelated.id), 'unrelated item should remain');
+});
+
+test('Deleting a bag nulls its items bag_id instead of orphaning them', async () => {
+  const d1 = await createTestDatabase();
+  const db = drizzle(d1);
+  const userId = 'bag_delete_user';
+
+  const trip = await db
+    .insert(trips)
+    .values({ clerk_user_id: userId, name: 'Bag Trip' })
+    .returning()
+    .get();
+
+  const bag = await db
+    .insert(bags)
+    .values({ trip_id: trip.id, name: 'Carry-on', type: 'carry_on' })
+    .returning()
+    .get();
+
+  const item = await db
+    .insert(tripItems)
+    .values({ trip_id: trip.id, bag_id: bag.id, name: 'Socks' })
+    .returning()
+    .get();
+
+  const deleteCtx = buildApiContext({
+    db: d1,
+    userId,
+    request: new Request(`http://localhost/api/trips/${trip.id}/bags`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ bag_id: bag.id }),
+    }),
+    params: { tripId: trip.id },
+  });
+
+  const { DELETE: BAGS_DELETE } = await import('../src/pages/api/trips/[tripId]/bags');
+  const deleteResponse = await BAGS_DELETE!(deleteCtx);
+  assert.equal(deleteResponse.status, 200);
+
+  const remainingBags = await db.select().from(bags).where(eq(bags.id, bag.id)).all();
+  assert.equal(remainingBags.length, 0, 'bag should be deleted');
+
+  const updatedItem = await db.select().from(tripItems).where(eq(tripItems.id, item.id)).get();
+  assert.ok(updatedItem, 'item should still exist');
+  assert.equal(updatedItem!.bag_id, null, 'item bag_id should be nulled');
+});
+
 test('User isolation is enforced across trips, bags, and trip items', async () => {
   const d1 = await createTestDatabase();
   const db = drizzle(d1);
