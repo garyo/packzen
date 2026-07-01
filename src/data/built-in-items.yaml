@@ -46,27 +46,35 @@ trip_types:
   - id: 'overnight'
     name: 'Overnight'
     description: '1-2 nights'
+    nights: 2
   - id: 'weekend'
     name: 'Weekend'
     description: '3-4 nights'
+    nights: 4
   - id: 'week'
     name: 'Week-long'
     description: '5-7 nights'
+    nights: 7
   - id: 'beach'
     name: 'Beach Day'
     description: 'Beach or pool'
+    nights: 3
   - id: 'business'
     name: 'Business'
     description: 'Work travel'
+    nights: 4
   - id: 'international'
     name: 'International'
     description: 'Cross-border travel'
+    nights: 7
   - id: 'hiking'
     name: 'Hiking/Camping'
     description: 'Outdoor adventure'
+    nights: 3
   - id: 'ski'
     name: 'Ski Trip'
     description: 'Winter sports'
+    nights: 5
 
 items:
   # Clothing
@@ -76,6 +84,7 @@ items:
     default_quantity: 5
     trip_types: ['overnight', 'weekend', 'week', 'beach']
     essential: true
+    per_day: true
 
   - name: 'Short sleeve shirts'
     description: 'Casual button-up or polo shirts'
@@ -87,6 +96,7 @@ items:
     description: 'Underwear (any style)'
     category: 'Undergarments'
     default_quantity: 7
+    per_day: true
     trip_types:
       ['overnight', 'weekend', 'week', 'beach', 'business', 'international', 'hiking', 'ski']
     essential: true
@@ -103,6 +113,7 @@ items:
     default_quantity: 7
     trip_types: ['overnight', 'weekend', 'week', 'business', 'hiking']
     essential: true
+    per_day: true
 
   - name: 'Pants/Jeans'
     description: 'Casual pants or jeans'

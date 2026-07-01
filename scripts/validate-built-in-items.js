@@ -90,6 +90,13 @@ function validateBuiltInItems() {
   const categoryNames = new Set(categories.map((c) => c.name));
   const tripTypeIds = new Set(trip_types.map((t) => t.id));
   const VALID_MODIFIERS = new Set(['international', 'feminine', 'masculine']);
+
+  // Trip types must declare nominal nights (used to scale per-day consumables)
+  trip_types.forEach((t, index) => {
+    if (typeof t.nights !== 'number' || t.nights <= 0) {
+      errors.push(`Trip type #${index + 1} "${t.id}": nights must be a positive number`);
+    }
+  });
   const itemsPerCategory = new Map();
   const itemsPerTripType = new Map();
 
@@ -121,6 +128,9 @@ function validateBuiltInItems() {
     // Starter essentials fields (both optional; an item uses at most one)
     if (item.essential !== undefined && typeof item.essential !== 'boolean') {
       errors.push(`${itemLabel}: essential must be a boolean`);
+    }
+    if (item.per_day !== undefined && typeof item.per_day !== 'boolean') {
+      errors.push(`${itemLabel}: per_day must be a boolean`);
     }
     if (item.essential_trip_types !== undefined) {
       if (!Array.isArray(item.essential_trip_types)) {

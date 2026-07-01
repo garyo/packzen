@@ -31,6 +31,21 @@ const STARTER_EXCLUDED_CATEGORIES = new Set(['Baby', 'Children']);
 /** Additive starter modifiers layered on top of a trip type. */
 export type StarterModifier = 'international' | 'feminine' | 'masculine';
 
+/** Nominal nights for a trip type, used to scale per-day consumables. */
+export function getTripTypeNights(tripTypeId: string): number {
+  return builtInItems.trip_types.find((t) => t.id === tripTypeId)?.nights ?? 3;
+}
+
+/**
+ * Starter quantity for an item on a given trip type. Per-day consumables scale
+ * with nominal trip length but never exceed the curated default_quantity, so
+ * short trips get trimmed while long trips stay capped (laundry assumption).
+ */
+export function getStarterQuantity(item: BuiltInItem, tripTypeId: string): number {
+  if (!item.per_day) return item.default_quantity;
+  return Math.min(item.default_quantity, getTripTypeNights(tripTypeId) + 1);
+}
+
 /**
  * Get the curated "starter essentials" for a trip type, optionally layered with
  * modifiers (international travel, clothing style). Resolves to universal core

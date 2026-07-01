@@ -37,7 +37,12 @@ import { PackingListCategoryView } from './PackingListCategoryView';
 import { AddModeView } from './AddModeView';
 import { SelectModeActionBar } from './SelectModeActionBar';
 import { BuiltInItemsBrowser } from '../built-in-items/BuiltInItemsBrowser';
-import { builtInItems, getStarterItems, type StarterModifier } from '../../lib/built-in-items';
+import {
+  builtInItems,
+  getStarterItems,
+  getStarterQuantity,
+  type StarterModifier,
+} from '../../lib/built-in-items';
 import { fetchWithErrorHandling, fetchSingleWithErrorHandling } from '../../lib/resource-helpers';
 import { syncManager } from '../../lib/sync-manager';
 import { tripToYAML, downloadYAML } from '../../lib/yaml';
@@ -1077,7 +1082,7 @@ export function PackingPage(props: PackingPageProps) {
       const payload = starter.map((item) => ({
         name: item.name,
         category_name: item.category,
-        quantity: item.default_quantity,
+        quantity: getStarterQuantity(item, tripTypeId),
         notes: item.description,
         is_container: item.is_container || false,
         bag_id: null,

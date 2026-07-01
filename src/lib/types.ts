@@ -73,6 +73,8 @@ export interface TripType {
   id: string;
   name: string;
   description: string;
+  /** Nominal trip length in nights, used to scale per-day consumables. */
+  nights: number;
 }
 
 export interface BuiltInItem {
@@ -88,6 +90,8 @@ export interface BuiltInItem {
   essential_trip_types?: string[];
   /** Situational essential gated by a starter modifier (international / feminine / masculine). */
   essential_modifiers?: string[];
+  /** Consumable whose starter quantity scales with trip length (capped at default_quantity). */
+  per_day?: boolean;
 }
 
 export interface BuiltInItemsData {
