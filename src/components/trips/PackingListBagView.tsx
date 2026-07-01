@@ -128,10 +128,10 @@ function WayfindingNavBar(props: {
   };
 
   return (
-    <div class="sticky top-0 z-10 -mx-4 bg-gray-50/95 px-4 py-1.5 backdrop-blur-sm md:-mx-3 md:px-3">
+    <div class="sticky top-0 z-10 -mx-4 bg-gray-50/95 px-4 py-1.5 backdrop-blur-sm md:-mx-3 md:px-3 [@media(max-height:500px)]:py-0.5">
       <div class="flex items-center gap-x-1 gap-y-0">
         {/* Bags and containers interleaved in visibility order */}
-        <div class="flex flex-1 flex-wrap gap-x-1 gap-y-0">
+        <div class="flex flex-1 flex-wrap gap-x-1 gap-y-0 [@media(max-height:500px)]:flex-nowrap [@media(max-height:500px)]:overflow-x-auto [@media(max-height:500px)]:whitespace-nowrap">
           <For each={props.navItems}>
             {(navItem) => {
               if (navItem.type === 'bag') {
@@ -140,7 +140,7 @@ function WayfindingNavBar(props: {
                 return (
                   <button
                     onClick={() => props.onScrollToSection(sectionId)}
-                    class={`btn-compact flex items-center gap-1 px-1.5 py-0.5 text-xs ${
+                    class={`btn-compact flex items-center gap-1 px-1.5 py-0.5 text-xs [@media(max-height:500px)]:shrink-0 ${
                       isHighlighted()
                         ? 'text-gray-900 underline decoration-2 underline-offset-2'
                         : 'text-gray-500 hover:text-gray-900'
@@ -161,7 +161,7 @@ function WayfindingNavBar(props: {
                 return (
                   <button
                     onClick={() => props.onScrollToSection(sectionId)}
-                    class={`btn-compact flex items-center gap-1 px-1.5 py-0.5 text-xs ${
+                    class={`btn-compact flex items-center gap-1 px-1.5 py-0.5 text-xs [@media(max-height:500px)]:shrink-0 ${
                       isHighlighted()
                         ? 'text-gray-900 underline decoration-2 underline-offset-2'
                         : 'text-gray-500 hover:text-gray-900'

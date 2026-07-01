@@ -116,9 +116,9 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
 
   return (
     <header class="relative flex-shrink-0 border-b border-gray-200 bg-white">
-      <div class="container mx-auto px-4 py-4 lg:py-2">
+      <div class="container mx-auto px-4 py-4 lg:py-2 [@media(max-height:500px)]:!py-1">
         {/* Two-row layout on mobile/tablet, single row on desktop */}
-        <div class="mb-3 flex flex-col gap-2 lg:mb-2 lg:flex-row lg:items-center lg:justify-between">
+        <div class="mb-3 flex flex-col gap-2 lg:mb-2 lg:flex-row lg:items-center lg:justify-between [@media(max-height:500px)]:mb-1">
           {/* Title row */}
           <div class="flex min-w-0 flex-1 items-center gap-2">
             <a
@@ -199,7 +199,7 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
                     <Button
                       variant={isSearchActive() || isSearchOpen() ? 'primary' : 'secondary'}
                       size="sm"
-                      class="h-full !px-2 md:!px-3"
+                      class="h-full !px-2 md:!px-3 [@media(max-height:500px)]:!py-0.5"
                       onClick={() => (isSearchOpen() ? closeSearch() : openSearch())}
                       title="Search items"
                     >
@@ -248,7 +248,7 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
                   <Button
                     variant="primary"
                     size="sm"
-                    class="!px-2 md:!px-3"
+                    class="!px-2 md:!px-3 [@media(max-height:500px)]:!py-0.5"
                     onClick={props.onToggleViewMode}
                   >
                     <span class="hidden md:inline">
@@ -261,7 +261,7 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
                     <Button
                       variant="secondary"
                       size="sm"
-                      class="!px-2 md:!px-3"
+                      class="!px-2 md:!px-3 [@media(max-height:500px)]:!py-0.5"
                       onClick={props.onManageBags}
                     >
                       Bags
@@ -269,7 +269,7 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
                     <Button
                       variant="secondary"
                       size="sm"
-                      class="!px-2 md:!px-3"
+                      class="!px-2 md:!px-3 [@media(max-height:500px)]:!py-0.5"
                       onClick={props.onAddItem}
                     >
                       <span class="hidden md:inline">Quick Add</span>
@@ -281,7 +281,7 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
                     <Button
                       variant="secondary"
                       size="sm"
-                      class="!hidden !px-2 md:!inline-flex md:!px-3"
+                      class="!hidden !px-2 md:!inline-flex md:!px-3 [@media(max-height:500px)]:!py-0.5"
                       onClick={props.onToggleSelectMode}
                     >
                       Select Batch
@@ -291,7 +291,7 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
                     <Button
                       variant="secondary"
                       size="sm"
-                      class="!px-2 md:!px-3"
+                      class="!px-2 md:!px-3 [@media(max-height:500px)]:!py-0.5"
                       onClick={props.onToggleSortBy}
                       title={`Currently sorting by ${props.sortBy()}. Click to switch.`}
                     >
@@ -307,7 +307,7 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
                     <Button
                       variant="secondary"
                       size="sm"
-                      class="h-full !px-2 md:!px-3"
+                      class="h-full !px-2 md:!px-3 [@media(max-height:500px)]:!py-0.5"
                       onClick={() => setShowMenu(!showMenu())}
                     >
                       <MoreVerticalIcon class="h-4 w-4" />

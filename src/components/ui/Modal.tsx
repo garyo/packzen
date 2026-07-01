@@ -31,11 +31,11 @@ export function Modal(props: ModalProps) {
         {/* Modal */}
         <div class="flex min-h-screen items-center justify-center p-4">
           <div
-            class={`relative z-10 w-full ${maxWidthClass()} rounded-lg bg-white p-6 shadow-xl`}
+            class={`relative z-10 flex max-h-[90dvh] w-full flex-col ${maxWidthClass()} rounded-lg bg-white shadow-xl`}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div class="mb-4 flex items-center justify-between">
+            <div class="flex flex-shrink-0 items-center justify-between px-6 pt-6 pb-4">
               <h2 class="text-xl font-semibold text-gray-900">{props.title}</h2>
               <button
                 onClick={props.onClose}
@@ -47,7 +47,7 @@ export function Modal(props: ModalProps) {
             </div>
 
             {/* Content */}
-            <div>{props.children}</div>
+            <div class="flex-1 overflow-y-auto px-6 pb-6">{props.children}</div>
           </div>
         </div>
       </div>
