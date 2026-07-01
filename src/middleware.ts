@@ -42,9 +42,23 @@ export const onRequest = clerkMiddleware(async (auth, context, next) => {
   // Store billing status in locals for API routes to use
   context.locals.billingStatus = billingStatus;
 
-  // CSRF protection for state-changing requests
+  // CSRF protection for state-changing requests.
+  //
+  // CSRF only threatens cookie-authenticated requests, where the browser
+  // auto-attaches credentials to a cross-site request. A request carrying a
+  // Bearer token in the Authorization header is immune: a cross-site attacker
+  // cannot set that header (doing so forces a CORS preflight we don't grant)
+  // and has no valid token. So we skip the double-submit-cookie check for
+  // Bearer-authenticated requests — which is what the app's client always
+  // sends, and which also fixes mobile browsers that drop the HttpOnly CSRF
+  // cookie. Cookie-only state-changing requests still require a matching token.
   const method = context.request.method.toUpperCase();
-  if (method === 'POST' || method === 'PUT' || method === 'PATCH' || method === 'DELETE') {
+  const isStateChanging =
+    method === 'POST' || method === 'PUT' || method === 'PATCH' || method === 'DELETE';
+  const authHeader = context.request.headers.get('authorization') ?? '';
+  const hasBearerToken = /^bearer\s+\S/i.test(authHeader);
+
+  if (isStateChanging && !hasBearerToken) {
     if (!validateCsrfToken(context.request)) {
       return new Response(JSON.stringify({ error: 'CSRF token validation failed' }), {
         status: 403,

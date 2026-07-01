@@ -1,5 +1,6 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+import { SignIn, SignedIn, SignedOut } from '@clerk/astro/components';
 ---
 
 <BaseLayout title="Sign In - PackZen">
@@ -10,34 +11,31 @@ import BaseLayout from '../layouts/BaseLayout.astro';
         <p class="text-gray-600">Sign in to access your packing lists</p>
       </div>
 
-      <div id="clerk-sign-in" class="rounded-lg bg-white p-6 shadow-md"></div>
+      <div class="flex justify-center">
+        <SignedOut>
+          <!--
+            Clerk's <SignIn> renders its own loading + error states, fixing the
+            empty-box problem. It natively reads the `redirect_url` query param
+            for the post-sign-in redirect and preserves it on the sign-up link,
+            so `fallbackRedirectUrl` only applies when `redirect_url` is absent.
+          -->
+          <SignIn signUpUrl="/sign-up" fallbackRedirectUrl="/dashboard" />
+        </SignedOut>
+        <SignedIn>
+          <p class="text-gray-600">You're already signed in. Redirecting…</p>
+        </SignedIn>
+      </div>
     </div>
   </div>
 </BaseLayout>
 
 <script>
-  import { getClerk } from '../lib/clerk';
+  import { isSignedIn } from '../lib/clerk';
 
-  async function initSignIn() {
-    const clerk = await getClerk();
-
-    // If user is already signed in, redirect to dashboard
-    if (clerk.user) {
-      window.location.href = '/dashboard';
-      return;
+  // Already signed in → go straight to the dashboard.
+  (async () => {
+    if (await isSignedIn()) {
+      window.location.replace('/dashboard');
     }
-
-    // Read redirect_url from query string
-    const params = new URLSearchParams(window.location.search);
-    const redirectUrl = params.get('redirect_url');
-
-    clerk.mountSignIn(document.getElementById('clerk-sign-in')!, {
-      signUpUrl: redirectUrl
-        ? `/sign-up?redirect_url=${encodeURIComponent(redirectUrl)}`
-        : '/sign-up',
-      fallbackRedirectUrl: redirectUrl || '/dashboard',
-    });
-  }
-
-  initSignIn();
+  })();
 </script>

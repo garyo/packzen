@@ -1,36 +1,52 @@
-import { Clerk } from '@clerk/clerk-js';
+import { $clerkStore, $isLoadedStore } from '@clerk/astro/client';
 
-// Get the publishable key from environment variables
-const clerkPubKey = import.meta.env.PUBLIC_CLERK_PUBLISHABLE_KEY;
+/**
+ * Single Clerk client managed by the `@clerk/astro` integration.
+ *
+ * The integration injects its bootstrap script on every page (via Astro's
+ * `injectScript`), so `window.Clerk` and these nanostores are always present.
+ * We read the instance from `$clerkStore` and its loaded state from
+ * `$isLoadedStore` instead of constructing our own `clerk-js` instance.
+ */
+type ClerkClient = NonNullable<ReturnType<typeof $clerkStore.get>>;
 
-if (!clerkPubKey) {
-  throw new Error('Missing PUBLIC_CLERK_PUBLISHABLE_KEY environment variable');
-}
-
-// Initialize Clerk
-let clerkInstance: Clerk | null = null;
-
-export async function getClerk(): Promise<Clerk> {
-  if (clerkInstance) {
-    return clerkInstance;
+/**
+ * Resolve once the @clerk/astro client exists and has finished loading.
+ * Returns immediately if Clerk is already loaded.
+ */
+function waitForClerk(): Promise<ClerkClient> {
+  const existing = $clerkStore.get();
+  if (existing && $isLoadedStore.get()) {
+    return Promise.resolve(existing);
   }
 
-  clerkInstance = new Clerk(clerkPubKey);
-  await clerkInstance.load();
+  return new Promise((resolve) => {
+    let unsubClerk = () => {};
+    let unsubLoaded = () => {};
 
-  return clerkInstance;
+    const check = () => {
+      const clerk = $clerkStore.get();
+      if (clerk && $isLoadedStore.get()) {
+        unsubClerk();
+        unsubLoaded();
+        resolve(clerk);
+      }
+    };
+
+    unsubClerk = $clerkStore.listen(check);
+    unsubLoaded = $isLoadedStore.listen(check);
+    check();
+  });
+}
+
+export async function getClerk(): Promise<ClerkClient> {
+  return waitForClerk();
 }
 
 // Helper to get the current session token
 export async function getSessionToken(): Promise<string | null> {
   try {
-    const clerk = await getClerk();
-
-    // Wait for Clerk to be fully loaded
-    if (!clerk.loaded) {
-      await clerk.load();
-    }
-
+    const clerk = await waitForClerk();
     return (await clerk.session?.getToken()) ?? null;
   } catch (error) {
     console.error('Error getting session token:', error);
@@ -40,24 +56,28 @@ export async function getSessionToken(): Promise<string | null> {
 
 // Helper to check if user is signed in
 export async function isSignedIn(): Promise<boolean> {
-  const clerk = await getClerk();
-  return !!clerk.user;
+  try {
+    const clerk = await waitForClerk();
+    return !!clerk.user;
+  } catch (error) {
+    console.error('Error checking sign-in state:', error);
+    return false;
+  }
 }
 
 // Helper to get current user
-export async function getCurrentUser() {
-  const clerk = await getClerk();
-
-  // Ensure Clerk is fully loaded
-  if (!clerk.loaded) {
-    await clerk.load();
+export async function getCurrentUser(): Promise<ClerkClient['user']> {
+  try {
+    const clerk = await waitForClerk();
+    return clerk.user;
+  } catch (error) {
+    console.error('Error getting current user:', error);
+    return null;
   }
-
-  return clerk.user;
 }
 
 // Sign out helper
-export async function signOut() {
-  const clerk = await getClerk();
+export async function signOut(): Promise<void> {
+  const clerk = await waitForClerk();
   await clerk.signOut();
 }

@@ -1,5 +1,6 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+import { UserProfile, SignedIn, SignedOut } from '@clerk/astro/components';
 ---
 
 <BaseLayout title="Account Settings - PackZen">
@@ -20,31 +21,26 @@ import BaseLayout from '../layouts/BaseLayout.astro';
           Back to Dashboard
         </a>
       </div>
-      <div id="user-profile"></div>
+
+      <SignedIn>
+        <div class="flex justify-center">
+          <UserProfile />
+        </div>
+      </SignedIn>
+      <SignedOut>
+        <p class="text-center text-gray-600">Redirecting to sign in…</p>
+      </SignedOut>
     </div>
   </div>
 </BaseLayout>
 
 <script>
-  import { getClerk } from '../lib/clerk';
+  import { isSignedIn } from '../lib/clerk';
 
-  async function initUserProfile() {
-    const clerk = await getClerk();
-
-    // Wait for Clerk to be fully loaded
-    if (!clerk.loaded) {
-      await clerk.load();
+  // Client-side auth gate (static output, so no server guard).
+  (async () => {
+    if (!(await isSignedIn())) {
+      window.location.replace('/sign-in?redirect_url=%2Fprofile');
     }
-
-    // Mount the UserProfile component
-    const userProfileDiv = document.getElementById('user-profile');
-    if (userProfileDiv) {
-      clerk.mountUserProfile(userProfileDiv, {
-        // Optional: You can customize the appearance here
-        // appearance: { ... }
-      });
-    }
-  }
-
-  initUserProfile();
+  })();
 </script>

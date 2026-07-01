@@ -3,27 +3,24 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 ---
 
 <BaseLayout title="PackZen - Travel Packing Made Easy">
-  <!-- Redirect logged-in users to dashboard -->
+  <!--
+    The landing page renders immediately for everyone (good for SEO and for
+    visitors where Clerk is slow/blocked — it fails open). Once Clerk loads,
+    signed-in users are redirected to the dashboard.
+  -->
   <script>
     import { isSignedIn } from '../lib/clerk';
 
-    // Hide content during auth check to prevent flash
-    document.body.style.visibility = 'hidden';
-
     (async () => {
       try {
+        // Use replace to avoid the back button returning to the landing page.
         if (await isSignedIn()) {
-          // Use replace to avoid back button returning to landing page
           window.location.replace('/dashboard');
-          return;
         }
       } catch (error) {
+        // Fail open — leave the landing page visible.
         console.error('Auth check failed:', error);
-        // Fail open - show landing page
       }
-
-      // Not signed in, show landing page
-      document.body.style.visibility = 'visible';
     })();
   </script>
 

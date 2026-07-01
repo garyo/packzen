@@ -67,9 +67,20 @@ async function getCsrfToken(): Promise<string> {
   return csrfTokenPromise;
 }
 
+/**
+ * Drop the cached CSRF token (and any in-flight fetch) so the next
+ * state-changing request fetches a fresh one. Used to recover from a stale
+ * token after the cookie has expired or been cleared.
+ */
+function clearCsrfToken(): void {
+  csrfToken = null;
+  csrfTokenPromise = null;
+}
+
 async function makeRequest<T>(
   endpoint: string,
-  options: RequestOptions = {}
+  options: RequestOptions = {},
+  csrfRetried = false
 ): Promise<ApiResponse<T>> {
   try {
     const token = await getSessionToken();
@@ -121,14 +132,13 @@ async function makeRequest<T>(
         }
       }
 
-      // Handle 403 CSRF errors by refreshing token and retrying once
-      if (response.status === 403 && errorMessage.includes('CSRF') && !options.skipErrorHandling) {
-        // Clear cached token and in-flight promise, then retry once
-        csrfToken = null;
-        csrfTokenPromise = null;
-        console.warn('CSRF token validation failed, refreshing token and retrying...');
-        // Retry the request with a fresh token
-        return makeRequest<T>(endpoint, { ...options, skipErrorHandling: true });
+      // A 403 on a state-changing request likely means a stale CSRF token
+      // (expired/cleared cookie). Clear the cached token, fetch a fresh one,
+      // and retry exactly once. `csrfRetried` guards against an infinite loop.
+      if (response.status === 403 && needsCsrf && !csrfRetried && !options.skipErrorHandling) {
+        clearCsrfToken();
+        console.warn('Request rejected with 403; refreshing CSRF token and retrying once...');
+        return makeRequest<T>(endpoint, options, true);
       }
 
       return {

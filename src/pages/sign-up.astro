@@ -1,5 +1,6 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+import { SignUp, SignedIn, SignedOut } from '@clerk/astro/components';
 ---
 
 <BaseLayout title="Sign Up - PackZen">
@@ -10,34 +11,31 @@ import BaseLayout from '../layouts/BaseLayout.astro';
         <p class="text-gray-600">Create your account to start packing smarter</p>
       </div>
 
-      <div id="clerk-sign-up" class="rounded-lg bg-white p-6 shadow-md"></div>
+      <div class="flex justify-center">
+        <SignedOut>
+          <!--
+            Clerk's <SignUp> renders its own loading + error states, fixing the
+            empty-box problem. It natively reads the `redirect_url` query param
+            for the post-sign-up redirect and preserves it on the sign-in link,
+            so `fallbackRedirectUrl` only applies when `redirect_url` is absent.
+          -->
+          <SignUp signInUrl="/sign-in" fallbackRedirectUrl="/dashboard" />
+        </SignedOut>
+        <SignedIn>
+          <p class="text-gray-600">You're already signed in. Redirecting…</p>
+        </SignedIn>
+      </div>
     </div>
   </div>
 </BaseLayout>
 
 <script>
-  import { getClerk } from '../lib/clerk';
+  import { isSignedIn } from '../lib/clerk';
 
-  async function initSignUp() {
-    const clerk = await getClerk();
-
-    // If user is already signed in, redirect to dashboard
-    if (clerk.user) {
-      window.location.href = '/dashboard';
-      return;
+  // Already signed in → go straight to the dashboard.
+  (async () => {
+    if (await isSignedIn()) {
+      window.location.replace('/dashboard');
     }
-
-    // Read redirect_url from query string
-    const params = new URLSearchParams(window.location.search);
-    const redirectUrl = params.get('redirect_url');
-
-    clerk.mountSignUp(document.getElementById('clerk-sign-up')!, {
-      signInUrl: redirectUrl
-        ? `/sign-in?redirect_url=${encodeURIComponent(redirectUrl)}`
-        : '/sign-in',
-      fallbackRedirectUrl: redirectUrl || '/dashboard',
-    });
-  }
-
-  initSignUp();
+  })();
 </script>

@@ -1,5 +1,6 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+import { PricingTable } from '@clerk/astro/components';
 ---
 
 <BaseLayout title="Pricing - PackZen">
@@ -10,35 +11,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
         <p class="text-lg text-gray-600">Start with a free trial, upgrade anytime</p>
       </div>
 
-      {/* Clerk's PricingTable component will be mounted here */}
-      <div id="pricing-table"></div>
+      <PricingTable newSubscriptionRedirectUrl="/dashboard" />
     </div>
   </div>
 </BaseLayout>
-
-<script>
-  import { getClerk } from '../lib/clerk';
-
-  async function initPricingTable() {
-    const clerk = await getClerk();
-
-    // Wait for Clerk to be fully loaded
-    if (!clerk.loaded) {
-      await clerk.load();
-    }
-
-    // Mount the PricingTable component
-    const pricingDiv = document.getElementById('pricing-table');
-    if (pricingDiv) {
-      clerk.mountPricingTable(pricingDiv, {
-        // Redirect after successful checkout
-        newSubscriptionRedirectUrl: '/dashboard',
-        // Optional: customize appearance
-        // appearance: { ... }
-      });
-      console.log('[Pricing] PricingTable mounted successfully');
-    }
-  }
-
-  initPricingTable();
-</script>

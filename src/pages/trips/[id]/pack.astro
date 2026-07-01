@@ -13,11 +13,22 @@ const { id } = Astro.params;
 <script>
   import { render } from 'solid-js/web';
   import { PackingPage } from '../../../components/trips/PackingPage';
+  import { isSignedIn } from '../../../lib/clerk';
 
-  const root = document.getElementById('app-root');
-  const tripId = root?.dataset.tripId;
+  // Client-side auth gate. Waits for Clerk to load, then either redirects to
+  // sign-in or mounts the app.
+  (async () => {
+    if (!(await isSignedIn())) {
+      const path = window.location.pathname + window.location.search;
+      window.location.replace(`/sign-in?redirect_url=${encodeURIComponent(path)}`);
+      return;
+    }
 
-  if (root && tripId) {
-    render(() => PackingPage({ tripId }), root);
-  }
+    const root = document.getElementById('app-root');
+    const tripId = root?.dataset.tripId;
+
+    if (root && tripId) {
+      render(() => PackingPage({ tripId }), root);
+    }
+  })();
 </script>

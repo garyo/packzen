@@ -9,9 +9,20 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 <script>
   import { render } from 'solid-js/web';
   import { AllItemsPage } from '../components/all-items/AllItemsPage';
+  import { isSignedIn } from '../lib/clerk';
 
-  const root = document.getElementById('app-root');
-  if (root) {
-    render(AllItemsPage, root);
-  }
+  // Client-side auth gate (static output, so no server guard). Waits for Clerk
+  // to load, then either redirects to sign-in or mounts the app.
+  (async () => {
+    if (!(await isSignedIn())) {
+      const path = window.location.pathname + window.location.search;
+      window.location.replace(`/sign-in?redirect_url=${encodeURIComponent(path)}`);
+      return;
+    }
+
+    const root = document.getElementById('app-root');
+    if (root) {
+      render(AllItemsPage, root);
+    }
+  })();
 </script>
