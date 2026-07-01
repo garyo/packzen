@@ -64,7 +64,8 @@ export function dismissToast(id: string) {
 
 export function Toast() {
   const getStyles = (type: ToastMessage['type']) => {
-    const base = 'px-4 py-3 rounded-lg shadow-lg text-white mb-2 flex items-center gap-3';
+    const base =
+      'flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-white shadow-lg mb-1.5 md:gap-3 md:px-4 md:py-3 md:text-base md:mb-2';
     switch (type) {
       case 'success':
         return `${base} bg-green-600`;
@@ -85,8 +86,8 @@ export function Toast() {
   return (
     <Show when={toasts().length > 0}>
       <Portal>
-        <div class="fixed right-4 bottom-4 z-50 flex flex-col">
-          <For each={toasts()}>
+        <div class="fixed right-4 bottom-4 z-50 flex max-w-[calc(100vw-2rem)] flex-col items-stretch md:max-w-sm">
+          <For each={toasts().slice(-3)}>
             {(toast) => (
               <div class={getStyles(toast.type)}>
                 <span class="flex-1">{toast.message}</span>

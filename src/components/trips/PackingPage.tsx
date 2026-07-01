@@ -22,7 +22,7 @@ import { LoadingSpinner } from '../ui/LoadingSpinner';
 import { EmptyState } from '../ui/EmptyState';
 import { Button } from '../ui/Button';
 import { Toast, showToast } from '../ui/Toast';
-import { getPackingProgress } from '../../lib/utils';
+import { getPackingProgress, isSmallScreen } from '../../lib/utils';
 import { AddFromMasterList } from './AddFromMasterList';
 import { BagManager } from './BagManager';
 import { EditTripItem } from './EditTripItem';
@@ -346,7 +346,10 @@ export function PackingPage(props: PackingPageProps) {
       if (!response.success) {
         showToast('error', response.error || 'Failed to update item');
         updateItemInStore(item.id, { [field]: originalValue });
-      } else {
+      } else if (!isSmallScreen()) {
+        // On phones this confirmation just obscures the screen when packing in
+        // quick succession; the checkbox already reflects the change and tapping
+        // it again is the natural undo, so skip the toast on small viewports.
         const actionText = newValue ? actionLabel : `un${actionLabel}`;
         showToast('info', `${item.name} ${actionText}`, {
           action: {

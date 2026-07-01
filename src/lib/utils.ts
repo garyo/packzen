@@ -139,6 +139,15 @@ export function cn(...classes: (string | undefined | null | false)[]): string {
   return classes.filter(Boolean).join(' ');
 }
 
+/**
+ * True on phone-sized viewports: narrow portrait or short landscape.
+ * SSR-safe (returns false when there is no window).
+ */
+export function isSmallScreen(): boolean {
+  if (typeof window === 'undefined') return false;
+  return window.matchMedia('(max-width: 767px), (max-height: 500px)').matches;
+}
+
 export function normalizeTripDates(
   startDate: string | null | undefined,
   endDate: string | null | undefined
