@@ -6,7 +6,7 @@
  * Right panel: Compact bag cards as drop targets
  */
 
-import { createSignal, createEffect, type Accessor } from 'solid-js';
+import { createSignal, createEffect, createMemo, Show, type Accessor } from 'solid-js';
 import {
   DragDropProvider,
   DragDropSensors,
@@ -91,7 +91,28 @@ export function AddModeView(props: AddModeViewProps) {
   const [dragCancelled, setDragCancelled] = createSignal(false);
   // Selected target for click-to-add (undefined means no selection)
   const [selectedTarget, setSelectedTarget] = createSignal<SelectedTarget | undefined>(undefined);
+  // Which pane is visible on mobile (<md). At md+ both panes show side-by-side.
+  const [mobilePane, setMobilePane] = createSignal<'items' | 'bags'>('bags');
   let rightPanelRef: HTMLDivElement | undefined;
+
+  // Choose a target and, on mobile, jump to the Items pane so the user can tap "+".
+  const handleSelectTarget = (target: SelectedTarget | undefined) => {
+    setSelectedTarget(target);
+    if (target) setMobilePane('items');
+  };
+
+  // Human-readable name of the current target for the mobile "Adding to:" bar.
+  const selectedTargetName = createMemo(() => {
+    const target = selectedTarget();
+    if (!target) return undefined;
+    if (target.containerId) {
+      const container = props.items()?.find((i) => i.id === target.containerId);
+      return container?.name ?? 'Container';
+    }
+    if (target.bagId === null) return 'No Bag';
+    return props.bags()?.find((b) => b.id === target.bagId)?.name ?? 'Bag';
+  });
+
   const autoScroll = usePanelAutoScroll(() => rightPanelRef);
 
   const handleDragStart = (event: DragEvent) => {
@@ -176,62 +197,116 @@ export function AddModeView(props: AddModeViewProps) {
       <DragDropSensors />
       <EscapeCancelHandler onCancel={handleCancel} />
 
-      <div class="flex h-[calc(100vh-8rem)] gap-2 p-2 md:gap-4 md:p-4">
-        {/* Left Panel - Item Sources */}
-        <div class="flex w-1/2 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-          <AddModeLeftPanel
-            activeTab={activeTab}
-            onTabChange={setActiveTab}
-            items={props.items}
-            masterItems={props.masterItems}
-            categories={props.categories}
-            onRemoveFromTrip={props.onRemoveFromTrip}
-            onAddNewItem={props.onAddNewItem}
-            isDragging={() => draggedItem() !== null}
-            selectedTarget={selectedTarget}
-            onAddToSelectedBag={handleAddToSelectedBag}
-          />
-        </div>
-
-        {/* Right Panel - Bag Cards */}
-        <div class="relative w-1/2">
-          <div
-            ref={rightPanelRef}
-            class="h-full overflow-y-auto rounded-lg border border-gray-200 bg-white p-1 shadow-sm md:p-4"
-          >
-            <AddModeBagCards
-              tripId={props.tripId}
-              items={props.items}
-              bags={props.bags}
-              categories={props.categories}
-              onBagReplaced={props.onBagReplaced}
-              selectedTarget={selectedTarget}
-              onSelectTarget={setSelectedTarget}
-            />
-          </div>
-          {/* Manage Bags FAB */}
-          {props.onManageBags && (
+      <div class="flex h-[calc(100vh-8rem)] flex-col">
+        {/* Mobile-only controls: pane toggle + "Adding to:" target bar (hidden at md+) */}
+        <div class="flex flex-col gap-2 px-2 pt-2 md:hidden">
+          <div class="flex rounded-lg bg-gray-100 p-0.5">
             <button
               type="button"
-              onClick={props.onManageBags}
-              class="absolute right-2 bottom-2 flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg hover:bg-blue-700 md:right-3 md:bottom-3 md:h-12 md:w-12"
-              title="Manage bags"
+              class="flex-1 rounded-md py-1.5 text-sm font-medium transition-colors"
+              classList={{
+                'bg-white text-blue-600 shadow-sm': mobilePane() === 'items',
+                'text-gray-600': mobilePane() !== 'items',
+              }}
+              onClick={() => setMobilePane('items')}
             >
-              <svg
-                class="h-5 w-5 md:h-6 md:w-6"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M12 4v16m8-8H4"
-                />
-              </svg>
+              Items
             </button>
-          )}
+            <button
+              type="button"
+              class="flex-1 rounded-md py-1.5 text-sm font-medium transition-colors"
+              classList={{
+                'bg-white text-blue-600 shadow-sm': mobilePane() === 'bags',
+                'text-gray-600': mobilePane() !== 'bags',
+              }}
+              onClick={() => setMobilePane('bags')}
+            >
+              Bags
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={() => setMobilePane('bags')}
+            class="flex items-center justify-between gap-2 rounded-md border border-gray-200 bg-white px-3 py-2 text-left text-sm shadow-sm"
+          >
+            <Show
+              when={selectedTargetName()}
+              fallback={<span class="text-gray-500">Tap a bag to choose where items go</span>}
+            >
+              <span class="min-w-0 flex-1 truncate text-gray-700">
+                Adding to: <span class="font-semibold text-gray-900">{selectedTargetName()}</span>
+              </span>
+            </Show>
+            <span class="flex-shrink-0 text-xs font-medium text-blue-600">Change</span>
+          </button>
+        </div>
+
+        <div class="flex min-h-0 flex-1 gap-2 p-2 md:gap-4 md:p-4">
+          {/* Left Panel - Item Sources */}
+          <div
+            class="w-full flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm md:w-1/2"
+            classList={{
+              flex: mobilePane() === 'items',
+              'hidden md:flex': mobilePane() !== 'items',
+            }}
+          >
+            <AddModeLeftPanel
+              activeTab={activeTab}
+              onTabChange={setActiveTab}
+              items={props.items}
+              masterItems={props.masterItems}
+              categories={props.categories}
+              onRemoveFromTrip={props.onRemoveFromTrip}
+              onAddNewItem={props.onAddNewItem}
+              isDragging={() => draggedItem() !== null}
+              selectedTarget={selectedTarget}
+              onAddToSelectedBag={handleAddToSelectedBag}
+            />
+          </div>
+
+          {/* Right Panel - Bag Cards */}
+          <div
+            class="relative w-full md:block md:w-1/2"
+            classList={{ 'hidden md:block': mobilePane() !== 'bags' }}
+          >
+            <div
+              ref={rightPanelRef}
+              class="h-full overflow-y-auto rounded-lg border border-gray-200 bg-white p-1 shadow-sm md:p-4"
+            >
+              <AddModeBagCards
+                tripId={props.tripId}
+                items={props.items}
+                bags={props.bags}
+                categories={props.categories}
+                onBagReplaced={props.onBagReplaced}
+                selectedTarget={selectedTarget}
+                onSelectTarget={handleSelectTarget}
+              />
+            </div>
+            {/* Manage Bags FAB */}
+            {props.onManageBags && (
+              <button
+                type="button"
+                onClick={props.onManageBags}
+                class="absolute right-2 bottom-2 flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg hover:bg-blue-700 md:right-3 md:bottom-3 md:h-12 md:w-12"
+                title="Manage bags"
+              >
+                <svg
+                  class="h-5 w-5 md:h-6 md:w-6"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M12 4v16m8-8H4"
+                  />
+                </svg>
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

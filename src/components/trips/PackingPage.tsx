@@ -1403,7 +1403,7 @@ export function PackingPage(props: PackingPageProps) {
 
       {/* Back Button */}
       <Show when={!selectMode() || selectedItems().size === 0}>
-        <div class="fixed bottom-4 left-4">
+        <div class="fixed bottom-4 left-4 hidden md:block">
           <a
             href="/trips"
             class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-3 shadow-lg hover:bg-gray-50"

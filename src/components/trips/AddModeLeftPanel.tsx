@@ -129,7 +129,7 @@ function DraggableSourceItem(props: DraggableItemProps) {
       <Show when={props.canClickToAdd && !props.isInTrip}>
         <button
           type="button"
-          class="ml-1 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-green-500 text-white hover:bg-green-600"
+          class="ml-1 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-green-500 text-white hover:bg-green-600 md:h-6 md:w-6"
           onClick={(e) => {
             e.stopPropagation();
             props.onClickAdd?.();

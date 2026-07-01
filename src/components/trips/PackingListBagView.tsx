@@ -793,7 +793,7 @@ function PackingListBagViewInner(props: PackingListBagViewProps) {
                     </For>
                   </Show>
                   <Show when={bagContainers().length > 0}>
-                    <div class="mt-4 space-y-4 border-l-2 border-blue-100 pl-4 md:mt-2 md:space-y-2 md:pl-3">
+                    <div class="mt-3 space-y-3 border-l-2 border-blue-100 pl-3 md:mt-2 md:space-y-2 md:pl-3">
                       <For each={bagContainers()}>
                         {(container) => {
                           const contents = () => getContainerContents(container.id);
@@ -809,9 +809,9 @@ function PackingListBagViewInner(props: PackingListBagViewProps) {
                             <DroppableContainerSection containerId={container.id}>
                               <div
                                 id={`container-section-${container.id}`}
-                                class="rounded-lg border border-blue-100 bg-blue-50/40 p-3 shadow-sm md:p-2"
+                                class="rounded-lg border border-blue-100 bg-blue-50/40 p-2.5 shadow-sm md:p-2"
                               >
-                                <div class="mb-2 flex items-center gap-2">
+                                <div class="mb-1.5 flex items-center gap-2 md:mb-2">
                                   <span class="text-base md:text-sm">{containerIcon()}</span>
                                   <h3 class="flex-1 font-semibold text-gray-800">
                                     {container.name}
@@ -918,7 +918,7 @@ function PackingListBagViewInner(props: PackingListBagViewProps) {
                                 <Show
                                   when={contents().length > 0}
                                   fallback={
-                                    <p class="text-sm text-gray-500">
+                                    <p class="text-xs text-gray-500 md:text-sm">
                                       No items yet. Drag items here or use the + button.
                                     </p>
                                   }

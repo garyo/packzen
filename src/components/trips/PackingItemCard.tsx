@@ -73,7 +73,7 @@ export function PackingItemCard(props: PackingItemCardProps) {
     <div
       id={`trip-item-${props.item.id}`}
       data-trip-item-id={props.item.id}
-      class={`flex items-center gap-2 rounded-lg p-3 shadow-sm md:p-2 ${
+      class={`flex items-center gap-1.5 rounded-lg p-2.5 shadow-sm md:gap-2 md:p-2 ${
         isContainer() ? 'border border-blue-200 bg-blue-50' : 'bg-white'
       } ${props.item.is_skipped ? 'bg-gray-100 opacity-50' : ''} ${props.item.is_packed && !props.item.is_skipped ? 'opacity-60' : ''} ${props.selectMode && props.isSelected ? 'ring-2 ring-blue-500' : ''} ${props.isDragging ? 'opacity-50' : ''}`}
     >
@@ -115,7 +115,7 @@ export function PackingItemCard(props: PackingItemCardProps) {
             </span>
           </Show>
           <div
-            class={`min-w-0 flex-1 overflow-hidden text-lg font-medium text-ellipsis whitespace-nowrap md:text-base ${props.item.is_skipped ? 'text-gray-400 italic' : props.item.is_packed ? 'text-gray-500 line-through' : 'text-gray-900'}`}
+            class={`line-clamp-2 min-w-0 flex-1 text-lg font-medium break-words md:text-base ${props.item.is_skipped ? 'text-gray-400 italic' : props.item.is_packed ? 'text-gray-500 line-through' : 'text-gray-900'}`}
           >
             {props.item.name}
             <Show when={props.item.is_skipped}>

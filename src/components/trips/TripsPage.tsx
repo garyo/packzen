@@ -112,6 +112,7 @@ export function TripsPage() {
               </Button>
               <Button
                 size="sm"
+                class="whitespace-nowrap"
                 onClick={() => {
                   setEditingTrip(null);
                   setShowForm(true);
