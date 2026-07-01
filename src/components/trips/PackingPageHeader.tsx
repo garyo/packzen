@@ -118,9 +118,9 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
     <header class="relative flex-shrink-0 border-b border-gray-200 bg-white">
       <div class="container mx-auto px-4 py-4 lg:py-2 [@media(max-height:500px)]:!py-1">
         {/* Two-row layout on mobile/tablet, single row on desktop */}
-        <div class="mb-3 flex flex-col gap-2 lg:mb-2 lg:flex-row lg:items-center lg:justify-between [@media(max-height:500px)]:mb-1">
+        <div class="mb-3 flex flex-col gap-2 lg:mb-2 lg:flex-row lg:items-center lg:justify-between [@media(max-height:500px)]:mb-1 [@media(max-height:500px)]:flex-row [@media(max-height:500px)]:flex-wrap [@media(max-height:500px)]:items-center [@media(max-height:500px)]:justify-between">
           {/* Title row */}
-          <div class="flex min-w-0 flex-1 items-center gap-2">
+          <div class="flex min-w-0 flex-1 items-center gap-2 [@media(max-height:500px)]:min-w-[16rem]">
             <a
               href="/dashboard"
               class="flex flex-shrink-0 items-center text-gray-600 hover:text-gray-900"
@@ -155,7 +155,7 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
                 </button>
               </div>
               <Show
-                when={props.showUnpackedOnly()}
+                when={props.showUnpackedOnly() && props.viewMode() === 'pack'}
                 fallback={
                   <p class="text-xs text-gray-600">
                     {props.packedCount()} of {props.totalCount() - props.skippedCount()} packed
