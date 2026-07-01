@@ -82,6 +82,10 @@ export interface BuiltInItem {
   default_quantity: number;
   trip_types: string[]; // Array of trip_type IDs
   is_container?: boolean;
+  /** Universal core item: belongs in every trip type's starter list. */
+  essential?: boolean;
+  /** Situational essential: belongs only in these trip types' starter lists. */
+  essential_trip_types?: string[];
 }
 
 export interface BuiltInItemsData {

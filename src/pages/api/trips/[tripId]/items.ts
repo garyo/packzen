@@ -1,11 +1,13 @@
 export const prerender = false;
 
 import type { APIRoute } from 'astro';
+import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { eq, and, asc, count, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { tripItems, trips, bags } from '../../../../../db/schema';
 import {
   tripItemCreateSchema,
+  tripItemBatchCreateSchema,
   tripItemUpdateSchema,
   validateRequestSafe,
 } from '../../../../lib/validation';
@@ -67,6 +69,12 @@ export const POST: APIRoute = async (context) => {
 
     // Validate request body
     const body = await context.request.json();
+
+    // Batch path: `{ items: [...] }` adds many items in one request (starter lists).
+    if (body && typeof body === 'object' && Array.isArray((body as { items?: unknown }).items)) {
+      return await handleBatchCreate(context, db, userId, billingStatus, tripId, body);
+    }
+
     const validation = validateRequestSafe(tripItemCreateSchema, body);
     if (!validation.success) {
       return errorResponse(validation.error, 400);
@@ -207,6 +215,96 @@ export const POST: APIRoute = async (context) => {
     return handleApiError(error, 'create trip item');
   }
 };
+
+/**
+ * Add many trip items in one request (e.g. a one-tap starter list).
+ * Inserts all rows in a single D1 operation, dedups by name (case-insensitive)
+ * against existing items and within the batch, and logs a sync event per row so
+ * batched items are indistinguishable from individually-added ones.
+ */
+async function handleBatchCreate(
+  context: Parameters<APIRoute>[0],
+  db: DrizzleD1Database,
+  userId: string,
+  billingStatus: Parameters<typeof checkTripItemLimit>[1],
+  tripId: string,
+  body: unknown
+): Promise<Response> {
+  const validation = validateRequestSafe(tripItemBatchCreateSchema, body);
+  if (!validation.success) {
+    return errorResponse(validation.error, 400);
+  }
+
+  // Verify trip ownership
+  const trip = await db
+    .select()
+    .from(trips)
+    .where(and(eq(trips.id, tripId), eq(trips.clerk_user_id, userId)))
+    .get();
+
+  if (!trip) {
+    return errorResponse('Trip not found', 404);
+  }
+
+  // Existing items: used both for the resource limit and for dedup.
+  const existing = await db
+    .select({ name: tripItems.name })
+    .from(tripItems)
+    .where(eq(tripItems.trip_id, tripId))
+    .all();
+
+  const limitCheck = checkTripItemLimit(existing.length, billingStatus);
+  if (!limitCheck.allowed) {
+    return errorResponse(limitCheck.message!, 403);
+  }
+
+  // Dedup case-insensitively against existing items and within the batch itself.
+  const seenNames = new Set(existing.map((i) => i.name.toLowerCase()));
+  const rows: (typeof tripItems.$inferInsert)[] = [];
+  for (const item of validation.data.items) {
+    const key = item.name.toLowerCase();
+    if (seenNames.has(key)) continue;
+    seenNames.add(key);
+    rows.push({
+      trip_id: tripId,
+      name: item.name,
+      category_name: item.category_name || null,
+      quantity: item.quantity || 1,
+      bag_id: item.bag_id || null,
+      master_item_id: item.master_item_id || null,
+      container_item_id: item.container_item_id || null,
+      is_container: item.is_container || false,
+      is_packed: item.is_packed ?? false,
+      is_skipped: item.is_skipped ?? false,
+      notes: item.notes || null,
+    });
+  }
+
+  // Cap to the remaining room under the per-trip item limit.
+  const room = limitCheck.maxAllowed - existing.length;
+  const toInsert = rows.slice(0, room);
+
+  if (toInsert.length === 0) {
+    return successResponse([], 200);
+  }
+
+  // D1 caps bound variables at 100 per query and each row spans many columns,
+  // so insert in small chunks to stay well under the limit.
+  const CHUNK_SIZE = 6;
+  const inserted: (typeof tripItems.$inferSelect)[] = [];
+  for (let i = 0; i < toInsert.length; i += CHUNK_SIZE) {
+    const chunk = toInsert.slice(i, i + CHUNK_SIZE);
+    const rows = await db.insert(tripItems).values(chunk).returning().all();
+    inserted.push(...rows);
+  }
+
+  const sourceId = getSourceId(context.request);
+  for (const row of inserted) {
+    logChange(db, userId, 'tripItem', row.id, tripId, 'create', row, sourceId);
+  }
+
+  return successResponse(inserted, 201);
+}
 
 export const PATCH: APIRoute = createPatchHandler<
   z.infer<typeof tripItemUpdateSchema>,

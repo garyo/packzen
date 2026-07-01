@@ -24,6 +24,24 @@ export function getItemsByTripType(tripTypeId: string): BuiltInItem[] {
   return builtInItems.items.filter((item) => item.trip_types.includes(tripTypeId));
 }
 
+// Categories excluded from generic starter lists: situational for a subset of
+// travelers, with no dedicated family trip type. Still browsable in the Built-in browser.
+const STARTER_EXCLUDED_CATEGORIES = new Set(['Baby', 'Children']);
+
+/**
+ * Get the curated "starter essentials" for a trip type.
+ * Resolves to universal core items (essential: true) plus this trip type's
+ * situational essentials (essential_trip_types), minus excluded categories.
+ * Decoupled from the noisy trip_types tags.
+ */
+export function getStarterItems(tripTypeId: string): BuiltInItem[] {
+  return builtInItems.items.filter(
+    (item) =>
+      !STARTER_EXCLUDED_CATEGORIES.has(item.category) &&
+      (item.essential === true || item.essential_trip_types?.includes(tripTypeId))
+  );
+}
+
 /**
  * Get items by multiple trip types (intersection)
  * Returns items that have ALL the specified trip types

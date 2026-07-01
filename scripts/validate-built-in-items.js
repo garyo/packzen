@@ -117,6 +117,29 @@ function validateBuiltInItems() {
       errors.push(`${itemLabel}: trip_types must be an array`);
     }
 
+    // Starter essentials fields (both optional; an item uses at most one)
+    if (item.essential !== undefined && typeof item.essential !== 'boolean') {
+      errors.push(`${itemLabel}: essential must be a boolean`);
+    }
+    if (item.essential_trip_types !== undefined) {
+      if (!Array.isArray(item.essential_trip_types)) {
+        errors.push(`${itemLabel}: essential_trip_types must be an array`);
+      } else {
+        item.essential_trip_types.forEach((tripType) => {
+          if (!tripTypeIds.has(tripType)) {
+            errors.push(`${itemLabel}: Unknown essential_trip_type "${tripType}"`);
+          } else if (Array.isArray(item.trip_types) && !item.trip_types.includes(tripType)) {
+            errors.push(
+              `${itemLabel}: essential_trip_type "${tripType}" not in item's own trip_types`
+            );
+          }
+        });
+      }
+    }
+    if (item.essential === true && Array.isArray(item.essential_trip_types)) {
+      errors.push(`${itemLabel}: cannot set both essential and essential_trip_types`);
+    }
+
     // Check category exists
     if (item.category && !categoryNames.has(item.category)) {
       errors.push(`${itemLabel}: Unknown category "${item.category}"`);

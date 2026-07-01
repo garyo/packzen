@@ -75,12 +75,21 @@ items:
     category: 'Clothing'
     default_quantity: 5
     trip_types: ['overnight', 'weekend', 'week', 'beach']
+    essential: true
 
   - name: 'Short sleeve shirts'
     description: 'Casual button-up or polo shirts'
     category: 'Clothing'
     default_quantity: 3
     trip_types: ['weekend', 'week', 'business', 'beach']
+
+  - name: 'Underwear'
+    description: 'Underwear (any style)'
+    category: 'Undergarments'
+    default_quantity: 7
+    trip_types:
+      ['overnight', 'weekend', 'week', 'beach', 'business', 'international', 'hiking', 'ski']
+    essential: true
 
   - name: 'Panties'
     description: 'Underwear/panties'
@@ -93,12 +102,14 @@ items:
     category: 'Undergarments'
     default_quantity: 7
     trip_types: ['overnight', 'weekend', 'week', 'business', 'hiking']
+    essential: true
 
   - name: 'Pants/Jeans'
     description: 'Casual pants or jeans'
     category: 'Clothing'
     default_quantity: 2
     trip_types: ['overnight', 'weekend', 'week', 'business']
+    essential: true
 
   - name: 'Shorts'
     description: 'Casual shorts'
@@ -111,6 +122,7 @@ items:
     category: 'Clothing'
     default_quantity: 1
     trip_types: ['weekend', 'week', 'business', 'hiking']
+    essential: true
 
   - name: 'Sweatshirt/Hoodie'
     description: 'Casual pullover sweatshirt'
@@ -123,6 +135,7 @@ items:
     category: 'Clothing'
     default_quantity: 2
     trip_types: ['weekend', 'week', 'business']
+    essential_trip_types: ['business']
 
   - name: 'Bra'
     description: 'Undergarment bra'
@@ -165,18 +178,21 @@ items:
     category: 'Undergarments'
     default_quantity: 2
     trip_types: ['overnight', 'weekend', 'week', 'business']
+    essential: true
 
   - name: 'Dress shirt'
     description: 'Button-up dress shirt'
     category: 'Clothing'
     default_quantity: 2
     trip_types: ['business', 'week']
+    essential_trip_types: ['business']
 
   - name: 'Dress pants'
     description: 'Formal or business pants'
     category: 'Clothing'
     default_quantity: 2
     trip_types: ['business']
+    essential_trip_types: ['business']
 
   - name: 'Belt'
     description: 'Leather belt'
@@ -189,36 +205,42 @@ items:
     category: 'Clothing'
     default_quantity: 1
     trip_types: ['overnight', 'weekend', 'week', 'business']
+    essential: true
 
   - name: 'Dress shoes'
     description: 'Formal shoes'
     category: 'Clothing'
     default_quantity: 1
     trip_types: ['business']
+    essential_trip_types: ['business']
 
   - name: 'Sandals/Flip-flops'
     description: 'Casual footwear'
     category: 'Clothing'
     default_quantity: 1
     trip_types: ['beach', 'weekend', 'week']
+    essential_trip_types: ['beach']
 
   - name: 'Hat'
     description: 'Sun hat or cap'
     category: 'Accessories'
     default_quantity: 1
     trip_types: ['beach', 'hiking', 'week']
+    essential_trip_types: ['beach']
 
   - name: 'Sunglasses'
     description: 'UV protection sunglasses'
     category: 'Clothing'
     default_quantity: 1
     trip_types: ['beach', 'hiking', 'week', 'weekend']
+    essential_trip_types: ['beach']
 
   - name: 'Raincoat'
     description: 'Waterproof jacket'
     category: 'Clothing'
     default_quantity: 1
     trip_types: ['hiking', 'week']
+    essential_trip_types: ['hiking']
 
   # Undergarments (new items)
   - name: 'Robe'
@@ -281,12 +303,14 @@ items:
     category: 'Toiletries'
     default_quantity: 1
     trip_types: ['overnight', 'weekend', 'week', 'business', 'beach', 'hiking']
+    essential: true
 
   - name: 'Toothpaste'
     description: 'Travel-size toothpaste'
     category: 'Toiletries'
     default_quantity: 1
     trip_types: ['overnight', 'weekend', 'week', 'business', 'beach', 'hiking']
+    essential: true
 
   - name: 'Dental floss'
     description: 'Dental floss for oral hygiene'
@@ -299,6 +323,7 @@ items:
     category: 'Toiletries'
     default_quantity: 1
     trip_types: ['overnight', 'weekend', 'week', 'business', 'hiking']
+    essential: true
 
   - name: 'Conditioner'
     description: 'Travel-size conditioner'
@@ -317,6 +342,7 @@ items:
     category: 'Toiletries'
     default_quantity: 1
     trip_types: ['overnight', 'weekend', 'week', 'business', 'beach', 'hiking']
+    essential: true
 
   - name: 'Face wash'
     description: 'Facial cleanser'
@@ -335,6 +361,7 @@ items:
     category: 'Toiletries'
     default_quantity: 1
     trip_types: ['beach', 'hiking', 'week']
+    essential_trip_types: ['beach']
 
   - name: 'Razor'
     description: 'Shaving razor'
@@ -353,6 +380,7 @@ items:
     category: 'Toiletries'
     default_quantity: 1
     trip_types: ['overnight', 'weekend', 'week', 'business']
+    essential: true
 
   - name: 'Hair dryer'
     description: 'Travel hair dryer'
@@ -462,18 +490,21 @@ items:
     category: 'Electronics'
     default_quantity: 1
     trip_types: ['overnight', 'weekend', 'week', 'business', 'beach', 'hiking']
+    essential: true
 
   - name: 'Laptop'
     description: 'Work or personal laptop'
     category: 'Electronics'
     default_quantity: 1
     trip_types: ['business', 'week']
+    essential_trip_types: ['business']
 
   - name: 'Laptop charger'
     description: 'Laptop power adapter'
     category: 'Electronics'
     default_quantity: 1
     trip_types: ['business', 'week']
+    essential_trip_types: ['business']
 
   - name: 'Headphones'
     description: 'Earbuds or over-ear headphones'
@@ -504,6 +535,7 @@ items:
     category: 'Electronics'
     default_quantity: 1
     trip_types: ['week', 'business', 'international']
+    essential_trip_types: ['international']
 
   - name: 'Voltage converter'
     description: 'Converter for high-wattage devices when abroad'
@@ -516,6 +548,7 @@ items:
     category: 'Electronics'
     default_quantity: 1
     trip_types: ['international']
+    essential_trip_types: ['international']
 
   - name: 'E-reader'
     description: 'Kindle or similar e-reader'
@@ -571,6 +604,7 @@ items:
     category: 'Documents'
     default_quantity: 1
     trip_types: ['week', 'business', 'international']
+    essential_trip_types: ['international']
 
   - name: 'Visa documents'
     description: 'Entry visas, ESTA approvals, or invitation letters'
@@ -589,12 +623,14 @@ items:
     category: 'Documents'
     default_quantity: 1
     trip_types: ['overnight', 'weekend', 'week', 'business', 'international']
+    essential: true
 
   - name: 'Travel tickets'
     description: 'Flight, train, or bus tickets'
     category: 'Documents'
     default_quantity: 1
     trip_types: ['weekend', 'week', 'business', 'international']
+    essential_trip_types: ['international']
 
   - name: 'Hotel confirmation'
     description: 'Printed or digital hotel reservation'
@@ -607,12 +643,14 @@ items:
     category: 'Documents'
     default_quantity: 1
     trip_types: ['overnight', 'weekend', 'week', 'business', 'hiking', 'international']
+    essential_trip_types: ['international']
 
   - name: 'Credit cards'
     description: 'Payment cards'
     category: 'Documents'
     default_quantity: 2
     trip_types: ['overnight', 'weekend', 'week', 'business', 'beach', 'international']
+    essential: true
 
   - name: 'Cash'
     description: 'Local currency'
@@ -638,12 +676,14 @@ items:
     category: 'Health'
     default_quantity: 7
     trip_types: ['overnight', 'weekend', 'week', 'business', 'beach', 'hiking']
+    essential: true
 
   - name: 'Pain reliever'
     description: 'Ibuprofen or acetaminophen'
     category: 'Health'
     default_quantity: 10
     trip_types: ['overnight', 'weekend', 'week', 'business', 'hiking']
+    essential: true
 
   - name: 'Allergy medication'
     description: 'Antihistamines'
@@ -662,6 +702,7 @@ items:
     category: 'Health'
     default_quantity: 1
     trip_types: ['hiking', 'week']
+    essential_trip_types: ['hiking']
 
   - name: 'Vitamins'
     description: 'Daily vitamin supplements'
@@ -692,6 +733,7 @@ items:
     category: 'Health'
     default_quantity: 1
     trip_types: ['hiking', 'beach']
+    essential_trip_types: ['hiking']
 
   - name: 'After-sun lotion'
     description: 'Aloe vera gel for sunburn'
@@ -729,12 +771,14 @@ items:
     category: 'Beach/Pool'
     default_quantity: 2
     trip_types: ['beach', 'week']
+    essential_trip_types: ['beach']
 
   - name: 'Beach towel'
     description: 'Large towel for beach or pool'
     category: 'Beach/Pool'
     default_quantity: 1
     trip_types: ['beach', 'week']
+    essential_trip_types: ['beach']
 
   - name: 'Goggles'
     description: 'Swimming goggles'
@@ -772,12 +816,14 @@ items:
     category: 'Outdoor'
     default_quantity: 1
     trip_types: ['hiking']
+    essential_trip_types: ['hiking']
 
   - name: 'Backpack'
     description: 'Day hiking backpack'
     category: 'Outdoor'
     default_quantity: 1
     trip_types: ['hiking']
+    essential_trip_types: ['hiking']
 
   - name: 'Tent'
     description: 'Camping tent'
@@ -814,6 +860,7 @@ items:
     category: 'Outdoor'
     default_quantity: 2
     trip_types: ['hiking', 'beach', 'week']
+    essential_trip_types: ['hiking']
 
   - name: 'Hydration pack'
     description: 'CamelBak or similar hydration system'
@@ -1263,30 +1310,35 @@ items:
     category: 'Clothing'
     default_quantity: 1
     trip_types: ['ski', 'week']
+    essential_trip_types: ['ski']
 
   - name: 'Ski pants'
     description: 'Waterproof ski pants'
     category: 'Clothing'
     default_quantity: 1
     trip_types: ['ski', 'week']
+    essential_trip_types: ['ski']
 
   - name: 'Thermal underwear'
     description: 'Base layer thermal clothing'
     category: 'Clothing'
     default_quantity: 2
     trip_types: ['ski', 'hiking']
+    essential_trip_types: ['ski']
 
   - name: 'Ski gloves'
     description: 'Insulated waterproof gloves'
     category: 'Clothing'
     default_quantity: 2
     trip_types: ['ski']
+    essential_trip_types: ['ski']
 
   - name: 'Ski goggles'
     description: 'Snow goggles with UV protection'
     category: 'Clothing'
     default_quantity: 1
     trip_types: ['ski']
+    essential_trip_types: ['ski']
 
   - name: 'Neck warmer/Balaclava'
     description: 'Face and neck protection'
@@ -1305,12 +1357,14 @@ items:
     category: 'Clothing'
     default_quantity: 1
     trip_types: ['ski', 'hiking']
+    essential_trip_types: ['ski']
 
   - name: 'Ski helmet'
     description: 'Safety helmet for skiing'
     category: 'Outdoor'
     default_quantity: 1
     trip_types: ['ski']
+    essential_trip_types: ['ski']
 
   - name: 'Skis'
     description: 'Downhill or cross-country skis'

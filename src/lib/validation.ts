@@ -172,6 +172,11 @@ export const tripItemCreateSchema = z.object({
   merge_duplicates: z.boolean().default(true),
 });
 
+// Batch create: add many trip items in a single request (e.g. a starter list)
+export const tripItemBatchCreateSchema = z.object({
+  items: z.array(tripItemCreateSchema).min(1).max(500),
+});
+
 export const tripItemUpdateSchema = z.object({
   id: z.string().uuid(),
   name: sanitizeString(MAX_NAME_LENGTH).optional(),
@@ -197,6 +202,7 @@ export type BagUpdate = z.infer<typeof bagUpdateSchema>;
 export type BagTemplateCreate = z.infer<typeof bagTemplateCreateSchema>;
 export type BagTemplateUpdate = z.infer<typeof bagTemplateUpdateSchema>;
 export type TripItemCreate = z.infer<typeof tripItemCreateSchema>;
+export type TripItemBatchCreate = z.infer<typeof tripItemBatchCreateSchema>;
 export type TripItemUpdate = z.infer<typeof tripItemUpdateSchema>;
 
 /**

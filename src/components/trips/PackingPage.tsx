@@ -2,6 +2,7 @@ import {
   createSignal,
   createResource,
   Show,
+  For,
   onMount,
   createMemo,
   createEffect,
@@ -34,7 +35,7 @@ import { PackingListCategoryView } from './PackingListCategoryView';
 import { AddModeView } from './AddModeView';
 import { SelectModeActionBar } from './SelectModeActionBar';
 import { BuiltInItemsBrowser } from '../built-in-items/BuiltInItemsBrowser';
-import { builtInItems } from '../../lib/built-in-items';
+import { builtInItems, getStarterItems } from '../../lib/built-in-items';
 import { fetchWithErrorHandling, fetchSingleWithErrorHandling } from '../../lib/resource-helpers';
 import { syncManager } from '../../lib/sync-manager';
 import { tripToYAML, downloadYAML } from '../../lib/yaml';
@@ -63,6 +64,10 @@ export function PackingPage(props: PackingPageProps) {
   const [searchQuery, setSearchQuery] = createSignal('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = createSignal('');
   const [pendingScrollItemId, setPendingScrollItemId] = createSignal<string | null>(null);
+
+  // One-tap starter list (shown in the empty state)
+  const [starterDismissed, setStarterDismissed] = createSignal(false);
+  const [addingStarter, setAddingStarter] = createSignal<string | null>(null);
 
   // Debounce search query to avoid filtering on every keystroke
   createEffect(() => {
@@ -312,18 +317,6 @@ export function PackingPage(props: PackingPageProps) {
       refetchTrip();
     });
     onCleanup(unsubTrip);
-  });
-
-  // Start in Add Mode if trip has no items (first time load only)
-  let hasSetInitialMode = false;
-  createEffect(() => {
-    const loadedItems = items();
-    if (!hasSetInitialMode && loadedItems !== undefined) {
-      hasSetInitialMode = true;
-      if (loadedItems.length === 0) {
-        setViewMode('add');
-      }
-    }
   });
 
   // Generic optimistic toggle with undo support
@@ -1023,6 +1016,49 @@ export function PackingPage(props: PackingPageProps) {
     }
   };
 
+  // One-tap starter list: add a whole trip type's built-in items in one batch.
+  // Items go in unassigned (no bag) and are deduped by name against what's already
+  // on the trip, so tapping several chips (or the same chip twice) never duplicates.
+  const handleAddStarterList = async (tripTypeId: string) => {
+    if (addingStarter()) return;
+
+    const existingNames = new Set((items() ?? []).map((i) => i.name.toLowerCase()));
+    const payload = getStarterItems(tripTypeId)
+      .filter((item) => !existingNames.has(item.name.toLowerCase()))
+      .map((item) => ({
+        name: item.name,
+        category_name: item.category,
+        quantity: item.default_quantity,
+        notes: item.description,
+        is_container: item.is_container || false,
+        bag_id: null,
+        master_item_id: null,
+      }));
+
+    if (payload.length === 0) {
+      showToast('info', 'Those items are already on your list');
+      return;
+    }
+
+    setAddingStarter(tripTypeId);
+    try {
+      const response = await api.post<TripItem[]>(endpoints.tripItems(props.tripId), {
+        items: payload,
+      });
+
+      if (response.success && response.data) {
+        response.data.forEach((item) => addItemToStore(item));
+        showToast('success', `Added ${response.data.length} items`);
+      } else {
+        showToast('error', (response as { error?: string }).error || 'Failed to add items');
+      }
+    } catch {
+      showToast('error', 'Failed to add items');
+    } finally {
+      setAddingStarter(null);
+    }
+  };
+
   // Handler for adding master items from Add mode drag-drop
   const handleAddMasterItemFromAddMode = async (
     masterItem: MasterItemWithCategory,
@@ -1215,11 +1251,52 @@ export function PackingPage(props: PackingPageProps) {
                 <Show
                   when={totalCount() > 0}
                   fallback={
-                    <EmptyState
-                      icon="📦"
-                      title="No items yet"
-                      description="Add items to your packing list to get started"
-                    />
+                    <Show
+                      when={!starterDismissed()}
+                      fallback={
+                        <EmptyState
+                          icon="📦"
+                          title="No items yet"
+                          description="Use “Add More Items” above to build your packing list."
+                        />
+                      }
+                    >
+                      <div class="mx-auto max-w-2xl px-4 py-10 text-center">
+                        <div class="mb-3 text-5xl">🧳</div>
+                        <h3 class="mb-1 text-xl font-semibold text-gray-900">
+                          Start your packing list
+                        </h3>
+                        <p class="mb-6 text-gray-600">
+                          Tap a trip type to add the essentials instantly. Combine as many as you
+                          like.
+                        </p>
+                        <div class="flex flex-wrap justify-center gap-2 sm:gap-3">
+                          <For each={builtInItems.trip_types}>
+                            {(tripType) => (
+                              <button
+                                type="button"
+                                onClick={() => handleAddStarterList(tripType.id)}
+                                disabled={addingStarter() !== null}
+                                aria-busy={addingStarter() === tripType.id}
+                                class="flex min-w-[7rem] flex-col items-center rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm transition-colors hover:border-blue-400 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                <span class="font-medium text-gray-900">{tripType.name}</span>
+                                <span class="mt-0.5 text-xs text-gray-500">
+                                  {tripType.description}
+                                </span>
+                              </button>
+                            )}
+                          </For>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setStarterDismissed(true)}
+                          class="mt-6 text-sm text-gray-500 underline-offset-2 hover:text-gray-700 hover:underline"
+                        >
+                          I’ll add my own
+                        </button>
+                      </div>
+                    </Show>
                   }
                 >
                   <Show
