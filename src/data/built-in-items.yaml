@@ -135,13 +135,23 @@ items:
     category: 'Clothing'
     default_quantity: 2
     trip_types: ['weekend', 'week', 'business']
-    essential_trip_types: ['business']
+    essential_trip_types: ['weekend', 'week', 'business']
+    essential_modifiers: ['feminine']
+
+  - name: 'Blouse'
+    description: 'Dressy top'
+    category: 'Clothing'
+    default_quantity: 2
+    trip_types: ['weekend', 'week', 'business']
+    essential_trip_types: ['weekend', 'week', 'business']
+    essential_modifiers: ['feminine']
 
   - name: 'Bra'
     description: 'Undergarment bra'
     category: 'Undergarments'
     default_quantity: 3
     trip_types: ['overnight', 'weekend', 'week', 'business', 'beach', 'hiking']
+    essential_modifiers: ['feminine']
 
   - name: 'Scarf'
     description: 'Fashion or warm scarf'
@@ -160,6 +170,8 @@ items:
     category: 'Clothing'
     default_quantity: 1
     trip_types: ['business']
+    essential_trip_types: ['business']
+    essential_modifiers: ['masculine']
 
   - name: 'Sneakers'
     description: 'Athletic or casual sneakers'
@@ -395,6 +407,7 @@ items:
     category: 'Toiletries'
     default_quantity: 1
     trip_types: ['overnight', 'weekend', 'week', 'business']
+    essential_modifiers: ['feminine']
 
   - name: 'Makeup remover'
     description: 'Makeup remover wipes or solution'
@@ -437,6 +450,7 @@ items:
     category: 'Toiletries'
     default_quantity: 10
     trip_types: ['overnight', 'weekend', 'week', 'business', 'beach', 'hiking']
+    essential_modifiers: ['feminine']
 
   - name: 'Hand sanitizer'
     description: 'Antibacterial hand gel'
@@ -537,7 +551,7 @@ items:
     category: 'Electronics'
     default_quantity: 1
     trip_types: ['week', 'business', 'international']
-    essential_trip_types: ['international']
+    essential_modifiers: ['international']
 
   - name: 'Voltage converter'
     description: 'Converter for high-wattage devices when abroad'
@@ -550,7 +564,7 @@ items:
     category: 'Electronics'
     default_quantity: 1
     trip_types: ['international']
-    essential_trip_types: ['international']
+    essential_modifiers: ['international']
 
   - name: 'E-reader'
     description: 'Kindle or similar e-reader'
@@ -606,7 +620,7 @@ items:
     category: 'Documents'
     default_quantity: 1
     trip_types: ['week', 'business', 'international']
-    essential_trip_types: ['international']
+    essential_modifiers: ['international']
 
   - name: 'Visa documents'
     description: 'Entry visas, ESTA approvals, or invitation letters'
@@ -632,7 +646,7 @@ items:
     category: 'Documents'
     default_quantity: 1
     trip_types: ['weekend', 'week', 'business', 'international']
-    essential_trip_types: ['international']
+    essential_modifiers: ['international']
 
   - name: 'Hotel confirmation'
     description: 'Printed or digital hotel reservation'
@@ -645,7 +659,7 @@ items:
     category: 'Documents'
     default_quantity: 1
     trip_types: ['overnight', 'weekend', 'week', 'business', 'hiking', 'international']
-    essential_trip_types: ['international']
+    essential_modifiers: ['international']
 
   - name: 'Credit cards'
     description: 'Payment cards'

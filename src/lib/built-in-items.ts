@@ -28,18 +28,32 @@ export function getItemsByTripType(tripTypeId: string): BuiltInItem[] {
 // travelers, with no dedicated family trip type. Still browsable in the Built-in browser.
 const STARTER_EXCLUDED_CATEGORIES = new Set(['Baby', 'Children']);
 
+/** Additive starter modifiers layered on top of a trip type. */
+export type StarterModifier = 'international' | 'feminine' | 'masculine';
+
 /**
- * Get the curated "starter essentials" for a trip type.
- * Resolves to universal core items (essential: true) plus this trip type's
- * situational essentials (essential_trip_types), minus excluded categories.
- * Decoupled from the noisy trip_types tags.
+ * Get the curated "starter essentials" for a trip type, optionally layered with
+ * modifiers (international travel, clothing style). Resolves to universal core
+ * items (essential: true) plus situational essentials whose trip-type gate AND
+ * modifier gate are both satisfied, minus excluded categories. Modifiers are
+ * purely additive — they never swap or remove neutral core items.
  */
-export function getStarterItems(tripTypeId: string): BuiltInItem[] {
-  return builtInItems.items.filter(
-    (item) =>
-      !STARTER_EXCLUDED_CATEGORIES.has(item.category) &&
-      (item.essential === true || item.essential_trip_types?.includes(tripTypeId))
-  );
+export function getStarterItems(
+  tripTypeId: string,
+  modifiers: StarterModifier[] = []
+): BuiltInItem[] {
+  return builtInItems.items.filter((item) => {
+    if (STARTER_EXCLUDED_CATEGORIES.has(item.category)) return false;
+    if (item.essential === true) return true;
+    const hasTripGate = !!item.essential_trip_types?.length;
+    const hasModGate = !!item.essential_modifiers?.length;
+    if (!hasTripGate && !hasModGate) return false;
+    const tripOk = !hasTripGate || item.essential_trip_types!.includes(tripTypeId);
+    const modOk =
+      !hasModGate ||
+      item.essential_modifiers!.some((m) => modifiers.includes(m as StarterModifier));
+    return tripOk && modOk;
+  });
 }
 
 /**

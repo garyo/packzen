@@ -89,6 +89,7 @@ function validateBuiltInItems() {
   // Build lookup sets
   const categoryNames = new Set(categories.map((c) => c.name));
   const tripTypeIds = new Set(trip_types.map((t) => t.id));
+  const VALID_MODIFIERS = new Set(['international', 'feminine', 'masculine']);
   const itemsPerCategory = new Map();
   const itemsPerTripType = new Map();
 
@@ -138,6 +139,20 @@ function validateBuiltInItems() {
     }
     if (item.essential === true && Array.isArray(item.essential_trip_types)) {
       errors.push(`${itemLabel}: cannot set both essential and essential_trip_types`);
+    }
+    if (item.essential_modifiers !== undefined) {
+      if (!Array.isArray(item.essential_modifiers)) {
+        errors.push(`${itemLabel}: essential_modifiers must be an array`);
+      } else {
+        item.essential_modifiers.forEach((mod) => {
+          if (!VALID_MODIFIERS.has(mod)) {
+            errors.push(`${itemLabel}: Unknown essential_modifier "${mod}"`);
+          }
+        });
+      }
+    }
+    if (item.essential === true && Array.isArray(item.essential_modifiers)) {
+      errors.push(`${itemLabel}: cannot set both essential and essential_modifiers`);
     }
 
     // Check category exists

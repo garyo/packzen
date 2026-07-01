@@ -86,6 +86,8 @@ export interface BuiltInItem {
   essential?: boolean;
   /** Situational essential: belongs only in these trip types' starter lists. */
   essential_trip_types?: string[];
+  /** Situational essential gated by a starter modifier (international / feminine / masculine). */
+  essential_modifiers?: string[];
 }
 
 export interface BuiltInItemsData {

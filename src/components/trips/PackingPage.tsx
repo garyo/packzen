@@ -37,7 +37,7 @@ import { PackingListCategoryView } from './PackingListCategoryView';
 import { AddModeView } from './AddModeView';
 import { SelectModeActionBar } from './SelectModeActionBar';
 import { BuiltInItemsBrowser } from '../built-in-items/BuiltInItemsBrowser';
-import { builtInItems, getStarterItems } from '../../lib/built-in-items';
+import { builtInItems, getStarterItems, type StarterModifier } from '../../lib/built-in-items';
 import { fetchWithErrorHandling, fetchSingleWithErrorHandling } from '../../lib/resource-helpers';
 import { syncManager } from '../../lib/sync-manager';
 import { tripToYAML, downloadYAML } from '../../lib/yaml';
@@ -74,6 +74,17 @@ export function PackingPage(props: PackingPageProps) {
   // One-tap starter list (shown in the empty state)
   const [starterDismissed, setStarterDismissed] = createSignal(false);
   const [addingStarter, setAddingStarter] = createSignal<string | null>(null);
+  // Additive starter modifiers, chosen before tapping a trip type.
+  const [starterIntl, setStarterIntl] = createSignal(false);
+  const [starterFeminine, setStarterFeminine] = createSignal(false);
+  const [starterMasculine, setStarterMasculine] = createSignal(false);
+  const starterModifiers = (): StarterModifier[] => {
+    const mods: StarterModifier[] = [];
+    if (starterIntl()) mods.push('international');
+    if (starterFeminine()) mods.push('feminine');
+    if (starterMasculine()) mods.push('masculine');
+    return mods;
+  };
 
   // Debounce search query to avoid filtering on every keystroke
   createEffect(() => {
@@ -1025,11 +1036,11 @@ export function PackingPage(props: PackingPageProps) {
   // One-tap starter list: add a whole trip type's built-in items in one batch.
   // Items go in unassigned (no bag) and are deduped by name against what's already
   // on the trip, so tapping several chips (or the same chip twice) never duplicates.
-  const handleAddStarterList = async (tripTypeId: string) => {
+  const handleAddStarterList = async (tripTypeId: string, modifiers: StarterModifier[] = []) => {
     if (addingStarter()) return;
 
     const existingNames = new Set((items() ?? []).map((i) => i.name.toLowerCase()));
-    const starter = getStarterItems(tripTypeId).filter(
+    const starter = getStarterItems(tripTypeId, modifiers).filter(
       (item) => !existingNames.has(item.name.toLowerCase())
     );
 
@@ -1299,16 +1310,64 @@ export function PackingPage(props: PackingPageProps) {
                         <h3 class="mb-1 text-xl font-semibold text-gray-900">
                           Start your packing list
                         </h3>
-                        <p class="mb-6 text-gray-600">
+                        <p class="mb-4 text-gray-600">
                           Tap a trip type to add the essentials instantly. Combine as many as you
                           like.
                         </p>
+                        <div class="mb-5 flex flex-col items-center gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setStarterIntl((v) => !v)}
+                            aria-pressed={starterIntl()}
+                            class="rounded-full border px-3 py-1 text-sm transition-colors"
+                            classList={{
+                              'border-blue-500 bg-blue-50 text-blue-700': starterIntl(),
+                              'border-gray-200 bg-white text-gray-600 hover:border-blue-400':
+                                !starterIntl(),
+                            }}
+                          >
+                            🌍 International trip
+                          </button>
+                          <div class="flex flex-wrap items-center justify-center gap-2">
+                            <span class="text-sm text-gray-500">Add clothing:</span>
+                            <button
+                              type="button"
+                              onClick={() => setStarterFeminine((v) => !v)}
+                              aria-pressed={starterFeminine()}
+                              class="rounded-full border px-3 py-1 text-sm transition-colors"
+                              classList={{
+                                'border-blue-500 bg-blue-50 text-blue-700': starterFeminine(),
+                                'border-gray-200 bg-white text-gray-600 hover:border-blue-400':
+                                  !starterFeminine(),
+                              }}
+                            >
+                              Feminine
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setStarterMasculine((v) => !v)}
+                              aria-pressed={starterMasculine()}
+                              class="rounded-full border px-3 py-1 text-sm transition-colors"
+                              classList={{
+                                'border-blue-500 bg-blue-50 text-blue-700': starterMasculine(),
+                                'border-gray-200 bg-white text-gray-600 hover:border-blue-400':
+                                  !starterMasculine(),
+                              }}
+                            >
+                              Masculine
+                            </button>
+                          </div>
+                        </div>
                         <div class="flex flex-wrap justify-center gap-2 sm:gap-3">
-                          <For each={builtInItems.trip_types}>
+                          <For
+                            each={builtInItems.trip_types.filter((t) => t.id !== 'international')}
+                          >
                             {(tripType) => (
                               <button
                                 type="button"
-                                onClick={() => handleAddStarterList(tripType.id)}
+                                onClick={() =>
+                                  handleAddStarterList(tripType.id, starterModifiers())
+                                }
                                 disabled={addingStarter() !== null}
                                 aria-busy={addingStarter() === tripType.id}
                                 class="flex min-w-[7rem] flex-col items-center rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm transition-colors hover:border-blue-400 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
