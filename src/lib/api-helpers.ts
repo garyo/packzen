@@ -90,6 +90,12 @@ export function createApiHandler<T>(
 
       return successResponse(result);
     } catch (error) {
+      if (error instanceof NotFoundError) {
+        return errorResponse(error.message, 404);
+      }
+      if (error instanceof BadRequestError) {
+        return errorResponse(error.message, 400);
+      }
       return handleApiError(error, operationName);
     }
   };
@@ -120,12 +126,15 @@ export interface SyncConfig {
   parentId?: (params: Record<string, string | undefined>) => string | null;
 }
 
-/** Sentinel error for "resource not found" in handler wrappers */
-class NotFoundError extends Error {
-  constructor() {
-    super('Resource not found');
+/** Sentinel error for "resource not found" in handler wrappers → maps to 404 */
+export class NotFoundError extends Error {
+  constructor(message = 'Resource not found') {
+    super(message);
   }
 }
+
+/** Sentinel error for a malformed request in handler wrappers → maps to 400 */
+export class BadRequestError extends Error {}
 
 /**
  * Shared implementation for POST/PATCH handlers that read a JSON body,
@@ -181,7 +190,10 @@ function createBodyHandler<TInput, TOutput>(
       return successResponse(result, successStatus);
     } catch (error) {
       if (error instanceof NotFoundError) {
-        return errorResponse('Resource not found', 404);
+        return errorResponse(error.message, 404);
+      }
+      if (error instanceof BadRequestError) {
+        return errorResponse(error.message, 400);
       }
       return handleApiError(error, operationName);
     }

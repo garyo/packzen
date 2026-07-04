@@ -148,6 +148,15 @@ export function isSmallScreen(): boolean {
   return window.matchMedia('(max-width: 767px), (max-height: 500px)').matches;
 }
 
+/** Split an array into chunks of at most `size` elements each. */
+export function chunkArray<T>(items: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+  return chunks;
+}
+
 export function normalizeTripDates(
   startDate: string | null | undefined,
   endDate: string | null | undefined

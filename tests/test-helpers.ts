@@ -17,6 +17,7 @@ import {
   type TripItem,
 } from '../db/schema';
 import type { FullBackup } from '../src/lib/yaml';
+import type { ApiResponse } from '../src/lib/types';
 import type { APIContext } from 'astro';
 
 export interface Snapshot {
@@ -37,6 +38,7 @@ export interface TripItemSummary {
   container: string | null;
   is_container: boolean;
   is_packed: boolean;
+  is_skipped: boolean;
   notes: string | null;
 }
 
@@ -110,6 +112,24 @@ export const TEST_SCHEMA_STATEMENTS = [
     FOREIGN KEY (trip_id) REFERENCES trips(id) ON DELETE CASCADE,
     FOREIGN KEY (bag_id) REFERENCES bags(id) ON DELETE SET NULL,
     FOREIGN KEY (master_item_id) REFERENCES master_items(id) ON DELETE SET NULL
+  );`,
+  `CREATE TABLE change_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    clerk_user_id TEXT NOT NULL,
+    entity_type TEXT NOT NULL,
+    entity_id TEXT NOT NULL,
+    parent_id TEXT,
+    action TEXT NOT NULL,
+    data TEXT,
+    source_id TEXT,
+    created_at INTEGER NOT NULL
+  );`,
+  `CREATE TABLE analytics_events (
+    id TEXT PRIMARY KEY,
+    clerk_user_id TEXT,
+    event TEXT NOT NULL,
+    props TEXT,
+    created_at INTEGER NOT NULL
   );`,
 ];
 
@@ -404,6 +424,7 @@ export function summarizeSnapshot(snapshot: Snapshot) {
         container: item.container_item_id ? itemNameById.get(item.container_item_id) || null : null,
         is_container: item.is_container,
         is_packed: item.is_packed,
+        is_skipped: item.is_skipped,
         notes: item.notes,
       }));
 
@@ -531,6 +552,7 @@ export async function importBackupForUser(
           master_item_id: null,
           is_container: itemData.is_container ?? false,
           is_packed: itemData.is_packed,
+          is_skipped: itemData.is_skipped ?? false,
           notes: itemData.notes || null,
         })
         .returning()
@@ -570,4 +592,166 @@ export async function importBackupForUser(
       }
     }
   }
+}
+
+// ---------------------------------------------------------------------------
+// Fake API client for testing src/lib/backup.ts against the real
+// exportBackupData/restoreBackupData functions (not a reimplementation).
+// Models just enough of the REST surface (categories, master items, bag
+// templates, trips, bags, trip items) in memory so restore/export can run
+// end-to-end, with an optional hook for injecting per-call failures.
+// ---------------------------------------------------------------------------
+
+type FakeRecord = Record<string, unknown> & { id: string };
+type FailHook = (
+  method: 'get' | 'post' | 'patch',
+  endpoint: string,
+  data?: Record<string, unknown>
+) => string | undefined;
+
+export interface FakeApi {
+  api: {
+    get: <T>(endpoint: string) => Promise<ApiResponse<T>>;
+    post: <T>(endpoint: string, data?: unknown) => Promise<ApiResponse<T>>;
+    patch: <T>(endpoint: string, data?: unknown) => Promise<ApiResponse<T>>;
+    put: <T>(endpoint: string, data?: unknown) => Promise<ApiResponse<T>>;
+    delete: <T>(endpoint: string) => Promise<ApiResponse<T>>;
+  };
+  categories: FakeRecord[];
+  masterItems: FakeRecord[];
+  bagTemplates: FakeRecord[];
+  trips: FakeRecord[];
+  bagsByTrip: Map<string, FakeRecord[]>;
+  itemsByTrip: Map<string, FakeRecord[]>;
+}
+
+export function makeFakeApi(options: { failWhen?: FailHook } = {}): FakeApi {
+  const { failWhen } = options;
+  let idCounter = 0;
+  const newId = () => `fake-${++idCounter}`;
+
+  const categories: FakeRecord[] = [];
+  const masterItems: FakeRecord[] = [];
+  const bagTemplates: FakeRecord[] = [];
+  const trips: FakeRecord[] = [];
+  const bagsByTrip = new Map<string, FakeRecord[]>();
+  const itemsByTrip = new Map<string, FakeRecord[]>();
+
+  const ok = <T>(data: T): ApiResponse<T> => ({ success: true, data });
+  const fail = <T>(error: string): ApiResponse<T> => ({ success: false, error });
+
+  const tripSubResource = (endpoint: string, resource: 'bags' | 'items') => {
+    const match = endpoint.match(new RegExp(`^/api/trips/([^/]+)/${resource}$`));
+    return match ? match[1] : null;
+  };
+
+  async function get<T>(endpoint: string): Promise<ApiResponse<T>> {
+    const failure = failWhen?.('get', endpoint);
+    if (failure) return fail(failure);
+
+    if (endpoint === '/api/categories') return ok(categories as unknown as T);
+    if (endpoint === '/api/master-items') return ok(masterItems as unknown as T);
+    if (endpoint === '/api/bag-templates') return ok(bagTemplates as unknown as T);
+    if (endpoint === '/api/trips') return ok(trips as unknown as T);
+
+    const bagTripId = tripSubResource(endpoint, 'bags');
+    if (bagTripId) return ok((bagsByTrip.get(bagTripId) || []) as unknown as T);
+
+    const itemTripId = tripSubResource(endpoint, 'items');
+    if (itemTripId) return ok((itemsByTrip.get(itemTripId) || []) as unknown as T);
+
+    return fail(`fake api: unknown GET ${endpoint}`);
+  }
+
+  async function post<T>(endpoint: string, data?: unknown): Promise<ApiResponse<T>> {
+    const payload = (data || {}) as Record<string, unknown>;
+    const failure = failWhen?.('post', endpoint, payload);
+    if (failure) return fail(failure);
+
+    const created: FakeRecord = { id: newId(), ...payload };
+
+    if (endpoint === '/api/categories') {
+      categories.push(created);
+      return ok(created as unknown as T);
+    }
+    if (endpoint === '/api/master-items') {
+      masterItems.push(created);
+      return ok(created as unknown as T);
+    }
+    if (endpoint === '/api/bag-templates') {
+      bagTemplates.push(created);
+      return ok(created as unknown as T);
+    }
+    if (endpoint === '/api/trips') {
+      trips.push(created);
+      return ok(created as unknown as T);
+    }
+
+    const bagTripId = tripSubResource(endpoint, 'bags');
+    if (bagTripId) {
+      const list = bagsByTrip.get(bagTripId) || [];
+      list.push(created);
+      bagsByTrip.set(bagTripId, list);
+      return ok(created as unknown as T);
+    }
+
+    const itemTripId = tripSubResource(endpoint, 'items');
+    if (itemTripId) {
+      const list = itemsByTrip.get(itemTripId) || [];
+      list.push(created);
+      itemsByTrip.set(itemTripId, list);
+      return ok(created as unknown as T);
+    }
+
+    return fail(`fake api: unknown POST ${endpoint}`);
+  }
+
+  async function patch<T>(endpoint: string, data?: unknown): Promise<ApiResponse<T>> {
+    const payload = (data || {}) as Record<string, unknown>;
+    const failure = failWhen?.('patch', endpoint, payload);
+    if (failure) return fail(failure);
+
+    const applyTo = (list: FakeRecord[], id: unknown): ApiResponse<T> => {
+      const record = list.find((r) => r.id === id);
+      if (!record) return fail(`fake api: no record with id ${String(id)} at ${endpoint}`);
+      Object.assign(record, payload);
+      return ok(record as unknown as T);
+    };
+
+    const categoryMatch = endpoint.match(/^\/api\/categories\/([^/]+)$/);
+    if (categoryMatch) return applyTo(categories, categoryMatch[1]);
+
+    const masterItemMatch = endpoint.match(/^\/api\/master-items\/([^/]+)$/);
+    if (masterItemMatch) return applyTo(masterItems, masterItemMatch[1]);
+
+    const bagTemplateMatch = endpoint.match(/^\/api\/bag-templates\/([^/]+)$/);
+    if (bagTemplateMatch) return applyTo(bagTemplates, bagTemplateMatch[1]);
+
+    const tripMatch = endpoint.match(/^\/api\/trips\/([^/]+)$/);
+    if (tripMatch) return applyTo(trips, tripMatch[1]);
+
+    const bagTripId = tripSubResource(endpoint, 'bags');
+    if (bagTripId) return applyTo(bagsByTrip.get(bagTripId) || [], payload.bag_id);
+
+    const itemTripId = tripSubResource(endpoint, 'items');
+    if (itemTripId) return applyTo(itemsByTrip.get(itemTripId) || [], payload.id);
+
+    return fail(`fake api: unknown PATCH ${endpoint}`);
+  }
+
+  return {
+    api: {
+      get,
+      post,
+      patch,
+      put: async <T>() => fail<T>('fake api: PUT not supported'),
+      delete: async <T>() => fail<T>('fake api: DELETE not supported'),
+    },
+    categories,
+    masterItems,
+    bagTemplates,
+    trips,
+    bagsByTrip,
+    itemsByTrip,
+  };
 }

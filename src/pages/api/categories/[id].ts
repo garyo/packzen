@@ -5,7 +5,12 @@ import { eq, and } from 'drizzle-orm';
 import { z } from 'zod';
 import { categories } from '../../../../db/schema';
 import { categoryUpdateSchema, validateRequestSafe } from '../../../lib/validation';
-import { createPatchHandler, createDeleteHandler, type SyncConfig } from '../../../lib/api-helpers';
+import {
+  createPatchHandler,
+  createDeleteHandler,
+  BadRequestError,
+  type SyncConfig,
+} from '../../../lib/api-helpers';
 
 const sync: SyncConfig = { entityType: 'category' };
 
@@ -29,6 +34,10 @@ export const PATCH: APIRoute = createPatchHandler<
     if (name !== undefined) updates.name = name;
     if (icon !== undefined) updates.icon = icon;
     if (sort_order !== undefined) updates.sort_order = sort_order;
+
+    if (Object.keys(updates).length === 0) {
+      throw new BadRequestError('No fields provided to update');
+    }
 
     const updated = await db
       .update(categories)

@@ -13,6 +13,7 @@ import {
   errorResponse,
   successResponse,
   handleApiError,
+  NotFoundError,
 } from '../../../lib/api-helpers';
 import { masterItemWithCategorySelect } from './index';
 import { logChange, getSourceId } from '../../../lib/sync';
@@ -59,7 +60,7 @@ export const GET: APIRoute = createGetHandler(async ({ db, userId, params }) => 
     .get();
 
   if (!item) {
-    throw new Error('Item not found');
+    throw new NotFoundError('Item not found');
   }
 
   return item;

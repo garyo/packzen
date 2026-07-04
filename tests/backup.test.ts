@@ -4,12 +4,14 @@ import { drizzle } from 'drizzle-orm/d1';
 import { bags, tripItems, trips } from '../db/schema';
 import { tripToYAML, yamlToTrip, fullBackupToYAML, yamlToFullBackup } from '../src/lib/yaml';
 import { deleteAllUserData } from '../src/lib/user-data-cleanup';
+import { exportBackupData, restoreBackupData } from '../src/lib/backup';
 import {
   createTestDatabase,
   seedUserData,
   loadSnapshot,
   summarizeSnapshot,
   importBackupForUser,
+  makeFakeApi,
 } from './test-helpers';
 import type { Trip, Bag, TripItem, Category, MasterItem, BagTemplate } from '../db/schema';
 
@@ -611,4 +613,182 @@ test('Case-insensitive item name matching through YAML round-trip', async () => 
   assert.ok(passportItem, 'PASSPORT item should exist after import');
   assert.equal(passportItem.is_packed, true);
   assert.equal(passportItem.notes, 'Check expiration date');
+});
+
+// ---------------------------------------------------------------------------
+// Group 5: The real exportBackupData / restoreBackupData (src/lib/backup.ts),
+// exercised against a stubbed API client (makeFakeApi) rather than the
+// parallel DB-backed reimplementation used above.
+// ---------------------------------------------------------------------------
+
+test('exportBackupData throws when any fetch fails, instead of writing a partial backup', async () => {
+  const failingApi = makeFakeApi({
+    failWhen: (method, endpoint) =>
+      method === 'get' && endpoint === '/api/trips' ? 'network down' : undefined,
+  });
+
+  await assert.rejects(() => exportBackupData([], [], failingApi.api), /Backup failed/);
+});
+
+test('exportBackupData throws when a per-trip fetch fails', async () => {
+  const failingApi = makeFakeApi({
+    failWhen: (method, endpoint) =>
+      method === 'get' && /\/trips\/[^/]+\/items$/.test(endpoint) ? 'items unavailable' : undefined,
+  });
+  failingApi.trips.push({ id: 'trip-1', name: 'Beach Trip' });
+
+  await assert.rejects(
+    () => exportBackupData([], [], failingApi.api),
+    /Backup failed.*items.*Beach Trip/
+  );
+});
+
+test('restoreBackupData throws immediately on structural failure (category creation)', async () => {
+  const fixture = makeFullBackupFixture();
+  const yamlStr = fullBackupToYAML(fixture.categories, [], [], []);
+
+  const failingApi = makeFakeApi({
+    failWhen: (method, endpoint) =>
+      method === 'post' && endpoint === '/api/categories' ? 'boom' : undefined,
+  });
+
+  await assert.rejects(
+    () => restoreBackupData(yamlStr, [], [], failingApi.api),
+    /Restore failed.*Clothing/
+  );
+
+  // Nothing downstream should have been attempted successfully as a result
+  // of the corrupted category map.
+  assert.equal(failingApi.categories.length, 0);
+});
+
+test('restoreBackupData collects per-item failures and reports an accurate summary instead of a false success', async () => {
+  const fixture = makeFullBackupFixture();
+  const yamlStr = fullBackupToYAML(
+    fixture.categories,
+    fixture.masterItems,
+    fixture.bagTemplates,
+    fixture.trips
+  );
+
+  const failingApi = makeFakeApi({
+    failWhen: (method, endpoint, data) =>
+      method === 'post' && /\/items$/.test(endpoint) && data?.name === 'Sandals'
+        ? 'item rejected'
+        : undefined,
+  });
+
+  await assert.rejects(
+    () => restoreBackupData(yamlStr, [], [], failingApi.api),
+    /Restore incomplete: 1 of 3 items failed/
+  );
+
+  // The other two items in the same trip should still have been restored;
+  // one failure must not silently take down (or silently succeed for) the rest.
+  const restoredItems = [...failingApi.itemsByTrip.values()].flat();
+  assert.equal(restoredItems.length, 2);
+  assert.ok(!restoredItems.some((i) => i.name === 'Sandals'));
+});
+
+test('is_skipped survives restoreBackupData round-trip', async () => {
+  const now = new Date();
+  const tripId = crypto.randomUUID();
+  const bagId = crypto.randomUUID();
+  const itemId = crypto.randomUUID();
+
+  const trip: Trip = {
+    id: tripId,
+    clerk_user_id: 'user_1',
+    name: 'Ski Trip',
+    destination: 'Aspen',
+    start_date: '2026-12-01',
+    end_date: '2026-12-05',
+    notes: null,
+    created_at: now,
+    updated_at: now,
+  };
+  const bagList: Bag[] = [
+    {
+      id: bagId,
+      trip_id: tripId,
+      name: 'Duffel',
+      type: 'checked',
+      color: null,
+      sort_order: 0,
+      created_at: now,
+    },
+  ];
+  const itemList: TripItem[] = [
+    {
+      id: itemId,
+      trip_id: tripId,
+      bag_id: bagId,
+      master_item_id: null,
+      container_item_id: null,
+      is_container: false,
+      name: 'Extra Gloves',
+      category_name: 'Clothing',
+      quantity: 1,
+      is_packed: false,
+      is_skipped: true,
+      notes: null,
+      created_at: now,
+      updated_at: now,
+    },
+  ];
+
+  const yamlStr = fullBackupToYAML([], [], [], [{ trip, bags: bagList, items: itemList }]);
+  const fakeApi = makeFakeApi();
+
+  await restoreBackupData(yamlStr, [], [], fakeApi.api);
+
+  const restoredItems = [...fakeApi.itemsByTrip.values()].flat();
+  assert.equal(restoredItems.length, 1);
+  assert.equal(restoredItems[0].is_skipped, true);
+});
+
+test('restoreBackupData relinks containers for items matched to existing rows, not just newly created ones', async () => {
+  const { trip, bags: bagList, items } = makeTripFixture();
+  const yamlStr = fullBackupToYAML([], [], [], [{ trip, bags: bagList, items }]);
+
+  const fakeApi = makeFakeApi();
+  // Pre-seed the "existing" trip/bag/items on the target system, using the
+  // same ids as the backup's source_ids so restoreBackupData matches them
+  // instead of creating new rows -- simulating a restore over existing data.
+  fakeApi.trips.push({
+    id: trip.id,
+    name: trip.name,
+    destination: trip.destination,
+    start_date: trip.start_date,
+    end_date: trip.end_date,
+    notes: trip.notes,
+  });
+  fakeApi.bagsByTrip.set(
+    trip.id,
+    bagList.map((bag) => ({ ...bag }))
+  );
+  fakeApi.itemsByTrip.set(
+    trip.id,
+    // Nesting not yet present on the target -- this is what should get
+    // restored by the container-linking pass even though these items are
+    // matched to existing rows rather than newly created.
+    items.map((item) => ({ ...item, container_item_id: null }))
+  );
+
+  await restoreBackupData(yamlStr, [], [], fakeApi.api);
+
+  const restoredItems = fakeApi.itemsByTrip.get(trip.id) || [];
+  const kit = restoredItems.find((i) => i.name === 'Toiletry Kit');
+  const sunscreen = restoredItems.find((i) => i.name === 'Sunscreen');
+
+  assert.ok(kit);
+  assert.ok(sunscreen);
+  assert.equal(
+    sunscreen.container_item_id,
+    kit.id,
+    'Sunscreen should be relinked to the Toiletry Kit'
+  );
+
+  // No duplicate items should have been created -- everything matched existing rows.
+  assert.equal(restoredItems.length, items.length);
 });

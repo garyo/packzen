@@ -140,6 +140,7 @@ export const bagUpdateSchema = z.object({
   name: sanitizeString(MAX_NAME_LENGTH).optional(),
   type: z.enum(['carry_on', 'checked', 'personal', 'custom']).optional(),
   color: colorString(),
+  sort_order: z.number().int().min(0).optional(),
 });
 
 // Bag Template schemas

@@ -2,7 +2,16 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, count } from 'drizzle-orm';
-import { bagTemplates, bags, categories, masterItems, tripItems, trips } from '../db/schema';
+import {
+  analyticsEvents,
+  bagTemplates,
+  bags,
+  categories,
+  changeLog,
+  masterItems,
+  tripItems,
+  trips,
+} from '../db/schema';
 import { fullBackupToYAML, yamlToFullBackup } from '../src/lib/yaml';
 import { deleteAllUserData } from '../src/lib/user-data-cleanup';
 import * as bagTemplatesApi from '../src/pages/api/bag-templates/index';
@@ -410,6 +419,23 @@ test('deleteAllUserData removes all user artifacts', async () => {
     name: 'Shoes',
   });
 
+  // B3: change_log (full entity JSON) and analytics_events (PII-keyed) must
+  // also be purged on account deletion — a GDPR right-to-erasure gap.
+  await db.insert(changeLog).values({
+    clerk_user_id: userId,
+    entity_type: 'trip',
+    entity_id: trip.id,
+    action: 'create',
+    data: JSON.stringify({ name: 'Account Trip', destination: 'Secret Place' }),
+    created_at: Math.floor(Date.now() / 1000),
+  });
+
+  await db.insert(analyticsEvents).values({
+    clerk_user_id: userId,
+    event: 'trip_created',
+    props: JSON.stringify({ tripId: trip.id }),
+  });
+
   await deleteAllUserData(userId, db);
 
   const remainingCounts = await Promise.all([
@@ -431,6 +457,12 @@ test('deleteAllUserData removes all user artifacts', async () => {
     db.select({ count: count() }).from(trips).where(eq(trips.clerk_user_id, userId)).get(),
     db.select({ count: count() }).from(bags).where(eq(bags.trip_id, trip.id)).get(),
     db.select({ count: count() }).from(tripItems).where(eq(tripItems.trip_id, trip.id)).get(),
+    db.select({ count: count() }).from(changeLog).where(eq(changeLog.clerk_user_id, userId)).get(),
+    db
+      .select({ count: count() })
+      .from(analyticsEvents)
+      .where(eq(analyticsEvents.clerk_user_id, userId))
+      .get(),
   ]);
 
   remainingCounts.forEach((row) => assert.equal(row?.count ?? 0, 0));
@@ -569,9 +601,10 @@ test('User isolation is enforced across trips, bags, and trip items', async () =
     request: new Request(`http://localhost/api/trips/${trip.id}`),
     params: { tripId: trip.id },
   });
+  // Ownership misses are "not found", not server errors (B7).
   const { GET: TRIP_GET } = await import('../src/pages/api/trips/[tripId]/index');
   const otherTripResponse = await TRIP_GET!(fetchTripCtx);
-  assert.equal(otherTripResponse.status, 500);
+  assert.equal(otherTripResponse.status, 404);
 
   const bagGetCtx = buildApiContext({
     db: d1,
@@ -581,7 +614,7 @@ test('User isolation is enforced across trips, bags, and trip items', async () =
   });
   const { GET: BAGS_GET } = await import('../src/pages/api/trips/[tripId]/bags');
   const bagResponse = await BAGS_GET!(bagGetCtx);
-  assert.equal(bagResponse.status, 500);
+  assert.equal(bagResponse.status, 404);
 
   const itemsGetCtx = buildApiContext({
     db: d1,
@@ -590,5 +623,332 @@ test('User isolation is enforced across trips, bags, and trip items', async () =
     params: { tripId: trip.id },
   });
   const itemsResponse = await tripItemsApi.GET!(itemsGetCtx);
-  assert.equal(itemsResponse.status, 500);
+  assert.equal(itemsResponse.status, 404);
+});
+
+test('Trip copy respects the per-user trip limit (B1)', async () => {
+  const d1 = await createTestDatabase();
+  const db = drizzle(d1);
+  const userId = 'copy_trip_limit_user';
+  const limit = getLimitsForPlan({
+    activePlan: 'free_user',
+    hasFreeUserPlan: true,
+    hasStandardPlan: false,
+  }).maxTrips;
+
+  let sourceTripId = '';
+  for (let i = 0; i < limit; i++) {
+    const trip = await db
+      .insert(trips)
+      .values({ clerk_user_id: userId, name: `Trip ${i + 1}` })
+      .returning()
+      .get();
+    if (i === 0) sourceTripId = trip.id;
+  }
+
+  const { POST: COPY_POST } = await import('../src/pages/api/trips/[tripId]/copy');
+  const copyCtx = buildApiContext({
+    db: d1,
+    userId,
+    request: new Request(`http://localhost/api/trips/${sourceTripId}/copy`, { method: 'POST' }),
+    params: { tripId: sourceTripId },
+  });
+  const copyResponse = await COPY_POST!(copyCtx);
+  assert.equal(copyResponse.status, 403);
+
+  const tripCountAfter = await db
+    .select({ count: count() })
+    .from(trips)
+    .where(eq(trips.clerk_user_id, userId))
+    .get();
+  assert.equal(tripCountAfter?.count, limit, 'no extra trip should have been created');
+});
+
+test('Trip copy respects the per-trip item limit (B1)', async () => {
+  const d1 = await createTestDatabase();
+  const db = drizzle(d1);
+  const userId = 'copy_item_limit_user';
+  const maxItems = getLimitsForPlan({
+    activePlan: 'free_user',
+    hasFreeUserPlan: true,
+    hasStandardPlan: false,
+  }).maxItemsPerTrip;
+
+  const trip = await db
+    .insert(trips)
+    .values({ clerk_user_id: userId, name: 'Big Trip' })
+    .returning()
+    .get();
+
+  for (let i = 0; i < maxItems; i++) {
+    await db.insert(tripItems).values({ trip_id: trip.id, name: `Item ${i + 1}` });
+  }
+
+  const { POST: COPY_POST } = await import('../src/pages/api/trips/[tripId]/copy');
+  const copyCtx = buildApiContext({
+    db: d1,
+    userId,
+    request: new Request(`http://localhost/api/trips/${trip.id}/copy`, { method: 'POST' }),
+    params: { tripId: trip.id },
+  });
+  const copyResponse = await COPY_POST!(copyCtx);
+  assert.equal(copyResponse.status, 403);
+
+  const tripCountAfter = await db
+    .select({ count: count() })
+    .from(trips)
+    .where(eq(trips.clerk_user_id, userId))
+    .get();
+  assert.equal(tripCountAfter?.count, 1, 'no copy trip should have been created');
+});
+
+test('Trip copy duplicates bags, items, and container relationships in one atomic batch (B2)', async () => {
+  const d1 = await createTestDatabase();
+  const db = drizzle(d1);
+  const userId = 'copy_happy_user';
+
+  const trip = await db
+    .insert(trips)
+    .values({
+      clerk_user_id: userId,
+      name: 'Original Trip',
+      destination: 'Lisbon',
+      start_date: '2026-08-01',
+      end_date: '2026-08-05',
+    })
+    .returning()
+    .get();
+
+  const bag = await db
+    .insert(bags)
+    .values({ trip_id: trip.id, name: 'Carry-on', type: 'carry_on', sort_order: 1 })
+    .returning()
+    .get();
+
+  const container = await db
+    .insert(tripItems)
+    .values({
+      trip_id: trip.id,
+      bag_id: bag.id,
+      name: 'Toiletry Kit',
+      is_container: true,
+      is_packed: true,
+    })
+    .returning()
+    .get();
+
+  await db.insert(tripItems).values({
+    trip_id: trip.id,
+    bag_id: bag.id,
+    container_item_id: container.id,
+    name: 'Toothbrush',
+    is_packed: true,
+  });
+
+  const { POST: COPY_POST } = await import('../src/pages/api/trips/[tripId]/copy');
+  const copyCtx = buildApiContext({
+    db: d1,
+    userId,
+    request: new Request(`http://localhost/api/trips/${trip.id}/copy`, { method: 'POST' }),
+    params: { tripId: trip.id },
+  });
+  const copyResponse = await COPY_POST!(copyCtx);
+  assert.equal(copyResponse.status, 201);
+  const newTrip = (await copyResponse.json()) as { id: string; name: string };
+  assert.equal(newTrip.name, 'Original Trip (Copy)');
+  assert.notEqual(newTrip.id, trip.id);
+
+  const newBags = await db.select().from(bags).where(eq(bags.trip_id, newTrip.id)).all();
+  assert.equal(newBags.length, 1);
+
+  const newItems = await db.select().from(tripItems).where(eq(tripItems.trip_id, newTrip.id)).all();
+  assert.equal(newItems.length, 2);
+  // Packed/skipped state resets on copy.
+  assert.ok(newItems.every((item) => item.is_packed === false));
+
+  const newContainer = newItems.find((item) => item.is_container);
+  const newChild = newItems.find((item) => !item.is_container);
+  assert.ok(newContainer && newChild, 'copy should include both the container and its child');
+  assert.equal(newChild!.container_item_id, newContainer!.id);
+  assert.equal(newChild!.bag_id, newBags[0].id);
+});
+
+test('A failed trip copy leaves no partial trip/bag/item rows (B2)', async () => {
+  const d1 = await createTestDatabase();
+  const db = drizzle(d1);
+  const userId = 'copy_atomic_user';
+
+  const trip = await db
+    .insert(trips)
+    .values({ clerk_user_id: userId, name: 'Original Trip' })
+    .returning()
+    .get();
+  const bag = await db
+    .insert(bags)
+    .values({ trip_id: trip.id, name: 'Carry-on', type: 'carry_on' })
+    .returning()
+    .get();
+  await db.insert(tripItems).values({ trip_id: trip.id, bag_id: bag.id, name: 'Socks' });
+
+  // Force the underlying D1 batch to fail right where the route handler
+  // calls db.batch(), simulating a mid-copy failure (e.g. a transient D1
+  // error). With the old sequential-insert implementation this would have
+  // left a ghost trip/bag/item behind; the batched version must leave nothing.
+  const originalBatch = d1.batch.bind(d1);
+  (d1 as unknown as { batch: unknown }).batch = async () => {
+    throw new Error('Simulated D1 batch failure');
+  };
+
+  try {
+    const { POST: COPY_POST } = await import('../src/pages/api/trips/[tripId]/copy');
+    const copyCtx = buildApiContext({
+      db: d1,
+      userId,
+      request: new Request(`http://localhost/api/trips/${trip.id}/copy`, { method: 'POST' }),
+      params: { tripId: trip.id },
+    });
+    const copyResponse = await COPY_POST!(copyCtx);
+    assert.equal(copyResponse.status, 500);
+  } finally {
+    (d1 as unknown as { batch: unknown }).batch = originalBatch;
+  }
+
+  const allTrips = await db.select().from(trips).where(eq(trips.clerk_user_id, userId)).all();
+  assert.equal(allTrips.length, 1, 'no ghost trip should remain after a failed copy');
+  const allBags = await db.select().from(bags).all();
+  assert.equal(allBags.length, 1, 'no ghost bag should remain after a failed copy');
+});
+
+test('Batch item create rejects a bag_id that belongs to another trip (B4)', async () => {
+  const d1 = await createTestDatabase();
+  const db = drizzle(d1);
+  const userId = 'batch_ref_bag_user';
+
+  const tripA = await db
+    .insert(trips)
+    .values({ clerk_user_id: userId, name: 'Trip A' })
+    .returning()
+    .get();
+  const tripB = await db
+    .insert(trips)
+    .values({ clerk_user_id: userId, name: 'Trip B' })
+    .returning()
+    .get();
+
+  const foreignBag = await db
+    .insert(bags)
+    .values({ trip_id: tripB.id, name: 'Trip B Bag', type: 'carry_on' })
+    .returning()
+    .get();
+
+  const batchRequest = new Request(`http://localhost/api/trips/${tripA.id}/items`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ items: [{ name: 'Sunscreen', bag_id: foreignBag.id }] }),
+  });
+
+  const ctx = buildApiContext({
+    db: d1,
+    userId,
+    request: batchRequest,
+    params: { tripId: tripA.id },
+  });
+  const response = await tripItemsApi.POST!(ctx);
+  assert.equal(response.status, 400);
+
+  const items = await db.select().from(tripItems).where(eq(tripItems.trip_id, tripA.id)).all();
+  assert.equal(items.length, 0, 'no item should be inserted when a bag reference is invalid');
+});
+
+test('Batch item create rejects a container_item_id that belongs to another trip (B4)', async () => {
+  const d1 = await createTestDatabase();
+  const db = drizzle(d1);
+  const userId = 'batch_ref_container_user';
+
+  const tripA = await db
+    .insert(trips)
+    .values({ clerk_user_id: userId, name: 'Trip A' })
+    .returning()
+    .get();
+  const tripB = await db
+    .insert(trips)
+    .values({ clerk_user_id: userId, name: 'Trip B' })
+    .returning()
+    .get();
+
+  const foreignContainer = await db
+    .insert(tripItems)
+    .values({ trip_id: tripB.id, name: 'Trip B Container', is_container: true })
+    .returning()
+    .get();
+
+  const batchRequest = new Request(`http://localhost/api/trips/${tripA.id}/items`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      items: [{ name: 'Toothpaste', container_item_id: foreignContainer.id }],
+    }),
+  });
+
+  const ctx = buildApiContext({
+    db: d1,
+    userId,
+    request: batchRequest,
+    params: { tripId: tripA.id },
+  });
+  const response = await tripItemsApi.POST!(ctx);
+  assert.equal(response.status, 400);
+
+  const items = await db.select().from(tripItems).where(eq(tripItems.trip_id, tripA.id)).all();
+  assert.equal(items.length, 0, 'no item should be inserted when a container reference is invalid');
+});
+
+test('Empty PATCH body returns 400 instead of crashing (B8)', async () => {
+  const d1 = await createTestDatabase();
+  const db = drizzle(d1);
+  const userId = 'empty_patch_user';
+
+  const trip = await db
+    .insert(trips)
+    .values({ clerk_user_id: userId, name: 'Patch Trip' })
+    .returning()
+    .get();
+  const bag = await db
+    .insert(bags)
+    .values({ trip_id: trip.id, name: 'Carry-on', type: 'carry_on' })
+    .returning()
+    .get();
+  const category = await db
+    .insert(categories)
+    .values({ clerk_user_id: userId, name: 'Docs' })
+    .returning()
+    .get();
+
+  const { PATCH: BAGS_PATCH } = await import('../src/pages/api/trips/[tripId]/bags');
+  const bagPatchCtx = buildApiContext({
+    db: d1,
+    userId,
+    request: new Request(`http://localhost/api/trips/${trip.id}/bags`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ bag_id: bag.id }),
+    }),
+    params: { tripId: trip.id },
+  });
+  const bagPatchResponse = await BAGS_PATCH!(bagPatchCtx);
+  assert.equal(bagPatchResponse.status, 400);
+
+  const { PATCH: CATEGORY_PATCH } = await import('../src/pages/api/categories/[id]');
+  const categoryPatchCtx = buildApiContext({
+    db: d1,
+    userId,
+    request: new Request(`http://localhost/api/categories/${category.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    }),
+    params: { id: category.id },
+  });
+  const categoryPatchResponse = await CATEGORY_PATCH!(categoryPatchCtx);
+  assert.equal(categoryPatchResponse.status, 400);
 });

@@ -2,9 +2,9 @@ export const prerender = false;
 
 import type { APIRoute } from 'astro';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { eq, and, asc, count, sql } from 'drizzle-orm';
+import { eq, and, asc, count, inArray, sql } from 'drizzle-orm';
 import { z } from 'zod';
-import { tripItems, trips, bags } from '../../../../../db/schema';
+import { tripItems, trips, bags, masterItems } from '../../../../../db/schema';
 import {
   tripItemCreateSchema,
   tripItemBatchCreateSchema,
@@ -21,16 +21,90 @@ import {
   errorResponse,
   successResponse,
   handleApiError,
+  NotFoundError,
   type SyncConfig,
 } from '../../../../lib/api-helpers';
 import { logChange, getSourceId } from '../../../../lib/sync';
 import { logEvent } from '../../../../lib/analytics';
+import { chunkArray } from '../../../../lib/utils';
 
 const sync: SyncConfig = {
   entityType: 'tripItem',
   parentId: (params) => params.tripId || null,
 };
 import { checkTripItemLimit } from '../../../../lib/resource-limits';
+
+// D1 caps bound variables at 100 per query and each trip-item row spans many
+// columns, so batch inserts run in small chunks to stay well under the limit.
+const CHUNK_SIZE = 6;
+
+/**
+ * Verify that bag_id, container_item_id, and master_item_id references on one
+ * or more trip items actually belong to this trip/user. Runs one query per
+ * reference type across the whole batch instead of N queries per item.
+ * Returns an error message to surface to the client, or null if all refs check out.
+ */
+async function validateItemRefs(
+  db: DrizzleD1Database,
+  userId: string,
+  tripId: string,
+  items: Array<{
+    bag_id?: string | null;
+    container_item_id?: string | null;
+    master_item_id?: string | null;
+    is_container?: boolean | null;
+  }>
+): Promise<string | null> {
+  const uniqueIds = (values: (string | null | undefined)[]) => [
+    ...new Set(values.filter((id): id is string => !!id)),
+  ];
+
+  const bagIds = uniqueIds(items.map((i) => i.bag_id));
+  if (bagIds.length > 0) {
+    const ownedBags = await db
+      .select({ id: bags.id })
+      .from(bags)
+      .where(and(inArray(bags.id, bagIds), eq(bags.trip_id, tripId)))
+      .all();
+    if (ownedBags.length !== bagIds.length) {
+      return 'Bag not found or does not belong to this trip';
+    }
+  }
+
+  const containerIds = uniqueIds(items.map((i) => i.container_item_id));
+  if (containerIds.length > 0) {
+    const containers = await db
+      .select({ id: tripItems.id, is_container: tripItems.is_container })
+      .from(tripItems)
+      .where(and(inArray(tripItems.id, containerIds), eq(tripItems.trip_id, tripId)))
+      .all();
+    if (containers.length !== containerIds.length) {
+      return 'Container item not found or does not belong to this trip';
+    }
+    if (containers.some((c) => !c.is_container)) {
+      return 'Cannot add item to a non-container item';
+    }
+  }
+
+  // Containers cannot be nested inside other containers
+  if (items.some((i) => i.container_item_id && i.is_container)) {
+    return 'Containers cannot be nested inside other containers';
+  }
+
+  const masterItemIds = uniqueIds(items.map((i) => i.master_item_id));
+  if (masterItemIds.length > 0) {
+    const ownedMasterItems = await db
+      .select({ id: masterItems.id })
+      .from(masterItems)
+      .where(and(inArray(masterItems.id, masterItemIds), eq(masterItems.clerk_user_id, userId)))
+      .all();
+    if (ownedMasterItems.length !== masterItemIds.length) {
+      return 'Master item not found or does not belong to you';
+    }
+  }
+
+  return null;
+}
 
 export const GET: APIRoute = createGetHandler(async ({ db, userId, params }) => {
   const { tripId } = params;
@@ -46,7 +120,7 @@ export const GET: APIRoute = createGetHandler(async ({ db, userId, params }) => 
     .get();
 
   if (!trip) {
-    throw new Error('Trip not found');
+    throw new NotFoundError('Trip not found');
   }
 
   return await db
@@ -156,39 +230,12 @@ export const POST: APIRoute = async (context) => {
       return successResponse(updatedItem, 200);
     }
 
-    // Verify bag ownership if bag_id is provided
-    if (bag_id) {
-      const bag = await db
-        .select()
-        .from(bags)
-        .where(and(eq(bags.id, bag_id), eq(bags.trip_id, tripId)))
-        .get();
-
-      if (!bag) {
-        return errorResponse('Bag not found or does not belong to this trip', 400);
-      }
-    }
-
-    // Validate container assignment if container_item_id is provided
-    if (container_item_id) {
-      const containerItem = await db
-        .select()
-        .from(tripItems)
-        .where(and(eq(tripItems.id, container_item_id), eq(tripItems.trip_id, tripId)))
-        .get();
-
-      if (!containerItem) {
-        return errorResponse('Container item not found or does not belong to this trip', 400);
-      }
-
-      if (!containerItem.is_container) {
-        return errorResponse('Cannot add item to a non-container item', 400);
-      }
-
-      // Containers cannot be nested inside other containers
-      if (is_container) {
-        return errorResponse('Containers cannot be nested inside other containers', 400);
-      }
+    // Verify bag/container/master-item ownership before inserting
+    const refError = await validateItemRefs(db, userId, tripId, [
+      { bag_id, container_item_id, master_item_id, is_container },
+    ]);
+    if (refError) {
+      return errorResponse(refError, 400);
     }
 
     const newItem = await db
@@ -290,12 +337,15 @@ async function handleBatchCreate(
     return successResponse([], 200);
   }
 
-  // D1 caps bound variables at 100 per query and each row spans many columns,
-  // so insert in small chunks to stay well under the limit.
-  const CHUNK_SIZE = 6;
+  // Verify bag/container/master-item ownership across the whole batch in one
+  // query per reference type, rather than per-item.
+  const refError = await validateItemRefs(db, userId, tripId, toInsert);
+  if (refError) {
+    return errorResponse(refError, 400);
+  }
+
   const inserted: (typeof tripItems.$inferSelect)[] = [];
-  for (let i = 0; i < toInsert.length; i += CHUNK_SIZE) {
-    const chunk = toInsert.slice(i, i + CHUNK_SIZE);
+  for (const chunk of chunkArray(toInsert, CHUNK_SIZE)) {
     const rows = await db.insert(tripItems).values(chunk).returning().all();
     inserted.push(...rows);
   }
@@ -331,7 +381,7 @@ export const PATCH: APIRoute = createPatchHandler<
       .get();
 
     if (!trip) {
-      throw new Error('Trip not found');
+      throw new NotFoundError('Trip not found');
     }
 
     const {

@@ -7,7 +7,16 @@
 
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
-import { masterItems, trips, tripItems, bags, categories, bagTemplates } from '../../db/schema';
+import {
+  masterItems,
+  trips,
+  tripItems,
+  bags,
+  categories,
+  bagTemplates,
+  changeLog,
+  analyticsEvents,
+} from '../../db/schema';
 
 /**
  * Delete all data for a user
@@ -37,6 +46,14 @@ export async function deleteAllUserData(userId: string, db: DrizzleD1Database): 
 
   // 6. Delete bag templates
   await db.delete(bagTemplates).where(eq(bagTemplates.clerk_user_id, userId)).run();
+
+  // 7. Delete change-log entries — `data` holds full entity JSON (trip names,
+  // destinations, notes) and isn't covered by the 24h sync cleanup unless the
+  // user happens to write again after deleting their account.
+  await db.delete(changeLog).where(eq(changeLog.clerk_user_id, userId)).run();
+
+  // 8. Delete analytics events — kept indefinitely otherwise.
+  await db.delete(analyticsEvents).where(eq(analyticsEvents.clerk_user_id, userId)).run();
 
   console.log(`Successfully deleted all data for user ${userId}`);
 }

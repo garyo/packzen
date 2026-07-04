@@ -10,6 +10,8 @@ import {
   createPostHandler,
   createPatchHandler,
   createDeleteHandler,
+  NotFoundError,
+  BadRequestError,
   type SyncConfig,
 } from '../../../../lib/api-helpers';
 
@@ -32,7 +34,7 @@ export const GET: APIRoute = createGetHandler(async ({ db, userId, params }) => 
     .get();
 
   if (!trip) {
-    throw new Error('Trip not found');
+    throw new NotFoundError('Trip not found');
   }
 
   return await db
@@ -61,7 +63,7 @@ export const POST: APIRoute = createPostHandler<
       .get();
 
     if (!trip) {
-      throw new Error('Trip not found');
+      throw new NotFoundError('Trip not found');
     }
 
     const { name, type, color, sort_order } = validatedData;
@@ -101,17 +103,24 @@ export const PATCH: APIRoute = createPatchHandler<
       .get();
 
     if (!trip) {
-      throw new Error('Trip not found');
+      throw new NotFoundError('Trip not found');
     }
 
-    const { bag_id, name, type, color } = validatedData;
+    const { bag_id, name, type, color, sort_order } = validatedData;
 
     // Build update object dynamically
-    type BagUpdate = Partial<Pick<typeof bags.$inferSelect, 'name' | 'type' | 'color'>>;
+    type BagUpdate = Partial<
+      Pick<typeof bags.$inferSelect, 'name' | 'type' | 'color' | 'sort_order'>
+    >;
     const updates: BagUpdate = {};
     if (name !== undefined) updates.name = name;
     if (type !== undefined) updates.type = type;
     if (color !== undefined) updates.color = color;
+    if (sort_order !== undefined) updates.sort_order = sort_order;
+
+    if (Object.keys(updates).length === 0) {
+      throw new BadRequestError('No fields provided to update');
+    }
 
     return await db
       .update(bags)

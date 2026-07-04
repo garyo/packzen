@@ -9,6 +9,7 @@ import {
   createGetHandler,
   createPatchHandler,
   createDeleteHandler,
+  NotFoundError,
   type SyncConfig,
 } from '../../../lib/api-helpers';
 
@@ -27,7 +28,7 @@ export const GET: APIRoute = createGetHandler(async ({ db, userId, params }) => 
     .get();
 
   if (!template) {
-    throw new Error('Template not found');
+    throw new NotFoundError('Template not found');
   }
 
   return template;

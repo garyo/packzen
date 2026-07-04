@@ -9,6 +9,7 @@ import {
   createGetHandler,
   createPatchHandler,
   createDeleteHandler,
+  NotFoundError,
   type SyncConfig,
 } from '../../../../lib/api-helpers';
 
@@ -31,7 +32,7 @@ export const GET: APIRoute = createGetHandler(async ({ db, userId, params }) => 
     .get();
 
   if (!trip) {
-    throw new Error('Trip not found');
+    throw new NotFoundError('Trip not found');
   }
 
   return trip;
