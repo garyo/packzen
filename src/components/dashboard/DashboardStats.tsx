@@ -25,7 +25,7 @@ export function DashboardStats(props: DashboardStatsProps) {
         linkText="View and create trips"
       />
       <StatCard
-        title="All Saved Items"
+        title="My Items"
         value={props.masterItems()?.length || 0}
         icon="📦"
         linkTo="/all-items"

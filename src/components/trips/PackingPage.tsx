@@ -1077,7 +1077,7 @@ export function PackingPage(props: PackingPageProps) {
       }
 
       if (addedCount === itemsToAdd.length) {
-        showToast('success', `Added ${addedCount} items to trip and master list`);
+        showToast('success', `Added ${addedCount} items to trip and My Items`);
       } else {
         showToast(
           'error',
@@ -1391,7 +1391,7 @@ export function PackingPage(props: PackingPageProps) {
                         <EmptyState
                           icon="📦"
                           title="No items yet"
-                          description="Use “Add More Items” above to build your packing list."
+                          description="Tap Add above to build your packing list."
                         />
                       }
                     >

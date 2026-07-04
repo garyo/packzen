@@ -356,7 +356,7 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
       if (createMasterResponse.success && createMasterResponse.data) {
         masterItemId = createMasterResponse.data.id;
         categoryName = createMasterResponse.data.category_name;
-        showToast('success', `Added "${itemName}" to all items`);
+        showToast('success', `Added "${itemName}" to My Items`);
       }
     } else if (existingMasterItem) {
       categoryName = existingMasterItem.category_name;
@@ -584,7 +584,7 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
             class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
           />
           <label for="skip-master-add" class="text-sm text-gray-600">
-            Don't add to All Items (master list)
+            Don't add to My Items
           </label>
         </div>
 

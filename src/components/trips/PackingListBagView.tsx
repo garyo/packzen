@@ -663,7 +663,7 @@ function PackingListBagViewInner(props: PackingListBagViewProps) {
                                 }}
                                 class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
                               >
-                                📋 From My Saved Items
+                                📋 From My Items
                               </button>
                               <button
                                 onClick={() => {
@@ -672,7 +672,7 @@ function PackingListBagViewInner(props: PackingListBagViewProps) {
                                 }}
                                 class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
                               >
-                                📚 From Templates
+                                📚 Suggestions
                               </button>
                             </div>
                           </Show>
@@ -919,7 +919,7 @@ function PackingListBagViewInner(props: PackingListBagViewProps) {
                                           }}
                                           class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
                                         >
-                                          📋 From My Saved Items
+                                          📋 From My Items
                                         </button>
                                         <button
                                           onClick={() => {
@@ -928,7 +928,7 @@ function PackingListBagViewInner(props: PackingListBagViewProps) {
                                           }}
                                           class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
                                         >
-                                          📚 From Templates
+                                          📚 Suggestions
                                         </button>
                                       </div>
                                     </Show>

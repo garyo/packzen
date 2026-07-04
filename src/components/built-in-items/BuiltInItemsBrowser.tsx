@@ -236,7 +236,7 @@ export function BuiltInItemsBrowser(props: BuiltInItemsBrowserProps) {
   const selectedCount = () => selectedItems().size;
 
   return (
-    <Modal title="Browse Item Templates" onClose={props.onClose} size="large">
+    <Modal title="Browse Suggestions" onClose={props.onClose} size="large">
       {/* Search & Category - side by side on larger screens */}
       <div class="mb-4 grid gap-4 md:grid-cols-2">
         <div>

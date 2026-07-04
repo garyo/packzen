@@ -267,7 +267,7 @@ export function Combobox(props: ComboboxProps) {
           {/* Built-in items section */}
           <Show when={builtinItems().length > 0}>
             <div class="border-b border-gray-100 px-3 py-2 text-xs font-semibold text-gray-500 uppercase">
-              From Templates
+              Suggestions
             </div>
             <For each={builtinItems()}>
               {(item) => {

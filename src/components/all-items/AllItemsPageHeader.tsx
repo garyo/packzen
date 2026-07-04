@@ -187,7 +187,7 @@ export function AllItemsPageHeader(props: AllItemsPageHeaderProps) {
 
             {/* Browse Item Templates button */}
             <Button variant="secondary" size="sm" onClick={props.onBrowseTemplates}>
-              Browse Item Templates
+              Browse Suggestions
             </Button>
 
             {/* More menu (Import/Export) */}

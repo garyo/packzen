@@ -136,7 +136,7 @@ export function checkMasterItemLimit(
     billingStatus,
     'maxMasterItems',
     (max) =>
-      `You've reached the maximum of ${max} items in your master list. Please remove some, or upgrade your subscription.`
+      `You've reached the maximum of ${max} items in My Items. Please remove some, or upgrade your subscription.`
   );
 }
 

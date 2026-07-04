@@ -259,7 +259,7 @@ export function AddFromMasterList(props: AddFromMasterListProps) {
   };
 
   return (
-    <Modal title="Add from My Saved Items" onClose={props.onClose}>
+    <Modal title="Add from My Items" onClose={props.onClose}>
       {/* Container Selector (if containers exist) */}
       <Show when={availableContainers().length > 0}>
         <div class="mb-4">
@@ -307,8 +307,8 @@ export function AddFromMasterList(props: AddFromMasterListProps) {
             when={(props.masterItems()?.length || 0) > 0}
             fallback={
               <div class="py-8 text-center text-gray-500">
-                <p>No items in All Items list</p>
-                <p class="mt-2 text-sm">Add items to your All Items list first</p>
+                <p>No items in My Items list</p>
+                <p class="mt-2 text-sm">Add items to your My Items list first</p>
               </div>
             }
           >
