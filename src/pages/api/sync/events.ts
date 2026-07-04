@@ -67,12 +67,27 @@ export const GET: APIRoute = async (context) => {
     body += ':heartbeat\n\n';
   } else {
     for (const change of changes) {
+      let data: unknown = null;
+      if (change.data) {
+        try {
+          data = JSON.parse(change.data);
+        } catch (error) {
+          // Malformed row: don't let one bad JSON blob 500 the whole poll and
+          // kill sync for every device. Skip just this row, but still emit its
+          // id so the client's checkpoint advances past it — otherwise it
+          // would be re-fetched (and re-fail) on every subsequent poll.
+          console.error(`Skipping malformed change_log row id=${change.id}:`, error);
+          body += `id: ${change.id}\n\n`;
+          continue;
+        }
+      }
+
       const eventData = {
         entityType: change.entity_type,
         action: change.action,
         entityId: change.entity_id,
         parentId: change.parent_id,
-        data: change.data ? JSON.parse(change.data) : null,
+        data,
       };
       body += `id: ${change.id}\nevent: sync\ndata: ${JSON.stringify(eventData)}\n\n`;
     }

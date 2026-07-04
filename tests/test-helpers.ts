@@ -174,7 +174,7 @@ export function buildApiContext({
         hasStandardPlan: false,
       },
     },
-    url: new URL('http://localhost'),
+    url: new URL(req.url),
     redirect: () => {
       throw new Error('Not implemented');
     },

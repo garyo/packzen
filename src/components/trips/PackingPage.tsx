@@ -318,11 +318,19 @@ export function PackingPage(props: PackingPageProps) {
     });
   });
 
-  onMount(async () => {
-    await authStore.initAuth();
-    fetchItems();
-
-    // Connect to SSE sync for multi-device updates
+  onMount(() => {
+    // Everything that registers an onCleanup must run synchronously, before
+    // any `await` — an onCleanup called after the mount callback has resumed
+    // from an await runs with no reactive owner and is silently dropped (it
+    // would never fire syncManager.disconnect() or the unsubscribes below).
+    //
+    // Connecting here also closes the checkpoint race with the initial items
+    // fetch: syncManager.connect() dispatches its checkpoint-establishing
+    // request immediately, strictly before fetchItems() is called (which
+    // only happens after the auth/init await further down). Any change
+    // committed after that checkpoint is captured is guaranteed to show up
+    // either in the initial fetch's snapshot or a subsequent poll — closing
+    // the window where a change could land in neither.
     syncManager.connect();
     onCleanup(() => syncManager.disconnect());
 
@@ -358,6 +366,15 @@ export function PackingPage(props: PackingPageProps) {
       refetchTrip();
     });
     onCleanup(unsubTrip);
+
+    // Auth init and the initial items fetch have no bearing on the sync
+    // wiring above — getSessionToken() awaits Clerk's own load state
+    // independently of authStore — so they can run after, unawaited by
+    // onMount itself.
+    void (async () => {
+      await authStore.initAuth();
+      fetchItems();
+    })();
   });
 
   // Generic optimistic toggle with undo support

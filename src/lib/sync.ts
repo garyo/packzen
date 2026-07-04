@@ -77,8 +77,11 @@ export function logChange(
     action,
     data,
     sourceId
-  ).catch(() => {
-    // Non-critical — don't fail the request
+  ).catch((error) => {
+    // Don't fail the request over a change-log write failure, but a swallowed
+    // failure here means other devices silently never learn of this change —
+    // log it so it's visible instead of vanishing.
+    console.error('logChange failed:', entityType, entityId, action, error);
   });
 
   if (waitUntil) {
