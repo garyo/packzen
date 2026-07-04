@@ -31,11 +31,11 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
   const [quantity, setQuantity] = createSignal(1);
   const [categoryId, setCategoryId] = createSignal<string | null>(null);
   const [location, setLocation] = createSignal<string>('');
-  const [keepOpen, setKeepOpen] = createSignal(false);
   const [isNewCategory, setIsNewCategory] = createSignal(false);
   const [newCategoryName, setNewCategoryName] = createSignal('');
   const [isContainer, setIsContainer] = createSignal(false);
   const [skipMasterAddition, setSkipMasterAddition] = createSignal(false);
+  const [saving, setSaving] = createSignal(false);
   let formRef: HTMLFormElement | undefined;
 
   // Use pre-loaded bags if available, otherwise fetch
@@ -296,12 +296,15 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
       .sort((a, b) => a.localeCompare(b));
   });
 
-  const handleSubmit = async (e: Event) => {
+  const handleSubmit = async (e: Event, keepOpenAfterSubmit = false) => {
     e.preventDefault();
+    if (saving()) return;
+    setSaving(true);
 
     const itemName = name().trim();
     if (!itemName) {
       showToast('error', 'Item name is required');
+      setSaving(false);
       return;
     }
 
@@ -313,6 +316,7 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
       const newCatName = newCatNameInput;
       if (!newCatName) {
         showToast('error', 'Category name is required');
+        setSaving(false);
         return;
       }
       const createCategoryResponse = await api.post(endpoints.categories, {
@@ -325,6 +329,7 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
         showToast('success', `Created category "${newCatName}"`);
       } else {
         showToast('error', 'Failed to create category');
+        setSaving(false);
         return;
       }
     }
@@ -371,6 +376,7 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
     // Validate: containers cannot be inside other containers
     if (isContainer() && containerItemId) {
       showToast('error', 'Containers cannot be placed inside other containers');
+      setSaving(false);
       return;
     }
 
@@ -391,7 +397,7 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
       // Get the created item from the response
       const createdItem = response.data as TripItem | undefined;
 
-      if (keepOpen()) {
+      if (keepOpenAfterSubmit) {
         // Smart reuse logic for Add Another
         const wasContainer = isContainer();
         const lastLocation = location();
@@ -401,10 +407,10 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
         setName('');
         setIsNewCategory(false);
         setNewCategoryName('');
-        setKeepOpen(false);
         setIsContainer(false);
         setSkipMasterAddition(false);
         setLocation(''); // Clear location so restoration triggers a signal change
+        setSaving(false);
 
         // Call onSaved with created item to update store (important for containers to appear in list)
         props.onSaved(createdItem);
@@ -432,12 +438,12 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
       }
     } else {
       showToast('error', response.error || 'Failed to add item');
+      setSaving(false);
     }
   };
 
   const handleAddAnother = async (e: Event) => {
-    setKeepOpen(true);
-    await handleSubmit(e);
+    await handleSubmit(e, true);
   };
 
   return (
@@ -583,13 +589,14 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
         </div>
 
         <div class="flex gap-2 pt-4">
-          <Button type="button" onClick={handleSubmit} class="flex-1">
+          <Button type="button" onClick={handleSubmit} class="flex-1" disabled={saving()}>
             Add
           </Button>
           <Button
             type="submit"
             class="flex flex-1 items-center justify-center gap-2"
             variant="secondary"
+            disabled={saving()}
           >
             <span>Add More</span>
             <span class="rounded bg-gray-900/10 px-1.5 py-0.5 font-mono text-xs">↵</span>

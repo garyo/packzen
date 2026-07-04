@@ -19,6 +19,14 @@ let globalPointerX = 0;
 let globalPointerY = 0;
 let pointerTrackerActive = false;
 
+/**
+ * Maximum distance (px) from the pointer/draggable center that the Pack Mode
+ * "nearest droppable" fallback will still snap to. Beyond this, a drop is
+ * treated as landing on nothing rather than being forced onto whatever
+ * droppable happens to be closest.
+ */
+const PACK_MODE_FALLBACK_MAX_DISTANCE = 100;
+
 function updateGlobalPointer(e: PointerEvent | TouchEvent) {
   if ('touches' in e && e.touches.length > 0) {
     globalPointerX = e.touches[0].clientX;
@@ -105,6 +113,8 @@ export const liveRectCollision = (
   // This helps when the draggable position is slightly off due to scrolling
   // Don't use this fallback in Add Mode (pointer tracking active) to prevent
   // highlighting targets in the wrong panel
+  // Capped so releasing over whitespace (far from any droppable) is a no-drop,
+  // not an implicit move to whatever happens to be nearest.
   if (!pointerTrackerActive) {
     let closestDroppable: DroppableType | null = null;
     let closestDistance = Infinity;
@@ -122,7 +132,9 @@ export const liveRectCollision = (
       }
     }
 
-    return closestDroppable;
+    if (closestDistance <= PACK_MODE_FALLBACK_MAX_DISTANCE) {
+      return closestDroppable;
+    }
   }
 
   // No droppable contains the point - return null (no highlight)

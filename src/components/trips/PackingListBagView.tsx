@@ -251,6 +251,7 @@ function PackingListBagViewInner(props: PackingListBagViewProps) {
   const [openBagMenu, setOpenBagMenu] = createSignal<string | null>(null);
   const [openContainerMenu, setOpenContainerMenu] = createSignal<string | null>(null);
   const [activeItem, setActiveItem] = createSignal<TripItem | null>(null);
+  const [dragCancelled, setDragCancelled] = createSignal(false);
   const [replacingBagId, setReplacingBagId] = createSignal<string | null>(null);
   const autoScroll = useAutoScroll();
 
@@ -258,8 +259,13 @@ function PackingListBagViewInner(props: PackingListBagViewProps) {
   // Simplified: D&D only moves items between locations (bags, containers), never changes category
   const handleDragEnd = (event: DragEvent) => {
     const { draggable, droppable } = event;
+    const wasCancelled = dragCancelled();
     setActiveItem(null);
+    setDragCancelled(false);
     autoScroll.stop();
+
+    // User pressed ESC to cancel - don't commit the drop
+    if (wasCancelled) return;
 
     if (!droppable) return;
 
@@ -280,7 +286,14 @@ function PackingListBagViewInner(props: PackingListBagViewProps) {
   const handleDragStart = (event: DragEvent) => {
     const dragData = event.draggable.data as DragData;
     setActiveItem(dragData.item);
+    setDragCancelled(false);
     autoScroll.start();
+  };
+
+  const handleDragCancel = () => {
+    setDragCancelled(true);
+    setActiveItem(null);
+    autoScroll.stop();
   };
 
   // Get all container items and their contents
@@ -519,7 +532,7 @@ function PackingListBagViewInner(props: PackingListBagViewProps) {
       collisionDetector={liveRectCollision}
     >
       <DragDropSensors />
-      <EscapeCancelHandler onCancel={() => setActiveItem(null)} />
+      <EscapeCancelHandler onCancel={handleDragCancel} />
       <div class="space-y-6 md:space-y-3">
         {/* Sticky Wayfinding Nav Bar */}
         <Show when={navItems().length > 1}>

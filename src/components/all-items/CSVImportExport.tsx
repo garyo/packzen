@@ -46,6 +46,7 @@ export function CSVImportExport(props: CSVImportExportProps) {
       let createdCount = 0;
       let updatedCount = 0;
       let createdCategoriesCount = 0;
+      let failedCount = 0;
 
       // Helper to get or create category by name
       const getCategoryId = async (categoryName: string | undefined): Promise<string | null> => {
@@ -88,6 +89,8 @@ export function CSVImportExport(props: CSVImportExportProps) {
           });
           if (response.success) {
             updatedCount++;
+          } else {
+            failedCount++;
           }
         } else {
           // Create new item
@@ -99,6 +102,8 @@ export function CSVImportExport(props: CSVImportExportProps) {
           });
           if (response.success) {
             createdCount++;
+          } else {
+            failedCount++;
           }
         }
       }
@@ -107,7 +112,10 @@ export function CSVImportExport(props: CSVImportExportProps) {
       if (createdCategoriesCount > 0) {
         message += `, ${createdCategoriesCount} categories created`;
       }
-      showToast('success', message);
+      if (failedCount > 0) {
+        message += `, ${failedCount} failed`;
+      }
+      showToast(failedCount > 0 ? 'error' : 'success', message);
 
       props.onDataChanged();
     } catch (error) {

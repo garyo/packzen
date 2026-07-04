@@ -36,6 +36,7 @@ export function EditTripItem(props: EditTripItemProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = createSignal(false);
   const [containedItemsCount, setContainedItemsCount] = createSignal(0);
   const [categoryInitialized, setCategoryInitialized] = createSignal(false);
+  const [saving, setSaving] = createSignal(false);
 
   // Use pre-loaded bags if available, otherwise fetch
   const bags = () => props.bags || [];
@@ -78,6 +79,9 @@ export function EditTripItem(props: EditTripItemProps) {
   });
 
   const handleSave = async () => {
+    if (saving()) return;
+    setSaving(true);
+
     // Create new category if needed
     let finalCategoryId = categoryId();
     let finalCategoryName = '';
@@ -86,6 +90,7 @@ export function EditTripItem(props: EditTripItemProps) {
       const newCatName = newCategoryName().trim();
       if (!newCatName) {
         showToast('error', 'Category name is required');
+        setSaving(false);
         return;
       }
       const createCategoryResponse = await api.post(endpoints.categories, {
@@ -99,12 +104,17 @@ export function EditTripItem(props: EditTripItemProps) {
         showToast('success', `Created category "${newCatName}"`);
       } else {
         showToast('error', 'Failed to create category');
+        setSaving(false);
         return;
       }
     } else if (finalCategoryId) {
       // Look up category name from ID
       const cat = categories()?.find((c) => c.id === finalCategoryId);
       finalCategoryName = cat?.name || '';
+    } else if (!categoryInitialized()) {
+      // Categories haven't resolved yet: keep the item's current category instead
+      // of wiping it with categoryId()'s not-yet-initialized null.
+      finalCategoryName = props.item.category_name || '';
     }
 
     // Parse location to determine bag_id and container_item_id
@@ -121,6 +131,7 @@ export function EditTripItem(props: EditTripItemProps) {
     // Validate container constraints
     if (isContainer() && containerItemId) {
       showToast('error', 'A container cannot be placed inside another container');
+      setSaving(false);
       return;
     }
 
@@ -148,6 +159,7 @@ export function EditTripItem(props: EditTripItemProps) {
       props.onClose();
     } else {
       showToast('error', response.error || 'Failed to update item');
+      setSaving(false);
     }
   };
 
@@ -180,6 +192,8 @@ export function EditTripItem(props: EditTripItemProps) {
   };
 
   const performDelete = async (keepItems: boolean) => {
+    if (saving()) return;
+    setSaving(true);
     const movedItemIds: string[] = [];
 
     if (keepItems) {
@@ -188,11 +202,21 @@ export function EditTripItem(props: EditTripItemProps) {
         props.allItems?.filter((item) => item.container_item_id === props.item.id) || [];
 
       for (const item of contained) {
-        await api.patch(endpoints.tripItems(props.tripId), {
+        const moveResponse = await api.patch(endpoints.tripItems(props.tripId), {
           id: item.id,
           container_item_id: null,
           bag_id: props.item.bag_id || null, // Inherit bag from container
         });
+
+        if (!moveResponse.success) {
+          // Abort before deleting the container - otherwise the server-side cascade
+          // would delete the children the user asked to keep. Some items may already
+          // have been moved, so refresh from the server to stay in sync.
+          showToast('error', moveResponse.error || 'Failed to move items out of container');
+          props.onSaved();
+          setSaving(false);
+          return;
+        }
         movedItemIds.push(item.id);
       }
     }
@@ -220,6 +244,7 @@ export function EditTripItem(props: EditTripItemProps) {
       props.onClose();
     } else {
       showToast('error', response.error || 'Failed to delete item');
+      setSaving(false);
     }
   };
 
@@ -368,12 +393,13 @@ export function EditTripItem(props: EditTripItemProps) {
         </div>
 
         <div class="flex gap-2 pt-4">
-          <Button onClick={handleSave} class="flex-1">
+          <Button onClick={handleSave} class="flex-1" disabled={saving()}>
             Save
           </Button>
           <button
             onClick={handleDelete}
-            class="p-2 text-gray-400 hover:text-red-600"
+            disabled={saving()}
+            class="p-2 text-gray-400 hover:text-red-600 disabled:opacity-50"
             title="Delete item"
           >
             <TrashIcon class="h-5 w-5" />
@@ -395,6 +421,7 @@ export function EditTripItem(props: EditTripItemProps) {
                 onClick={() => performDelete(true)}
                 variant="primary"
                 class="w-full justify-center"
+                disabled={saving()}
               >
                 Keep Items (move {getContainerDestination()})
               </Button>
@@ -402,6 +429,7 @@ export function EditTripItem(props: EditTripItemProps) {
                 onClick={() => performDelete(false)}
                 variant="secondary"
                 class="w-full justify-center bg-red-50 text-red-600 hover:bg-red-100"
+                disabled={saving()}
               >
                 Delete All ({containedItemsCount() + 1} items)
               </Button>
@@ -409,6 +437,7 @@ export function EditTripItem(props: EditTripItemProps) {
                 onClick={() => setShowDeleteConfirm(false)}
                 variant="secondary"
                 class="w-full justify-center"
+                disabled={saving()}
               >
                 Cancel
               </Button>

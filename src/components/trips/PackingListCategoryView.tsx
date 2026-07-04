@@ -149,14 +149,20 @@ interface PackingListCategoryViewProps {
 function PackingListCategoryViewInner(props: PackingListCategoryViewProps) {
   const [activeItem, setActiveItem] = createSignal<TripItem | null>(null);
   const [activeCategoryName, setActiveCategoryName] = createSignal<string | null>(null);
+  const [dragCancelled, setDragCancelled] = createSignal(false);
   const autoScroll = useAutoScroll();
 
   // Handle drag end - only move if dropping in same category
   const handleDragEnd = (event: DragEvent) => {
     const { draggable, droppable } = event;
+    const wasCancelled = dragCancelled();
     setActiveItem(null);
     setActiveCategoryName(null);
+    setDragCancelled(false);
     autoScroll.stop();
+
+    // User pressed ESC to cancel - don't commit the drop
+    if (wasCancelled) return;
 
     if (!droppable) return;
 
@@ -179,7 +185,15 @@ function PackingListCategoryViewInner(props: PackingListCategoryViewProps) {
     const dragData = event.draggable.data as DragData;
     setActiveItem(dragData.item);
     setActiveCategoryName(dragData.categoryName);
+    setDragCancelled(false);
     autoScroll.start();
+  };
+
+  const handleDragCancel = () => {
+    setDragCancelled(true);
+    setActiveItem(null);
+    setActiveCategoryName(null);
+    autoScroll.stop();
   };
 
   // Check if current drop target is valid (same category as dragged item)
@@ -280,12 +294,7 @@ function PackingListCategoryViewInner(props: PackingListCategoryViewProps) {
       collisionDetector={liveRectCollision}
     >
       <DragDropSensors />
-      <EscapeCancelHandler
-        onCancel={() => {
-          setActiveItem(null);
-          setActiveCategoryName(null);
-        }}
-      />
+      <EscapeCancelHandler onCancel={handleDragCancel} />
       <div class="space-y-6 md:space-y-3">
         <For each={sortedCategories()}>
           {(category) => {

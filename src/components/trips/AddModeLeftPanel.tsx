@@ -176,6 +176,31 @@ export function AddModeLeftPanel(props: AddModeLeftPanelProps) {
     return new Set(items.map((item) => item.name.toLowerCase()));
   });
 
+  // First trip item for each master_item_id (mirrors items.find() first-match order)
+  const tripItemsByMasterItemId = createMemo(() => {
+    const items = props.items() || [];
+    const map = new Map<string, TripItem>();
+    for (const item of items) {
+      if (item.master_item_id && !map.has(item.master_item_id)) {
+        map.set(item.master_item_id, item);
+      }
+    }
+    return map;
+  });
+
+  // First trip item for each normalized name (mirrors items.find() first-match order)
+  const tripItemsByName = createMemo(() => {
+    const items = props.items() || [];
+    const map = new Map<string, TripItem>();
+    for (const item of items) {
+      const key = item.name.toLowerCase();
+      if (!map.has(key)) {
+        map.set(key, item);
+      }
+    }
+    return map;
+  });
+
   // Check if an item is already in trip
   // For master items: check by master_item_id first, then fallback to name match
   // For built-in items: check by name
@@ -190,12 +215,11 @@ export function AddModeLeftPanel(props: AddModeLeftPanelProps) {
 
   // Get packed status for an item
   const isItemPacked = (itemId: string, itemName: string, sourceType: 'master' | 'built-in') => {
-    const items = props.items() || [];
     if (sourceType === 'master') {
-      const tripItem = items.find((i) => i.master_item_id === itemId);
+      const tripItem = tripItemsByMasterItemId().get(itemId);
       return tripItem?.is_packed ?? false;
     } else {
-      const tripItem = items.find((i) => i.name.toLowerCase() === itemName.toLowerCase());
+      const tripItem = tripItemsByName().get(itemName.toLowerCase());
       return tripItem?.is_packed ?? false;
     }
   };
@@ -203,14 +227,13 @@ export function AddModeLeftPanel(props: AddModeLeftPanelProps) {
   // Get the trip item ID for an item (to enable removal)
   // Check by master_item_id first, then fall back to name matching
   const getTripItemId = (itemId: string, itemName: string, sourceType: 'master' | 'built-in') => {
-    const items = props.items() || [];
     if (sourceType === 'master' && itemId) {
       // First try by master_item_id
-      const tripItemById = items.find((i) => i.master_item_id === itemId);
+      const tripItemById = tripItemsByMasterItemId().get(itemId);
       if (tripItemById) return tripItemById.id;
     }
     // Fallback: find by name (handles items added without master_item_id link)
-    const tripItemByName = items.find((i) => i.name.toLowerCase() === itemName.toLowerCase());
+    const tripItemByName = tripItemsByName().get(itemName.toLowerCase());
     return tripItemByName?.id;
   };
 

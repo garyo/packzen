@@ -54,6 +54,17 @@ interface PackingPageProps {
   tripId: string;
 }
 
+// api.* never throws - it resolves to { success: false, ... } on failure. This runs a
+// batch of requests and reports back which ids failed, so callers can roll those back
+// while keeping the successful ones applied.
+async function runBatch<R extends { success: boolean }>(
+  ids: string[],
+  request: (id: string) => Promise<R>
+): Promise<string[]> {
+  const responses = await Promise.all(ids.map(request));
+  return ids.filter((_, i) => !responses[i].success);
+}
+
 export function PackingPage(props: PackingPageProps) {
   const [showAddFromMaster, setShowAddFromMaster] = createSignal(false);
   const [showBagManager, setShowBagManager] = createSignal(false);
@@ -204,11 +215,19 @@ export function PackingPage(props: PackingPageProps) {
     );
   };
 
-  // Add item to store
+  // Add item to store, or update in place if one with the same id is already
+  // present. The items POST endpoint merges duplicates server-side (e.g. bumps
+  // quantity on an existing row) and returns that existing item rather than a
+  // new one, so callers can't assume the id is new.
   const addItemToStore = (item: TripItem) => {
     setItemsState(
       produce((state) => {
-        state.data.push(item);
+        const index = state.data.findIndex((i) => i.id === item.id);
+        if (index === -1) {
+          state.data.push(item);
+        } else {
+          state.data[index] = item;
+        }
       })
     );
   };
@@ -371,12 +390,11 @@ export function PackingPage(props: PackingPageProps) {
             label: 'Undo',
             onClick: async () => {
               updateItemInStore(item.id, { [field]: originalValue });
-              try {
-                await api.patch(endpoints.tripItems(props.tripId), {
-                  id: item.id,
-                  [field]: originalValue,
-                });
-              } catch {
+              const undoResponse = await api.patch(endpoints.tripItems(props.tripId), {
+                id: item.id,
+                [field]: originalValue,
+              });
+              if (!undoResponse.success) {
                 showToast('error', 'Failed to undo');
                 updateItemInStore(item.id, { [field]: newValue });
               }
@@ -513,27 +531,28 @@ export function PackingPage(props: PackingPageProps) {
     // Optimistic update using store - no scroll disruption
     updateItemsInStore(itemsToUpdate, { bag_id: bagId, container_item_id: null });
 
-    try {
-      await Promise.all(
-        itemsToUpdate.map((itemId) =>
-          api.patch(endpoints.tripItems(props.tripId), {
-            id: itemId,
-            bag_id: bagId,
-            container_item_id: null, // Clear container when assigning to bag
-          })
-        )
-      );
+    const failedIds = await runBatch(itemsToUpdate, (itemId) =>
+      api.patch(endpoints.tripItems(props.tripId), {
+        id: itemId,
+        bag_id: bagId,
+        container_item_id: null, // Clear container when assigning to bag
+      })
+    );
 
+    if (failedIds.length > 0) {
+      failedIds.forEach((id) => updateItemInStore(id, previousStates.get(id)!));
+      const succeeded = itemsToUpdate.length - failedIds.length;
+      showToast(
+        'error',
+        succeeded > 0
+          ? `Assigned ${succeeded} of ${itemsToUpdate.length} items to bag; ${failedIds.length} failed`
+          : `Failed to assign ${failedIds.length} items to bag`
+      );
+    } else {
       showToast('success', `Assigned ${itemsToUpdate.length} items to bag`);
-      setSelectMode(false);
-      setSelectedItems(new Set<string>());
-    } catch (error) {
-      showToast('error', 'Failed to assign items');
-      // Restore previous state instead of full refetch
-      previousStates.forEach((state, id) => {
-        updateItemInStore(id, state);
-      });
     }
+    setSelectMode(false);
+    setSelectedItems(new Set<string>());
   };
 
   const handleBatchAssignToContainer = async (containerId: string | null) => {
@@ -564,30 +583,32 @@ export function PackingPage(props: PackingPageProps) {
     // Optimistic update using store - no scroll disruption
     updateItemsInStore(itemsToUpdate, { container_item_id: containerId, bag_id: null });
 
-    try {
-      await Promise.all(
-        itemsToUpdate.map((itemId) =>
-          api.patch(endpoints.tripItems(props.tripId), {
-            id: itemId,
-            container_item_id: containerId,
-            bag_id: null, // Clear bag when assigning to container
-          })
-        )
-      );
+    const failedIds = await runBatch(itemsToUpdate, (itemId) =>
+      api.patch(endpoints.tripItems(props.tripId), {
+        id: itemId,
+        container_item_id: containerId,
+        bag_id: null, // Clear bag when assigning to container
+      })
+    );
 
-      const containerName = containerId
-        ? currentItems.find((item) => item.id === containerId)?.name || 'container'
-        : 'no container';
+    const containerName = containerId
+      ? currentItems.find((item) => item.id === containerId)?.name || 'container'
+      : 'no container';
+
+    if (failedIds.length > 0) {
+      failedIds.forEach((id) => updateItemInStore(id, previousStates.get(id)!));
+      const succeeded = itemsToUpdate.length - failedIds.length;
+      showToast(
+        'error',
+        succeeded > 0
+          ? `Assigned ${succeeded} of ${itemsToUpdate.length} items to ${containerName}; ${failedIds.length} failed`
+          : `Failed to assign ${failedIds.length} items to ${containerName}`
+      );
+    } else {
       showToast('success', `Assigned ${itemsToUpdate.length} items to ${containerName}`);
-      setSelectMode(false);
-      setSelectedItems(new Set<string>());
-    } catch (error) {
-      showToast('error', 'Failed to assign items to container');
-      // Restore previous state instead of full refetch
-      previousStates.forEach((state, id) => {
-        updateItemInStore(id, state);
-      });
     }
+    setSelectMode(false);
+    setSelectedItems(new Set<string>());
   };
 
   const handleBatchAssignToCategory = async (categoryId: string | null) => {
@@ -609,29 +630,31 @@ export function PackingPage(props: PackingPageProps) {
     // Optimistic update using store - no scroll disruption
     updateItemsInStore(itemsToUpdate, { category_name: categoryName });
 
-    try {
-      await Promise.all(
-        itemsToUpdate.map((itemId) =>
-          api.patch(endpoints.tripItems(props.tripId), {
-            id: itemId,
-            category_name: categoryName,
-          })
-        )
-      );
+    const failedIds = await runBatch(itemsToUpdate, (itemId) =>
+      api.patch(endpoints.tripItems(props.tripId), {
+        id: itemId,
+        category_name: categoryName,
+      })
+    );
 
-      showToast(
-        'success',
-        `Assigned ${itemsToUpdate.length} items to ${categoryName || 'no category'}`
+    const categoryLabel = categoryName || 'no category';
+
+    if (failedIds.length > 0) {
+      failedIds.forEach((id) =>
+        updateItemInStore(id, { category_name: previousCategories.get(id) ?? null })
       );
-      setSelectMode(false);
-      setSelectedItems(new Set<string>());
-    } catch (error) {
-      showToast('error', 'Failed to assign items to category');
-      // Restore previous state instead of full refetch
-      previousCategories.forEach((prevCategoryName, id) => {
-        updateItemInStore(id, { category_name: prevCategoryName });
-      });
+      const succeeded = itemsToUpdate.length - failedIds.length;
+      showToast(
+        'error',
+        succeeded > 0
+          ? `Assigned ${succeeded} of ${itemsToUpdate.length} items to ${categoryLabel}; ${failedIds.length} failed`
+          : `Failed to assign ${failedIds.length} items to ${categoryLabel}`
+      );
+    } else {
+      showToast('success', `Assigned ${itemsToUpdate.length} items to ${categoryLabel}`);
     }
+    setSelectMode(false);
+    setSelectedItems(new Set<string>());
   };
 
   async function handleBatchSetSkipped(skip: boolean) {
@@ -640,24 +663,29 @@ export function PackingPage(props: PackingPageProps) {
 
     updateItemsInStore(itemsToUpdate, { is_skipped: skip });
 
-    try {
-      await Promise.all(
-        itemsToUpdate.map((itemId) =>
-          api.patch(endpoints.tripItems(props.tripId), {
-            id: itemId,
-            is_skipped: skip,
-          })
-        )
-      );
+    const failedIds = await runBatch(itemsToUpdate, (itemId) =>
+      api.patch(endpoints.tripItems(props.tripId), {
+        id: itemId,
+        is_skipped: skip,
+      })
+    );
 
-      const label = skip ? 'Skipped' : 'Unskipped';
+    const label = skip ? 'Skipped' : 'Unskipped';
+
+    if (failedIds.length > 0) {
+      updateItemsInStore(failedIds, { is_skipped: !skip });
+      const succeeded = itemsToUpdate.length - failedIds.length;
+      showToast(
+        'error',
+        succeeded > 0
+          ? `${label} ${succeeded} of ${itemsToUpdate.length} items; ${failedIds.length} failed`
+          : `Failed to ${skip ? 'skip' : 'unskip'} ${failedIds.length} items`
+      );
+    } else {
       showToast('success', `${label} ${itemsToUpdate.length} items`);
-      setSelectMode(false);
-      setSelectedItems(new Set<string>());
-    } catch {
-      showToast('error', `Failed to ${skip ? 'skip' : 'unskip'} items`);
-      updateItemsInStore(itemsToUpdate, { is_skipped: !skip });
     }
+    setSelectMode(false);
+    setSelectedItems(new Set<string>());
   }
 
   const handleBatchSkip = () => handleBatchSetSkipped(true);
@@ -669,27 +697,34 @@ export function PackingPage(props: PackingPageProps) {
 
     // Capture deleted items for rollback
     const deletedItems = items()?.filter((item) => selectedItems().has(item.id)) || [];
+    const deletedItemsById = new Map(deletedItems.map((item) => [item.id, item]));
 
     // Optimistic delete using store - no scroll disruption
     deleteItemsFromStore(itemsToDelete);
 
-    try {
-      await Promise.all(
-        itemsToDelete.map((itemId) =>
-          api.delete(endpoints.tripItems(props.tripId), {
-            body: JSON.stringify({ id: itemId }),
-          })
-        )
-      );
+    const failedIds = await runBatch(itemsToDelete, (itemId) =>
+      api.delete(endpoints.tripItems(props.tripId), {
+        body: JSON.stringify({ id: itemId }),
+      })
+    );
 
+    if (failedIds.length > 0) {
+      failedIds.forEach((id) => {
+        const item = deletedItemsById.get(id);
+        if (item) addItemToStore(item);
+      });
+      const succeeded = itemsToDelete.length - failedIds.length;
+      showToast(
+        'error',
+        succeeded > 0
+          ? `Deleted ${succeeded} of ${itemsToDelete.length} items; ${failedIds.length} failed`
+          : `Failed to delete ${failedIds.length} items`
+      );
+    } else {
       showToast('success', `Deleted ${itemsToDelete.length} items`);
-      setSelectMode(false);
-      setSelectedItems(new Set<string>());
-    } catch (error) {
-      showToast('error', 'Failed to delete items');
-      // Restore deleted items instead of full refetch
-      deletedItems.forEach((item) => addItemToStore(item));
     }
+    setSelectMode(false);
+    setSelectedItems(new Set<string>());
   };
 
   const handleExport = () => {
@@ -729,42 +764,47 @@ export function PackingPage(props: PackingPageProps) {
     // Optimistic update using store
     updateItemsInStore(packedItemIds, { is_packed: false });
 
-    try {
-      await Promise.all(
-        packedItems.map((item) =>
-          api.patch(endpoints.tripItems(props.tripId), {
-            id: item.id,
-            is_packed: false,
-          })
-        )
-      );
+    const failedIds = await runBatch(packedItemIds, (itemId) =>
+      api.patch(endpoints.tripItems(props.tripId), {
+        id: itemId,
+        is_packed: false,
+      })
+    );
 
-      showToast('info', `Unpacked ${packedItems.length} items`, {
-        action: {
-          label: 'Undo',
-          onClick: async () => {
-            updateItemsInStore(packedItemIds, { is_packed: true });
-            try {
-              await Promise.all(
-                packedItems.map((item) =>
-                  api.patch(endpoints.tripItems(props.tripId), {
-                    id: item.id,
-                    is_packed: true,
-                  })
-                )
-              );
-            } catch {
-              showToast('error', 'Failed to undo');
-              updateItemsInStore(packedItemIds, { is_packed: false });
-            }
-          },
-        },
-      });
-    } catch (error) {
-      showToast('error', 'Failed to unpack items');
-      // Restore packed state instead of full refetch
-      updateItemsInStore(packedItemIds, { is_packed: true });
+    if (failedIds.length > 0) {
+      updateItemsInStore(failedIds, { is_packed: true });
     }
+
+    const succeededIds = packedItemIds.filter((id) => !failedIds.includes(id));
+
+    if (succeededIds.length === 0) {
+      showToast('error', `Failed to unpack ${failedIds.length} items`);
+      return;
+    }
+
+    const message =
+      failedIds.length > 0
+        ? `Unpacked ${succeededIds.length} of ${packedItemIds.length} items; ${failedIds.length} failed`
+        : `Unpacked ${succeededIds.length} items`;
+
+    showToast('info', message, {
+      action: {
+        label: 'Undo',
+        onClick: async () => {
+          updateItemsInStore(succeededIds, { is_packed: true });
+          const undoFailedIds = await runBatch(succeededIds, (itemId) =>
+            api.patch(endpoints.tripItems(props.tripId), {
+              id: itemId,
+              is_packed: true,
+            })
+          );
+          if (undoFailedIds.length > 0) {
+            showToast('error', 'Failed to undo');
+            updateItemsInStore(undoFailedIds, { is_packed: false });
+          }
+        },
+      },
+    });
   };
 
   const handleDeleteTrip = async () => {
@@ -1003,14 +1043,19 @@ export function PackingPage(props: PackingPageProps) {
     return masterItem?.id || null;
   }
 
+  const [addingBuiltIn, setAddingBuiltIn] = createSignal(false);
+
   const handleAddBuiltInItemsToTrip = async (
     itemsToAdd: SelectedBuiltInItem[],
     bagId?: string | null,
     containerId?: string | null
   ) => {
+    if (addingBuiltIn()) return;
+    setAddingBuiltIn(true);
     try {
       const { masterItemsList, categoriesList } = await ensureResourcesLoaded();
 
+      let addedCount = 0;
       for (const item of itemsToAdd) {
         const masterItemId = await getOrCreateMasterItem(item, masterItemsList, categoriesList);
 
@@ -1027,14 +1072,24 @@ export function PackingPage(props: PackingPageProps) {
 
         if (response.success && response.data) {
           addItemToStore(response.data as TripItem);
+          addedCount++;
         }
       }
 
-      showToast('success', `Added ${itemsToAdd.length} items to trip and master list`);
+      if (addedCount === itemsToAdd.length) {
+        showToast('success', `Added ${addedCount} items to trip and master list`);
+      } else {
+        showToast(
+          'error',
+          `Added ${addedCount} of ${itemsToAdd.length} items; ${itemsToAdd.length - addedCount} failed`
+        );
+      }
       refetchMasterItems();
     } catch (error) {
       showToast('error', 'Failed to add items');
       console.error('Error adding built-in items to trip:', error);
+    } finally {
+      setAddingBuiltIn(false);
     }
   };
 
@@ -1065,17 +1120,28 @@ export function PackingPage(props: PackingPageProps) {
     setAddingStarter(tripTypeId);
     try {
       // Create the container first so its generated id can nest the toiletries.
+      // Reuse an existing "Toilet Kit" instead of creating a second one — a repeat
+      // tap (e.g. another chip that also has toiletries) would otherwise merge into
+      // a duplicate container, bumping its quantity to "2x Toilet Kit".
       let toiletKitId: string | null = null;
+      let createdToiletKit: TripItem | null = null;
       if (hasToiletries) {
-        const containerRes = await api.post<TripItem>(endpoints.tripItems(props.tripId), {
-          name: 'Toilet Kit',
-          category_name: TOILETRY_CATEGORY,
-          is_container: true,
-          bag_id: null,
-        });
-        if (containerRes.success && containerRes.data) {
-          toiletKitId = containerRes.data.id;
-          addItemToStore(containerRes.data);
+        const existingToiletKit = (items() ?? []).find(
+          (i) => i.is_container && i.name.toLowerCase() === 'toilet kit'
+        );
+        if (existingToiletKit) {
+          toiletKitId = existingToiletKit.id;
+        } else {
+          const containerRes = await api.post<TripItem>(endpoints.tripItems(props.tripId), {
+            name: 'Toilet Kit',
+            category_name: TOILETRY_CATEGORY,
+            is_container: true,
+            bag_id: null,
+          });
+          if (containerRes.success && containerRes.data) {
+            toiletKitId = containerRes.data.id;
+            createdToiletKit = containerRes.data;
+          }
         }
       }
 
@@ -1095,10 +1161,18 @@ export function PackingPage(props: PackingPageProps) {
       });
 
       if (response.success && response.data) {
+        if (createdToiletKit) addItemToStore(createdToiletKit);
         response.data.forEach((item) => addItemToStore(item));
-        const total = response.data.length + (toiletKitId ? 1 : 0);
+        const total = response.data.length + (createdToiletKit ? 1 : 0);
         showToast('success', `Added ${total} items`);
       } else {
+        // The items that were meant to go in it never made it — don't leave a
+        // newly-created container orphaned and empty.
+        if (createdToiletKit) {
+          await api.delete(endpoints.tripItems(props.tripId), {
+            body: JSON.stringify({ id: createdToiletKit.id }),
+          });
+        }
         showToast('error', (response as { error?: string }).error || 'Failed to add items');
       }
     } catch {

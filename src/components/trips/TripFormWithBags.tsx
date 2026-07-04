@@ -71,41 +71,56 @@ export function TripFormWithBags(props: TripFormWithBagsProps) {
 
       const newTripId = tripResponse.data.id;
 
-      // Step 2: Create bags from selected templates
+      // Step 2: Create bags from selected templates (independent inserts, run in parallel)
       const templates = bagTemplates() || [];
       const selectedTemplates = templates.filter((t) => selectedTemplateIds().has(t.id));
 
-      for (const template of selectedTemplates) {
-        await api.post(endpoints.tripBags(newTripId), {
-          name: template.name,
-          type: template.type,
-          color: template.color,
-          sort_order: 0,
-        });
-      }
+      const templateBagResponses = await Promise.all(
+        selectedTemplates.map((template) =>
+          api.post(endpoints.tripBags(newTripId), {
+            name: template.name,
+            type: template.type,
+            color: template.color,
+            sort_order: 0,
+          })
+        )
+      );
 
-      // Step 3: Create custom bags (and optionally save to My Bags)
-      for (const bag of customBags()) {
-        // Save to bag templates if requested
-        if (bag.saveToMyBags) {
-          await api.post(endpoints.bagTemplates, {
+      // Step 3: Create custom bags (and optionally save to My Bags), also in parallel
+      const customBagResponses = await Promise.all(
+        customBags().map(async (bag) => {
+          // Save to bag templates if requested
+          if (bag.saveToMyBags) {
+            await api.post(endpoints.bagTemplates, {
+              name: bag.name,
+              type: bag.type,
+              color: bag.color,
+            });
+          }
+
+          // Always add to this trip
+          return api.post(endpoints.tripBags(newTripId), {
             name: bag.name,
             type: bag.type,
             color: bag.color,
+            sort_order: 0,
           });
-        }
+        })
+      );
 
-        // Always add to this trip
-        await api.post(endpoints.tripBags(newTripId), {
-          name: bag.name,
-          type: bag.type,
-          color: bag.color,
-          sort_order: 0,
-        });
-      }
+      const failedBagCount = [...templateBagResponses, ...customBagResponses].filter(
+        (response) => !response.success
+      ).length;
 
       setCreating(false);
-      showToast('success', 'Trip created successfully!');
+      if (failedBagCount > 0) {
+        showToast(
+          'error',
+          `Trip created, but ${failedBagCount} bag${failedBagCount === 1 ? '' : 's'} failed to add. You can add ${failedBagCount === 1 ? 'it' : 'them'} from the trip.`
+        );
+      } else {
+        showToast('success', 'Trip created successfully!');
+      }
       props.onSaved(newTripId);
     } catch (error) {
       setCreating(false);

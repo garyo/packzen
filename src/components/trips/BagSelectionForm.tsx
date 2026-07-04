@@ -282,19 +282,11 @@ export function BagSelectionForm(props: BagSelectionFormProps) {
         <Button type="button" variant="secondary" onClick={props.onBack}>
           Back
         </Button>
-        <div class="flex gap-2">
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={props.onSubmit}
-            disabled={totalBagsSelected() === 0}
-          >
-            Skip Bags
-          </Button>
-          <Button type="button" onClick={props.onSubmit}>
-            {totalBagsSelected() > 0 ? 'Create Trip with Bags' : 'Create Trip (no bags)'}
-          </Button>
-        </div>
+        <Button type="button" onClick={props.onSubmit}>
+          {totalBagsSelected() > 0
+            ? `Create Trip with ${totalBagsSelected()} ${totalBagsSelected() === 1 ? 'Bag' : 'Bags'}`
+            : 'Create Trip'}
+        </Button>
       </div>
     </div>
   );

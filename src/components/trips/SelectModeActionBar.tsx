@@ -9,6 +9,10 @@ import { For, Show, createSignal, createMemo, type Accessor } from 'solid-js';
 import type { Bag, Category, TripItem } from '../../lib/types';
 import { Button } from '../ui/Button';
 
+// Distinct sentinel for the "Choose..." placeholder so it never collides with the
+// "No bag"/"No container"/"No category" clear option, which uses value="".
+const PLACEHOLDER = '__placeholder__';
+
 interface SelectModeActionBarProps {
   selectedCount: Accessor<number>;
   bags: Accessor<Bag[] | undefined>;
@@ -44,10 +48,13 @@ export function SelectModeActionBar(props: SelectModeActionBarProps) {
             <div class="flex items-center gap-2">
               <label class="text-sm font-medium text-gray-700">Bag:</label>
               <select
-                onChange={(e) => props.onAssignToBag(e.target.value || null)}
+                onChange={(e) => {
+                  if (e.target.value === PLACEHOLDER) return;
+                  props.onAssignToBag(e.target.value || null);
+                }}
                 class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
               >
-                <option value="">Choose...</option>
+                <option value={PLACEHOLDER}>Choose...</option>
                 <option value="">No bag</option>
                 <For each={props.bags()}>{(bag) => <option value={bag.id}>{bag.name}</option>}</For>
               </select>
@@ -58,10 +65,13 @@ export function SelectModeActionBar(props: SelectModeActionBarProps) {
               <div class="flex items-center gap-2">
                 <label class="text-sm font-medium text-gray-700">Container:</label>
                 <select
-                  onChange={(e) => props.onAssignToContainer(e.target.value || null)}
+                  onChange={(e) => {
+                    if (e.target.value === PLACEHOLDER) return;
+                    props.onAssignToContainer(e.target.value || null);
+                  }}
                   class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value="">Choose...</option>
+                  <option value={PLACEHOLDER}>Choose...</option>
                   <option value="">No container</option>
                   <For each={props.containers()}>
                     {(container) => <option value={container.id}>📦 {container.name}</option>}
@@ -74,10 +84,13 @@ export function SelectModeActionBar(props: SelectModeActionBarProps) {
             <div class="flex items-center gap-2">
               <label class="text-sm font-medium text-gray-700">Category:</label>
               <select
-                onChange={(e) => props.onAssignToCategory(e.target.value || null)}
+                onChange={(e) => {
+                  if (e.target.value === PLACEHOLDER) return;
+                  props.onAssignToCategory(e.target.value || null);
+                }}
                 class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
               >
-                <option value="">Choose...</option>
+                <option value={PLACEHOLDER}>Choose...</option>
                 <option value="">No category</option>
                 <For each={sortedCategories()}>
                   {(category) => <option value={category.id}>{category.name}</option>}
