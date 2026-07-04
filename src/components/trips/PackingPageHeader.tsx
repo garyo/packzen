@@ -8,7 +8,14 @@
 import { Show, type Accessor, onMount, onCleanup, createEffect, createSignal } from 'solid-js';
 import type { Trip } from '../../lib/types';
 import { Button } from '../ui/Button';
-import { HomeIcon, ChevronLeftIcon, EditIcon, SearchIcon, MoreVerticalIcon } from '../ui/Icons';
+import {
+  HomeIcon,
+  ChevronLeftIcon,
+  EditIcon,
+  SearchIcon,
+  MoreVerticalIcon,
+  PrinterIcon,
+} from '../ui/Icons';
 import { formatDateRange } from '../../lib/utils';
 
 interface PackingPageHeaderProps {
@@ -48,6 +55,8 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
   let searchContainerRef: HTMLDivElement | undefined;
   let searchOverlayRef: HTMLDivElement | undefined;
   let searchInputRef: HTMLInputElement | undefined;
+
+  const printHref = () => `/trips/${props.trip()?.id}/print?sortBy=${props.sortBy()}`;
 
   const isSearchActive = () => props.searchQuery().trim().length > 0;
   const openSearch = () => setIsSearchOpen(true);
@@ -244,6 +253,15 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
                       </div>
                     </Show>
                   </div>
+                  <a
+                    href={printHref()}
+                    target="_blank"
+                    class="inline-flex h-full items-center justify-center rounded-lg bg-gray-200 !px-2 text-sm font-medium text-gray-900 transition-colors hover:bg-gray-300 focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:outline-none md:!px-3 [@media(max-height:500px)]:!py-0.5"
+                    aria-label="Print checklist"
+                    title="Print checklist"
+                  >
+                    <PrinterIcon class="h-4 w-4" />
+                  </a>
                   {/* Mode toggle button - primary CTA */}
                   <Button
                     variant="primary"
@@ -326,7 +344,7 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
                           </button>
                         </Show>
                         <a
-                          href={`/trips/${props.trip()?.id}/print?sortBy=${props.sortBy()}`}
+                          href={printHref()}
                           target="_blank"
                           onClick={() => setShowMenu(false)}
                           class="block w-full px-4 py-2 text-left text-sm hover:bg-gray-100"

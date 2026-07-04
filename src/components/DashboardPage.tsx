@@ -39,6 +39,10 @@ export function DashboardPage() {
     return fetchWithErrorHandling(() => api.get<Trip[]>(endpoints.trips), 'Failed to load trips');
   });
 
+  // Brand-new users (zero trips) get trip creation as the dashboard hero instead
+  // of scrolling past zero-value stat cards to find it.
+  const hasNoTrips = () => (trips() ?? []).length === 0;
+
   const [categories, { refetch: refetchCategories }] = createResource<Category[]>(async () => {
     return fetchWithErrorHandling(
       () => api.get<Category[]>(endpoints.categories),
@@ -125,8 +129,22 @@ export function DashboardPage() {
               }
             >
               <div class="space-y-8">
-                {/* Statistics */}
-                <DashboardStats trips={trips} masterItems={masterItems} categories={categories} />
+                {/* Zero-trip hero: trip creation is the first thing a new user sees */}
+                <Show when={hasNoTrips()}>
+                  <div class="text-center">
+                    <h2 class="text-2xl font-bold text-gray-900">Plan your first trip</h2>
+                    <p class="mt-2 text-gray-600">
+                      Add bags and items, then start packing — right from here.
+                    </p>
+                  </div>
+                  <PlanTripQuickLink />
+                </Show>
+
+                {/* Statistics: hidden for brand-new users so the CTA above isn't
+                    buried under two zero-value cards */}
+                <Show when={!hasNoTrips()}>
+                  <DashboardStats trips={trips} masterItems={masterItems} categories={categories} />
+                </Show>
 
                 {/* Ongoing Trips (only shows if there are any) */}
                 <OngoingTripsList trips={trips} onTripUpdated={() => refetchTrips()} />
@@ -134,17 +152,11 @@ export function DashboardPage() {
                 {/* Upcoming Trips */}
                 <UpcomingTripsList trips={trips} onTripUpdated={() => refetchTrips()} />
 
-                {/* Quick Links */}
-                <div class="flex justify-center">
-                  <div class="w-full max-w-md">
-                    <QuickLink
-                      href="/trips?new=true"
-                      icon="➕"
-                      title="Plan New Trip"
-                      description="Start planning your next adventure"
-                    />
-                  </div>
-                </div>
+                {/* Quick Links: only needed once trips exist; the zero-trip state
+                    already shows this CTA as the hero above */}
+                <Show when={!hasNoTrips()}>
+                  <PlanTripQuickLink />
+                </Show>
               </div>
             </Show>
           </Show>
@@ -159,6 +171,21 @@ export function DashboardPage() {
         <OnboardingModal onClose={handleCloseOnboarding} />
       </Show>
     </>
+  );
+}
+
+function PlanTripQuickLink() {
+  return (
+    <div class="flex justify-center">
+      <div class="w-full max-w-md">
+        <QuickLink
+          href="/trips?new=true"
+          icon="➕"
+          title="Plan New Trip"
+          description="Start planning your next adventure"
+        />
+      </div>
+    </div>
   );
 }
 

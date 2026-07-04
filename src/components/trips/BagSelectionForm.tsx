@@ -33,6 +33,14 @@ const BAG_COLORS = [
   { value: 'white', label: 'White', class: 'bg-white' },
 ];
 
+// One-tap starter presets shown when the user has no saved bag templates yet
+// (X4: the empty bag-selection step was a 4-decision dead end for new users).
+const BAG_PRESETS: { type: 'carry_on' | 'checked' | 'personal'; name: string; color: string }[] = [
+  { type: 'carry_on', name: 'Carry-on', color: 'blue' },
+  { type: 'checked', name: 'Checked Bag', color: 'green' },
+  { type: 'personal', name: 'Personal Item', color: 'purple' },
+];
+
 export function BagSelectionForm(props: BagSelectionFormProps) {
   const [showAddForm, setShowAddForm] = createSignal(false);
   const [newBagName, setNewBagName] = createSignal('');
@@ -68,6 +76,15 @@ export function BagSelectionForm(props: BagSelectionFormProps) {
     return props.selectedTemplateIds.size + props.customBags.length;
   };
 
+  const handleAddPreset = (preset: (typeof BAG_PRESETS)[number]) => {
+    props.onAddCustomBag({
+      name: preset.name,
+      type: preset.type,
+      color: preset.color,
+      saveToMyBags: true,
+    });
+  };
+
   return (
     <div class="space-y-6">
       {/* Header */}
@@ -77,6 +94,34 @@ export function BagSelectionForm(props: BagSelectionFormProps) {
           Choose from your saved bags or add new ones. You can skip this step and add bags later.
         </p>
       </div>
+
+      {/* Quick Start Presets (shown only when the user has no saved bag templates) */}
+      <Show when={props.templates.length === 0}>
+        <div>
+          <h4 class="mb-3 text-sm font-medium text-gray-700">Quick Start</h4>
+          <div class="grid grid-cols-3 gap-3">
+            <For each={BAG_PRESETS}>
+              {(preset) => (
+                <button
+                  type="button"
+                  onClick={() => handleAddPreset(preset)}
+                  class="flex flex-col items-center gap-2 rounded-lg border-2 border-gray-200 bg-white p-3 text-center transition-colors hover:border-blue-500 hover:bg-blue-50"
+                >
+                  <div
+                    class={`h-4 w-4 rounded-full border border-gray-300 ${
+                      BAG_COLORS.find((c) => c.value === preset.color)?.class || 'bg-gray-500'
+                    }`}
+                  />
+                  <span class="text-sm font-medium text-gray-900">{preset.name}</span>
+                </button>
+              )}
+            </For>
+          </div>
+          <p class="mt-2 text-xs text-gray-500">
+            Tap a preset to add it instantly, or create a custom bag below.
+          </p>
+        </div>
+      </Show>
 
       {/* Templates Section */}
       <Show when={props.templates.length > 0}>

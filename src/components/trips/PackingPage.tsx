@@ -1110,12 +1110,19 @@ export function PackingPage(props: PackingPageProps) {
     }
 
     // Group toiletries into a "Toilet Kit" container so the starter list arrives
-    // organized. The container is left unbagged — one tap of the bag button drops
-    // the whole kit into a bag. Only runs on an empty trip, so no collision risk.
+    // organized.
     const TOILETRY_CATEGORY = 'Toiletries';
     const isToiletry = (item: BuiltInItem) =>
       item.category === TOILETRY_CATEGORY && !item.is_container;
     const hasToiletries = starter.some(isToiletry);
+
+    // Auto-assign into the user's bag when there's exactly one — otherwise the
+    // wizard's "create bags" step is immediately undone by dumping everything in
+    // "No Bag". Zero bags: nothing to assign into, keep current behavior.
+    // TODO: multiple bags — offer a one-tap "put everything in ___" prompt instead
+    // of defaulting to unbagged.
+    const currentBags = bags() || [];
+    const soleBagId = currentBags.length === 1 ? currentBags[0].id : null;
 
     setAddingStarter(tripTypeId);
     try {
@@ -1136,7 +1143,7 @@ export function PackingPage(props: PackingPageProps) {
             name: 'Toilet Kit',
             category_name: TOILETRY_CATEGORY,
             is_container: true,
-            bag_id: null,
+            bag_id: soleBagId,
           });
           if (containerRes.success && containerRes.data) {
             toiletKitId = containerRes.data.id;
@@ -1151,7 +1158,11 @@ export function PackingPage(props: PackingPageProps) {
         quantity: getStarterQuantity(item, tripTypeId),
         notes: item.description,
         is_container: item.is_container || false,
-        bag_id: null,
+        // Nested items follow their container's bag, not their own bag_id
+        // (PackingListBagView/PackingListCategoryView group by container_item_id
+        // and ignore bag_id on nested children) — null it for consistency with
+        // handleAddMasterItemFromAddMode/handleAddBuiltInItemFromAddMode.
+        bag_id: toiletKitId && isToiletry(item) ? null : soleBagId,
         container_item_id: toiletKitId && isToiletry(item) ? toiletKitId : null,
         master_item_id: null,
       }));
