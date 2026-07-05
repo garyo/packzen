@@ -89,10 +89,17 @@ def fetch_clerk_users() -> list[dict]:
                 email = u["email_addresses"][0].get("email_address", "")
             created_ts = u.get("created_at", 0)
             created_dt = datetime.fromtimestamp(created_ts / 1000, tz=timezone.utc)
+            last_sign_in_ts = u.get("last_sign_in_at")
+            last_sign_in = (
+                datetime.fromtimestamp(last_sign_in_ts / 1000, tz=timezone.utc).strftime("%Y-%m-%d %H:%M")
+                if last_sign_in_ts
+                else "never"
+            )
             users.append({
                 "id": u["id"],
                 "email": email,
-                "created_at": created_dt.strftime("%Y-%m-%d %H:%M:%S"),
+                "created_at": created_dt.strftime("%Y-%m-%d"),
+                "last_sign_in": last_sign_in,
             })
 
         if len(batch) < page_size:
@@ -160,8 +167,8 @@ def main() -> None:
 
     # Print combined report
     print()
-    print(f"{'USER_ID':<36} {'EMAIL':<35} {'TRIPS':>5} {'ITEMS':>5} {'CATS':>4} {'TMPL':>4}  STATUS")
-    print(f"{'-'*36} {'-'*35} {'-'*5} {'-'*5} {'-'*4} {'-'*4}  {'-'*20}")
+    print(f"{'USER_ID':<36} {'EMAIL':<35} {'CREATED':<12} {'LAST LOGIN':<18} {'TRIPS':>5} {'ITEMS':>5} {'CATS':>4} {'TMPL':>4}  STATUS")
+    print(f"{'-'*36} {'-'*35} {'-'*12} {'-'*18} {'-'*5} {'-'*5} {'-'*4} {'-'*4}  {'-'*20}")
 
     orphaned_db = []
     unused_clerk = []
@@ -171,6 +178,8 @@ def main() -> None:
         db_row = next((r for r in db_users if r["clerk_user_id"] == uid), None)
 
         email = clerk["email"] if clerk else ""
+        created = clerk["created_at"] if clerk else ""
+        last_login = clerk["last_sign_in"] if clerk else ""
         trips = db_row["trip_count"] if db_row else 0
         items = db_row["master_item_count"] if db_row else 0
         cats = db_row["category_count"] if db_row else 0
@@ -185,7 +194,7 @@ def main() -> None:
             status = "** ORPHANED DB DATA **"
             orphaned_db.append(uid)
 
-        print(f"{uid:<36} {email:<35} {trips:>5} {items:>5} {cats:>4} {tmpls:>4}  {status}")
+        print(f"{uid:<36} {email:<35} {created:<12} {last_login:<18} {trips:>5} {items:>5} {cats:>4} {tmpls:>4}  {status}")
 
     # Summary
     print()
