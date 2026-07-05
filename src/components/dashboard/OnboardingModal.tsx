@@ -1,8 +1,10 @@
 /**
  * OnboardingModal Component
  *
- * Shows onboarding instructions to new users
- * Displays once per user using localStorage
+ * The full "How To Use PackZen" walkthrough. Shown on demand — from the user
+ * menu, or the dashboard's first-run "See how it works" link — rather than
+ * auto-firing. Day-to-day guidance is contextual (empty states, the container
+ * checkbox label, the Select Batch button), so there's no per-browser flag.
  */
 
 import { Modal } from '../ui/Modal';
@@ -63,18 +65,4 @@ export function OnboardingModal(props: OnboardingModalProps) {
       </div>
     </Modal>
   );
-}
-
-/**
- * Check if user has seen onboarding
- */
-export function hasSeenOnboarding(): boolean {
-  return localStorage.getItem('packzen-onboarding-seen') === 'true';
-}
-
-/**
- * Mark onboarding as seen
- */
-export function markOnboardingAsSeen(): void {
-  localStorage.setItem('packzen-onboarding-seen', 'true');
 }

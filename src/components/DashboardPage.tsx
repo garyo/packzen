@@ -18,11 +18,7 @@ import { OngoingTripsList } from './dashboard/OngoingTripsList';
 import { UpcomingTripsList } from './dashboard/UpcomingTripsList';
 import { AboutModal } from './dashboard/AboutModal';
 import { UserMenu } from './dashboard/UserMenu';
-import {
-  OnboardingModal,
-  hasSeenOnboarding,
-  markOnboardingAsSeen,
-} from './dashboard/OnboardingModal';
+import { OnboardingModal } from './dashboard/OnboardingModal';
 
 export function DashboardPage() {
   const [showAbout, setShowAbout] = createSignal(false);
@@ -52,15 +48,9 @@ export function DashboardPage() {
 
   onMount(async () => {
     await authStore.initAuth();
-
-    // Show onboarding for new users
-    if (!hasSeenOnboarding()) {
-      setShowOnboarding(true);
-    }
   });
 
   const handleCloseOnboarding = () => {
-    markOnboardingAsSeen();
     setShowOnboarding(false);
   };
 
@@ -136,6 +126,12 @@ export function DashboardPage() {
                     <p class="mt-2 text-gray-600">
                       Add bags and items, then start packing — right from here.
                     </p>
+                    <button
+                      onClick={() => setShowOnboarding(true)}
+                      class="mt-3 text-sm font-medium text-blue-600 hover:text-blue-700 hover:underline"
+                    >
+                      New to PackZen? See how it works →
+                    </button>
                   </div>
                   <PlanTripQuickLink />
                 </Show>
