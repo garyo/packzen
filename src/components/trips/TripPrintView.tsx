@@ -12,14 +12,52 @@ import { LoadingSpinner } from '../ui/LoadingSpinner';
 import { fetchWithErrorHandling, fetchSingleWithErrorHandling } from '../../lib/resource-helpers';
 import { formatDateRange } from '../../lib/utils';
 
+// One printed checklist line, shared by the top-level item list and the
+// container-contents list.
+function ItemRow(props: { item: TripItem; locationLabel?: string | null }) {
+  return (
+    <div class="item-wrapper">
+      <div class="item-row">
+        <span class={props.item.is_packed ? 'checkbox checked' : 'checkbox'}></span>
+        <span class={props.item.is_skipped ? 'item-name skipped' : 'item-name'}>
+          {props.item.name}
+        </span>
+        {props.item.is_skipped && <span class="item-skipped-badge">Skipped</span>}
+        {props.item.quantity > 1 && <span class="item-quantity">×{props.item.quantity}</span>}
+        {props.locationLabel && <span class="item-bag">{props.locationLabel}</span>}
+      </div>
+      {props.item.notes && <div class="item-notes">{props.item.notes}</div>}
+    </div>
+  );
+}
+
+export const PRINT_COLUMNS_STORAGE_KEY = 'packzen-print-columns';
+
 interface TripPrintViewProps {
   tripId: string;
   sortBy?: 'bag' | 'category';
   initialColumns?: number;
+  initialIncludeSkipped?: boolean;
 }
 
 export function TripPrintView(props: TripPrintViewProps) {
   const [twoColumn] = createSignal((props.initialColumns || 1) === 2);
+  const [includeSkipped] = createSignal(props.initialIncludeSkipped || false);
+
+  const currentSortBy = () => props.sortBy || 'bag';
+
+  const buildPrintUrl = (overrides: {
+    sortBy?: 'bag' | 'category';
+    columns?: number;
+    includeSkipped?: boolean;
+  }) => {
+    const params = new URLSearchParams({
+      sortBy: overrides.sortBy ?? currentSortBy(),
+      columns: String(overrides.columns ?? (twoColumn() ? 2 : 1)),
+      includeSkipped: (overrides.includeSkipped ?? includeSkipped()) ? '1' : '0',
+    });
+    return `/trips/${props.tripId}/print?${params.toString()}`;
+  };
 
   // Best-effort analytics beacon: record that the print/checklist view loaded.
   onMount(() => {
@@ -64,9 +102,17 @@ export function TripPrintView(props: TripPrintViewProps) {
     return bag?.name || null;
   };
 
+  // Items that should actually render, honoring the skipped-items toggle
+  const visibleItems = () => {
+    const itemsList = items() || [];
+    return includeSkipped() ? itemsList : itemsList.filter((item) => !item.is_skipped);
+  };
+
+  const hasSkippedItems = () => (items() || []).some((item) => item.is_skipped);
+
   // Get container data - containers and their contents
   const containerData = () => {
-    const itemsList = items() || [];
+    const itemsList = visibleItems();
     const containers = itemsList.filter((item) => item.is_container);
     const containedItems = new Map<string, TripItem[]>();
 
@@ -119,10 +165,10 @@ export function TripPrintView(props: TripPrintViewProps) {
 
   // Group items based on sort preference
   const groupedItems = () => {
-    const itemsList = items();
     const categoriesList = categories();
     const bagsList = bags();
-    if (!itemsList || !categoriesList || !bagsList) return [];
+    if (!items() || !categoriesList || !bagsList) return [];
+    const itemsList = visibleItems();
 
     const sortBy = props.sortBy || 'bag';
 
@@ -254,6 +300,9 @@ export function TripPrintView(props: TripPrintViewProps) {
           margin-bottom: 30px;
           border-bottom: 2px solid #333;
           padding-bottom: 15px;
+        }
+
+        .print-header-row {
           display: flex;
           justify-content: space-between;
           align-items: baseline;
@@ -265,10 +314,23 @@ export function TripPrintView(props: TripPrintViewProps) {
           margin: 0;
         }
 
+        .print-destination {
+          font-size: 13px;
+          color: #555;
+          margin: 4px 0 0 0;
+        }
+
         .print-date {
           font-size: 14px;
           color: #666;
           margin: 0;
+        }
+
+        .print-trip-notes {
+          font-size: 12px;
+          color: #444;
+          font-style: italic;
+          margin: 10px 0 0 0;
         }
 
         .items-container.two-column {
@@ -330,6 +392,23 @@ export function TripPrintView(props: TripPrintViewProps) {
           flex: 1;
           font-size: 13px;
           font-weight: normal;
+        }
+
+        .item-name.skipped {
+          text-decoration: line-through;
+          color: #999;
+        }
+
+        .item-skipped-badge {
+          font-size: 10px;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          color: #9ca3af;
+          border: 1px solid #d1d5db;
+          padding: 1px 6px;
+          border-radius: 4px;
+          white-space: nowrap;
         }
 
         .item-quantity {
@@ -445,23 +524,32 @@ export function TripPrintView(props: TripPrintViewProps) {
           <button
             class="sort-button"
             onClick={() => {
-              const newSortBy = props.sortBy === 'bag' ? 'category' : 'bag';
-              const columns = twoColumn() ? 2 : 1;
-              window.location.href = `/trips/${props.tripId}/print?sortBy=${newSortBy}&columns=${columns}`;
+              const newSortBy = currentSortBy() === 'bag' ? 'category' : 'bag';
+              window.location.href = buildPrintUrl({ sortBy: newSortBy });
             }}
           >
-            {props.sortBy === 'category' ? '📁 Sort by Category' : '👜 Sort by Bag'}
+            {currentSortBy() === 'bag' ? '📁 Sort by Category' : '👜 Sort by Bag'}
           </button>
           <button
             class="sort-button"
             onClick={() => {
               const newColumns = twoColumn() ? 1 : 2;
-              const sortBy = props.sortBy || 'bag';
-              window.location.href = `/trips/${props.tripId}/print?sortBy=${sortBy}&columns=${newColumns}`;
+              window.localStorage.setItem(PRINT_COLUMNS_STORAGE_KEY, String(newColumns));
+              window.location.href = buildPrintUrl({ columns: newColumns });
             }}
           >
-            {twoColumn() ? '📄 2 Columns' : '📄 1 Column'}
+            {twoColumn() ? '📄 1 Column' : '📄 2 Columns'}
           </button>
+          <Show when={hasSkippedItems()}>
+            <button
+              class="sort-button"
+              onClick={() => {
+                window.location.href = buildPrintUrl({ includeSkipped: !includeSkipped() });
+              }}
+            >
+              {includeSkipped() ? '🙈 Hide Skipped' : '👁️ Show Skipped'}
+            </button>
+          </Show>
           <button class="print-button" onClick={() => window.print()}>
             🖨️ Print
           </button>
@@ -469,8 +557,18 @@ export function TripPrintView(props: TripPrintViewProps) {
 
         <div class="print-container">
           <div class="print-header">
-            <h1 class="print-title">{trip()?.name}</h1>
-            <p class="print-date">{formatDateRange(trip()?.start_date, trip()?.end_date)}</p>
+            <div class="print-header-row">
+              <div>
+                <h1 class="print-title">{trip()?.name}</h1>
+                <Show when={trip()?.destination}>
+                  <p class="print-destination">📍 {trip()?.destination}</p>
+                </Show>
+              </div>
+              <p class="print-date">{formatDateRange(trip()?.start_date, trip()?.end_date)}</p>
+            </div>
+            <Show when={trip()?.notes}>
+              <p class="print-trip-notes">{trip()?.notes}</p>
+            </Show>
           </div>
 
           <div class={twoColumn() ? 'items-container two-column' : 'items-container'}>
@@ -480,25 +578,20 @@ export function TripPrintView(props: TripPrintViewProps) {
                   <h2 class="category-header">{groupName}</h2>
                   <For each={groupItems}>
                     {(item) => (
-                      <div class="item-wrapper">
-                        <div class="item-row">
-                          <span class={item.is_packed ? 'checkbox checked' : 'checkbox'}></span>
-                          <span class="item-name">{item.name}</span>
-                          {item.quantity > 1 && <span class="item-quantity">×{item.quantity}</span>}
-                          {props.sortBy === 'bag' && item.category_name && (
-                            <span class="item-bag">{item.category_name}</span>
-                          )}
-                          {props.sortBy === 'category' &&
-                            (item.bag_id || item.container_item_id) && (
-                              <span class="item-bag">{getItemLocationLabel(item)}</span>
-                            )}
-                        </div>
-                        {item.notes && <div class="item-notes">{item.notes}</div>}
-                      </div>
+                      <ItemRow
+                        item={item}
+                        locationLabel={
+                          currentSortBy() === 'bag'
+                            ? item.category_name
+                            : item.bag_id || item.container_item_id
+                              ? getItemLocationLabel(item)
+                              : null
+                        }
+                      />
                     )}
                   </For>
                   {/* Container sections within this bag */}
-                  <Show when={props.sortBy === 'bag' && containers.length > 0}>
+                  <Show when={currentSortBy() === 'bag' && containers.length > 0}>
                     <For each={containers}>
                       {(container) => {
                         const contents = getContainerContents(container.id);
@@ -514,21 +607,7 @@ export function TripPrintView(props: TripPrintViewProps) {
                             >
                               <For each={contents.sort((a, b) => a.name.localeCompare(b.name))}>
                                 {(item) => (
-                                  <div class="item-wrapper">
-                                    <div class="item-row">
-                                      <span
-                                        class={item.is_packed ? 'checkbox checked' : 'checkbox'}
-                                      ></span>
-                                      <span class="item-name">{item.name}</span>
-                                      {item.quantity > 1 && (
-                                        <span class="item-quantity">×{item.quantity}</span>
-                                      )}
-                                      {item.category_name && (
-                                        <span class="item-bag">{item.category_name}</span>
-                                      )}
-                                    </div>
-                                    {item.notes && <div class="item-notes">{item.notes}</div>}
-                                  </div>
+                                  <ItemRow item={item} locationLabel={item.category_name} />
                                 )}
                               </For>
                             </Show>
