@@ -2,6 +2,7 @@ import { createSignal, createResource, For, Show } from 'solid-js';
 import { api, endpoints } from '../../lib/api';
 import type { Bag, BagTemplate } from '../../lib/types';
 import { BAG_TYPES } from '../../lib/types';
+import { BAG_COLORS, getBagColorSwatchClass } from '../../lib/color-utils';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
@@ -13,17 +14,6 @@ interface BagManagerProps {
   onClose: () => void;
   onSaved: () => void;
 }
-
-const BAG_COLORS = [
-  { value: 'blue', label: 'Blue', class: 'bg-blue-500' },
-  { value: 'red', label: 'Red', class: 'bg-red-500' },
-  { value: 'green', label: 'Green', class: 'bg-green-500' },
-  { value: 'yellow', label: 'Yellow', class: 'bg-yellow-500' },
-  { value: 'purple', label: 'Purple', class: 'bg-purple-500' },
-  { value: 'gray', label: 'Gray', class: 'bg-gray-500' },
-  { value: 'black', label: 'Black', class: 'bg-black' },
-  { value: 'white', label: 'White', class: 'bg-white' },
-];
 
 export function BagManager(props: BagManagerProps) {
   const [showForm, setShowForm] = createSignal(false);
@@ -252,10 +242,7 @@ export function BagManager(props: BagManagerProps) {
                         <div class="flex items-center justify-between rounded-lg border border-gray-200 p-3 hover:border-gray-300">
                           <div class="flex items-center gap-3">
                             <div
-                              class={`h-4 w-4 rounded-full border border-gray-300 ${
-                                BAG_COLORS.find((c) => c.value === bag.color)?.class ||
-                                'bg-gray-500'
-                              }`}
+                              class={`h-4 w-4 rounded-full border border-gray-300 ${getBagColorSwatchClass(bag.color)}`}
                             />
                             <div>
                               <p class="font-medium text-gray-900">{bag.name}</p>
@@ -327,9 +314,7 @@ export function BagManager(props: BagManagerProps) {
                       class="flex items-center gap-2 rounded-lg border border-gray-200 p-2 text-left hover:border-blue-500 hover:bg-blue-50"
                     >
                       <div
-                        class={`h-4 w-4 flex-shrink-0 rounded-full border border-gray-300 ${
-                          BAG_COLORS.find((c) => c.value === template.color)?.class || 'bg-gray-500'
-                        }`}
+                        class={`h-4 w-4 flex-shrink-0 rounded-full border border-gray-300 ${getBagColorSwatchClass(template.color)}`}
                       />
                       <div class="min-w-0 flex-1">
                         <p class="truncate text-sm font-medium text-gray-900">{template.name}</p>

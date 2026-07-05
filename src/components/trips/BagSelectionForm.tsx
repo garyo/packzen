@@ -1,6 +1,7 @@
 import { createSignal, For, Show } from 'solid-js';
 import type { BagTemplate } from '../../lib/types';
 import { BAG_TYPES } from '../../lib/types';
+import { BAG_COLORS, getBagColorSwatchClass } from '../../lib/color-utils';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 
@@ -21,17 +22,6 @@ interface BagSelectionFormProps {
   onBack: () => void;
   onSubmit: () => void;
 }
-
-const BAG_COLORS = [
-  { value: 'blue', label: 'Blue', class: 'bg-blue-500' },
-  { value: 'red', label: 'Red', class: 'bg-red-500' },
-  { value: 'green', label: 'Green', class: 'bg-green-500' },
-  { value: 'yellow', label: 'Yellow', class: 'bg-yellow-500' },
-  { value: 'purple', label: 'Purple', class: 'bg-purple-500' },
-  { value: 'gray', label: 'Gray', class: 'bg-gray-500' },
-  { value: 'black', label: 'Black', class: 'bg-black' },
-  { value: 'white', label: 'White', class: 'bg-white' },
-];
 
 // One-tap starter presets shown when the user has no saved bag templates yet
 // (X4: the empty bag-selection step was a 4-decision dead end for new users).
@@ -108,9 +98,7 @@ export function BagSelectionForm(props: BagSelectionFormProps) {
                   class="flex flex-col items-center gap-2 rounded-lg border-2 border-gray-200 bg-white p-3 text-center transition-colors hover:border-blue-500 hover:bg-blue-50"
                 >
                   <div
-                    class={`h-4 w-4 rounded-full border border-gray-300 ${
-                      BAG_COLORS.find((c) => c.value === preset.color)?.class || 'bg-gray-500'
-                    }`}
+                    class={`h-4 w-4 rounded-full border border-gray-300 ${getBagColorSwatchClass(preset.color)}`}
                   />
                   <span class="text-sm font-medium text-gray-900">{preset.name}</span>
                 </button>
@@ -142,9 +130,7 @@ export function BagSelectionForm(props: BagSelectionFormProps) {
                     }`}
                   >
                     <div
-                      class={`h-4 w-4 rounded-full border border-gray-300 ${
-                        BAG_COLORS.find((c) => c.value === template.color)?.class || 'bg-gray-500'
-                      }`}
+                      class={`h-4 w-4 rounded-full border border-gray-300 ${getBagColorSwatchClass(template.color)}`}
                     />
                     <div class="flex-1">
                       <p class="font-medium text-gray-900">{template.name}</p>
@@ -286,9 +272,7 @@ export function BagSelectionForm(props: BagSelectionFormProps) {
                 <div class="flex items-center justify-between rounded-lg border border-gray-200 bg-white p-3">
                   <div class="flex items-center gap-3">
                     <div
-                      class={`h-4 w-4 rounded-full border border-gray-300 ${
-                        BAG_COLORS.find((c) => c.value === bag.color)?.class || 'bg-gray-500'
-                      }`}
+                      class={`h-4 w-4 rounded-full border border-gray-300 ${getBagColorSwatchClass(bag.color)}`}
                     />
                     <div>
                       <p class="font-medium text-gray-900">{bag.name}</p>

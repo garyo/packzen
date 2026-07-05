@@ -42,7 +42,9 @@ const [toasts, setToasts] = createSignal<ToastMessage[]>([]);
  */
 export function showToast(type: ToastMessage['type'], message: string, options?: ToastOptions) {
   const id = Math.random().toString(36).substr(2, 9);
-  const duration = options?.duration ?? (options?.action ? 5000 : 3000);
+  // Error text takes longer to read than a short success/info confirmation.
+  const defaultDuration = type === 'error' ? 6000 : options?.action ? 5000 : 3000;
+  const duration = options?.duration ?? defaultDuration;
 
   setToasts((prev) => [...prev, { id, type, message, action: options?.action }]);
 
@@ -84,26 +86,32 @@ export function Toast() {
   };
 
   return (
-    <Show when={toasts().length > 0}>
-      <Portal>
-        <div class="fixed right-4 bottom-4 z-50 flex max-w-[calc(100vw-2rem)] flex-col items-stretch md:max-w-sm">
-          <For each={toasts().slice(-3)}>
-            {(toast) => (
-              <div class={getStyles(toast.type)}>
-                <span class="flex-1">{toast.message}</span>
-                <Show when={toast.action}>
-                  <button
-                    onClick={() => handleAction(toast)}
-                    class="rounded bg-white/20 px-2 py-1 text-sm font-medium hover:bg-white/30"
-                  >
-                    {toast.action!.label}
-                  </button>
-                </Show>
-              </div>
-            )}
-          </For>
-        </div>
-      </Portal>
-    </Show>
+    <Portal>
+      {/* Wrapper stays mounted (even with no toasts) so each toast's live region
+          is present in the DOM at the moment it's inserted, rather than the
+          whole region appearing and disappearing with the toast list. */}
+      <div class="fixed right-4 bottom-4 z-50 flex max-w-[calc(100vw-2rem)] flex-col items-stretch md:max-w-sm">
+        <For each={toasts().slice(-3)}>
+          {(toast) => (
+            <div
+              class={getStyles(toast.type)}
+              role={toast.type === 'error' ? 'alert' : 'status'}
+              aria-live={toast.type === 'error' ? 'assertive' : 'polite'}
+              aria-atomic="true"
+            >
+              <span class="flex-1">{toast.message}</span>
+              <Show when={toast.action}>
+                <button
+                  onClick={() => handleAction(toast)}
+                  class="rounded bg-white/20 px-2 py-1 text-sm font-medium hover:bg-white/30"
+                >
+                  {toast.action!.label}
+                </button>
+              </Show>
+            </div>
+          )}
+        </For>
+      </div>
+    </Portal>
   );
 }

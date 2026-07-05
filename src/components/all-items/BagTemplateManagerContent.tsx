@@ -5,22 +5,12 @@ import { showToast } from '../ui/Toast';
 import { api, endpoints } from '../../lib/api';
 import type { BagTemplate } from '../../lib/types';
 import { BAG_TYPES } from '../../lib/types';
+import { BAG_COLORS, getBagColorSwatchClass } from '../../lib/color-utils';
 
 interface BagTemplateManagerContentProps {
   templates: BagTemplate[];
   onSaved: () => void;
 }
-
-const BAG_COLORS = [
-  { value: 'blue', label: 'Blue', class: 'bg-blue-500' },
-  { value: 'red', label: 'Red', class: 'bg-red-500' },
-  { value: 'green', label: 'Green', class: 'bg-green-500' },
-  { value: 'yellow', label: 'Yellow', class: 'bg-yellow-500' },
-  { value: 'purple', label: 'Purple', class: 'bg-purple-500' },
-  { value: 'gray', label: 'Gray', class: 'bg-gray-500' },
-  { value: 'black', label: 'Black', class: 'bg-black' },
-  { value: 'white', label: 'White', class: 'bg-white' },
-];
 
 export function BagTemplateManagerContent(props: BagTemplateManagerContentProps) {
   const [newName, setNewName] = createSignal('');
@@ -200,10 +190,7 @@ export function BagTemplateManagerContent(props: BagTemplateManagerContentProps)
                     <div class="flex items-center justify-between rounded-lg border border-gray-200 p-3 hover:border-gray-300">
                       <div class="flex items-center gap-3">
                         <div
-                          class={`h-4 w-4 rounded-full border border-gray-300 ${
-                            BAG_COLORS.find((c) => c.value === template.color)?.class ||
-                            'bg-gray-500'
-                          }`}
+                          class={`h-4 w-4 rounded-full border border-gray-300 ${getBagColorSwatchClass(template.color)}`}
                         />
                         <div>
                           <p class="font-medium text-gray-900">{template.name}</p>

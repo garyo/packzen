@@ -518,6 +518,104 @@ test('Deleting a container cascade-deletes its children', async () => {
   assert.ok(remainingIds.includes(unrelated.id), 'unrelated item should remain');
 });
 
+test('PATCH rejects un-flagging a container that still has children', async () => {
+  const d1 = await createTestDatabase();
+  const db = drizzle(d1);
+  const userId = 'uncontainer_user';
+
+  const trip = await db
+    .insert(trips)
+    .values({ clerk_user_id: userId, name: 'Uncontainer Trip' })
+    .returning()
+    .get();
+
+  const container = await db
+    .insert(tripItems)
+    .values({ trip_id: trip.id, name: 'Toiletry Kit', is_container: true })
+    .returning()
+    .get();
+
+  const child = await db
+    .insert(tripItems)
+    .values({ trip_id: trip.id, name: 'Toothbrush', container_item_id: container.id })
+    .returning()
+    .get();
+
+  const patchCtx = buildApiContext({
+    db: d1,
+    userId,
+    request: new Request(`http://localhost/api/trips/${trip.id}/items`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: container.id, is_container: false }),
+    }),
+    params: { tripId: trip.id },
+  });
+
+  const patchResponse = await tripItemsApi.PATCH!(patchCtx);
+  assert.equal(patchResponse.status, 400);
+
+  // Rejected: the container keeps its flag and the child stays put.
+  const reloadedContainer = await db
+    .select()
+    .from(tripItems)
+    .where(eq(tripItems.id, container.id))
+    .get();
+  assert.equal(reloadedContainer?.is_container, true);
+
+  const reloadedChild = await db.select().from(tripItems).where(eq(tripItems.id, child.id)).get();
+  assert.equal(reloadedChild?.container_item_id, container.id);
+
+  // With the child moved out first, un-flagging succeeds...
+  const moveChildCtx = buildApiContext({
+    db: d1,
+    userId,
+    request: new Request(`http://localhost/api/trips/${trip.id}/items`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: child.id, container_item_id: null }),
+    }),
+    params: { tripId: trip.id },
+  });
+  const moveChildResponse = await tripItemsApi.PATCH!(moveChildCtx);
+  assert.equal(moveChildResponse.status, 200);
+
+  const unflagCtx = buildApiContext({
+    db: d1,
+    userId,
+    request: new Request(`http://localhost/api/trips/${trip.id}/items`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: container.id, is_container: false }),
+    }),
+    params: { tripId: trip.id },
+  });
+  const unflagResponse = await tripItemsApi.PATCH!(unflagCtx);
+  assert.equal(unflagResponse.status, 200);
+
+  // ...and deleting the now-plain item afterward leaves no dangling
+  // container_item_id anywhere in the trip.
+  const deleteCtx = buildApiContext({
+    db: d1,
+    userId,
+    request: new Request(`http://localhost/api/trips/${trip.id}/items`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: container.id }),
+    }),
+    params: { tripId: trip.id },
+  });
+  const deleteResponse = await tripItemsApi.DELETE!(deleteCtx);
+  assert.equal(deleteResponse.status, 200);
+
+  const orphans = await db
+    .select()
+    .from(tripItems)
+    .where(eq(tripItems.container_item_id, container.id))
+    .all();
+  assert.equal(orphans.length, 0, 'no item should reference the deleted container');
+});
+
 test('Deleting a bag nulls its items bag_id instead of orphaning them', async () => {
   const d1 = await createTestDatabase();
   const db = drizzle(d1);

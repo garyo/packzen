@@ -22,6 +22,7 @@ import {
   successResponse,
   handleApiError,
   NotFoundError,
+  BadRequestError,
   type SyncConfig,
 } from '../../../../lib/api-helpers';
 import { logChange, getSourceId } from '../../../../lib/sync';
@@ -454,6 +455,25 @@ export const PATCH: APIRoute = createPatchHandler<
 
       if (currentItem?.container_item_id && container_item_id !== null) {
         throw new Error('Cannot make an item a container while it is inside another container');
+      }
+    }
+
+    // Un-flagging a container that still holds items would let a later delete
+    // orphan them: the delete cascade only re-parents/removes children when
+    // is_container is true at delete time. Reject instead of silently
+    // stranding children (they'd also lose the bag they inherited from the
+    // container) — callers must move/delete the children first, same as the
+    // existing "delete container" flow requires.
+    if (is_container === false) {
+      const [{ childCount }] = await db
+        .select({ childCount: count() })
+        .from(tripItems)
+        .where(and(eq(tripItems.container_item_id, id), eq(tripItems.trip_id, tripId)));
+
+      if (childCount > 0) {
+        throw new BadRequestError(
+          'Cannot remove container status while it still contains items. Move or delete the contained items first.'
+        );
       }
     }
 
