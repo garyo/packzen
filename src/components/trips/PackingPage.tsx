@@ -45,7 +45,8 @@ import {
 } from '../../lib/built-in-items';
 import { fetchWithErrorHandling, fetchSingleWithErrorHandling } from '../../lib/resource-helpers';
 import { getOrCreateMasterItem, resolveMasterItems } from '../../lib/item-helpers';
-import { syncManager } from '../../lib/sync-manager';
+import { syncManager, type SyncChange } from '../../lib/sync-manager';
+import { LoadGate } from '../../lib/sync-buffer';
 import { tripToYAML, downloadYAML } from '../../lib/yaml';
 import { deleteTripWithConfirm } from '../../lib/trip-actions';
 import { TripForm } from './TripForm';
@@ -134,10 +135,20 @@ export function PackingPage(props: PackingPageProps) {
   // Track last fetch time for debouncing (declared here, used by silentRefresh below)
   let lastFetchTime = 0;
 
+  // Guards the race between wholesale snapshot loads (below) and incremental
+  // remote sync events (applied in onMount via applyTripItemChange, defined
+  // after the store mutation helpers). A snapshot is a point-in-time read;
+  // if a remote change lands while one is in flight, applying it immediately
+  // and then letting the snapshot overwrite `data` would silently drop it -
+  // permanently, since the sync poller's cursor has already moved past it.
+  // See src/lib/sync-buffer.ts for the coordination logic itself.
+  const loadGate = new LoadGate<SyncChange>();
+
   // Fetch items from server and populate store
   const fetchItems = async () => {
     setItemsState('loading', true);
     setItemsState('error', null);
+    loadGate.startLoad();
     try {
       const result = await fetchWithErrorHandling(
         () => api.get<TripItem[]>(endpoints.tripItems(props.tripId)),
@@ -149,6 +160,8 @@ export function PackingPage(props: PackingPageProps) {
     } catch (e) {
       setItemsState('error', e instanceof Error ? e.message : 'Failed to load items');
       setItemsState('loading', false);
+    } finally {
+      loadGate.endLoad(applyTripItemChange);
     }
   };
 
@@ -163,6 +176,7 @@ export function PackingPage(props: PackingPageProps) {
     if (now - lastFetchTime < REFETCH_DEBOUNCE_MS) return;
     lastFetchTime = now;
 
+    loadGate.startLoad();
     try {
       const result = await api.get<TripItem[]>(endpoints.tripItems(props.tripId));
       if (result.success && result.data) {
@@ -171,6 +185,8 @@ export function PackingPage(props: PackingPageProps) {
       }
     } catch {
       // Silent failure - don't disrupt the user
+    } finally {
+      loadGate.endLoad(applyTripItemChange);
     }
   };
 
@@ -234,6 +250,28 @@ export function PackingPage(props: PackingPageProps) {
         }
       })
     );
+  };
+
+  // Applies one remote `tripItem` sync change to the store. Pulled out of
+  // the onMount subscription so it can also be used as the replay function
+  // for events that loadGate queued during an in-flight snapshot load - each
+  // branch is idempotent (upsert-by-id, delete-of-absent is a no-op, update-
+  // of-absent is a no-op - see updateItemInStore), so replaying an event the
+  // snapshot already reflects is harmless.
+  const applyTripItemChange = (change: SyncChange) => {
+    switch (change.action) {
+      case 'create': {
+        const exists = itemsState.data.some((i) => i.id === change.entityId);
+        if (!exists) addItemToStore(change.data);
+        break;
+      }
+      case 'update':
+        updateItemInStore(change.entityId, change.data);
+        break;
+      case 'delete':
+        deleteItemsFromStore([change.entityId]);
+        break;
+    }
   };
 
   // Initial fetch on mount (auth init happens later in another onMount)
@@ -341,22 +379,13 @@ export function PackingPage(props: PackingPageProps) {
     syncManager.connect();
     onCleanup(() => syncManager.disconnect());
 
-    // Subscribe to trip item changes for this trip
+    // Subscribe to trip item changes for this trip. While a snapshot load
+    // (fetchItems/silentRefresh) is in flight, queue via loadGate instead of
+    // applying directly - the in-flight snapshot was fetched before this
+    // change and would otherwise clobber it when it lands.
     const unsubTripItem = syncManager.on('tripItem', (change) => {
       if (change.parentId !== props.tripId) return;
-      switch (change.action) {
-        case 'create': {
-          const exists = itemsState.data.some((i) => i.id === change.entityId);
-          if (!exists) addItemToStore(change.data);
-          break;
-        }
-        case 'update':
-          updateItemInStore(change.entityId, change.data);
-          break;
-        case 'delete':
-          deleteItemsFromStore([change.entityId]);
-          break;
-      }
+      loadGate.submit(change, applyTripItemChange);
     });
     onCleanup(unsubTripItem);
 
