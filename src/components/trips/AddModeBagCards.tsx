@@ -86,10 +86,10 @@ function DroppableBagCard(props: BagCardProps) {
       counts.set(cat, (counts.get(cat) || 0) + 1); // Count items, not quantities
     });
 
-    // Sort by count descending, take top 4
-    return Array.from(counts.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 4);
+    // Sort alphabetically so the order stays stable as counts change (and
+    // matches the expanded view). Sorting by count made categories jump around
+    // every time an item was added.
+    return Array.from(counts.entries()).sort((a, b) => a[0].localeCompare(b[0]));
   });
 
   // Count items (not quantities)
