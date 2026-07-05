@@ -149,6 +149,6 @@ export function checkBagTemplateLimit(
     billingStatus,
     'maxBagTemplates',
     (max) =>
-      `You've reached the maximum of ${max} bag templates. Please remove some, or upgrade your subscription.`
+      `You've reached the maximum of ${max} bags in My Bags. Please remove some, or upgrade your subscription.`
   );
 }

@@ -143,7 +143,7 @@ export function TripFormWithBags(props: TripFormWithBagsProps) {
         <Show when={step() === 2}>
           <Show
             when={!bagTemplates.loading}
-            fallback={<LoadingSpinner text="Loading your bags..." />}
+            fallback={<LoadingSpinner text="Loading My Bags..." />}
           >
             <BagSelectionForm
               templates={bagTemplates() || []}

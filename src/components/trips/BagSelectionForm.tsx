@@ -81,7 +81,7 @@ export function BagSelectionForm(props: BagSelectionFormProps) {
       <div>
         <h3 class="text-lg font-semibold text-gray-900">Select Bags for Your Trip</h3>
         <p class="mt-1 text-sm text-gray-600">
-          Choose from your saved bags or add new ones. You can skip this step and add bags later.
+          Choose from My Bags or add new ones. You can skip this step and add bags later.
         </p>
       </div>
 
@@ -114,7 +114,7 @@ export function BagSelectionForm(props: BagSelectionFormProps) {
       {/* Templates Section */}
       <Show when={props.templates.length > 0}>
         <div>
-          <h4 class="mb-3 text-sm font-medium text-gray-700">My Saved Bags (click to select)</h4>
+          <h4 class="mb-3 text-sm font-medium text-gray-700">My Bags (click to select)</h4>
           <div class="grid gap-3 sm:grid-cols-2">
             <For each={props.templates}>
               {(template) => {

@@ -144,7 +144,7 @@ export function ReplaceBagModal(props: ReplaceBagModalProps) {
       {/* Saved bag templates (filtered to exclude bags already in trip) */}
       <Show when={!bagTemplates.loading && filteredTemplates().length > 0}>
         <div class="mb-4">
-          <h3 class="mb-2 text-sm font-semibold text-gray-900">Replace with saved bag</h3>
+          <h3 class="mb-2 text-sm font-semibold text-gray-900">Replace from My Bags</h3>
           <div class="grid grid-cols-2 gap-2">
             <For each={filteredTemplates()}>
               {(template) => (
@@ -170,7 +170,7 @@ export function ReplaceBagModal(props: ReplaceBagModalProps) {
       </Show>
       <Show when={bagTemplates.loading}>
         <div class="mb-4">
-          <LoadingSpinner text="Loading saved bags..." />
+          <LoadingSpinner text="Loading My Bags..." />
         </div>
       </Show>
 
