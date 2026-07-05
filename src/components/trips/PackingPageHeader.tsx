@@ -288,7 +288,7 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
                     onClick={props.onToggleViewMode}
                   >
                     <span class="hidden md:inline">
-                      {props.viewMode() === 'add' ? 'Start Packing' : 'Add More Items'}
+                      {props.viewMode() === 'add' ? 'Start Packing' : 'Add Items'}
                     </span>
                     <span class="md:hidden">{props.viewMode() === 'add' ? 'Pack' : 'Add'}</span>
                   </Button>
