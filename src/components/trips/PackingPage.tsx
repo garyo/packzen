@@ -103,6 +103,16 @@ export function PackingPage(props: PackingPageProps) {
     if (starterMasculine()) mods.push('masculine');
     return mods;
   };
+  // Which bag starter items go into when the trip has 2+ bags (the selector is
+  // hidden otherwise). `undefined` = not chosen yet, so it falls back to the
+  // first bag by sort_order; `null` = user explicitly picked "No bag".
+  const [starterBagId, setStarterBagId] = createSignal<string | null | undefined>(undefined);
+  // Sorted copy for a stable "first bag" default — never mutate the bags() resource.
+  const sortedStarterBags = createMemo(() =>
+    [...(bags() ?? [])].sort((a, b) => a.sort_order - b.sort_order)
+  );
+  const selectedStarterBagId = () =>
+    starterBagId() !== undefined ? starterBagId() : (sortedStarterBags()[0]?.id ?? null);
 
   // Debounce search query to avoid filtering on every keystroke
   createEffect(() => {
@@ -1101,8 +1111,9 @@ export function PackingPage(props: PackingPageProps) {
   };
 
   // One-tap starter list: add a whole trip type's built-in items in one batch.
-  // Items go in unassigned (no bag) and are deduped by name against what's already
-  // on the trip, so tapping several chips (or the same chip twice) never duplicates.
+  // Items are assigned to a bag (see targetBagId below) and deduped by name against
+  // what's already on the trip, so tapping several chips (or the same chip twice)
+  // never duplicates.
   const handleAddStarterList = async (tripTypeId: string, modifiers: StarterModifier[] = []) => {
     if (addingStarter()) return;
 
@@ -1125,11 +1136,15 @@ export function PackingPage(props: PackingPageProps) {
 
     // Auto-assign into the user's bag when there's exactly one — otherwise the
     // wizard's "create bags" step is immediately undone by dumping everything in
-    // "No Bag". Zero bags: nothing to assign into, keep current behavior.
-    // TODO: multiple bags — offer a one-tap "put everything in ___" prompt instead
-    // of defaulting to unbagged.
+    // "No Bag". Zero bags: nothing to assign into. 2+ bags: use the inline
+    // selector's choice (defaults to the first bag by sort_order).
     const currentBags = bags() || [];
-    const soleBagId = currentBags.length === 1 ? currentBags[0].id : null;
+    const targetBagId =
+      currentBags.length === 0
+        ? null
+        : currentBags.length === 1
+          ? currentBags[0].id
+          : selectedStarterBagId();
 
     setAddingStarter(tripTypeId);
     try {
@@ -1150,7 +1165,7 @@ export function PackingPage(props: PackingPageProps) {
             name: 'Toilet Kit',
             category_name: TOILETRY_CATEGORY,
             is_container: true,
-            bag_id: soleBagId,
+            bag_id: targetBagId,
           });
           if (containerRes.success && containerRes.data) {
             toiletKitId = containerRes.data.id;
@@ -1169,7 +1184,7 @@ export function PackingPage(props: PackingPageProps) {
         // (PackingListBagView/PackingListCategoryView group by container_item_id
         // and ignore bag_id on nested children) — null it for consistency with
         // handleAddMasterItemFromAddMode/handleAddBuiltInItemFromAddMode.
-        bag_id: toiletKitId && isToiletry(item) ? null : soleBagId,
+        bag_id: toiletKitId && isToiletry(item) ? null : targetBagId,
         container_item_id: toiletKitId && isToiletry(item) ? toiletKitId : null,
         master_item_id: null,
       }));
@@ -1458,6 +1473,22 @@ export function PackingPage(props: PackingPageProps) {
                               Masculine
                             </button>
                           </div>
+                          <Show when={(bags()?.length ?? 0) >= 2}>
+                            <div class="flex items-center gap-2 text-sm text-gray-600">
+                              <label for="starter-bag-select">Add to:</label>
+                              <select
+                                id="starter-bag-select"
+                                value={selectedStarterBagId() ?? ''}
+                                onChange={(e) => setStarterBagId(e.currentTarget.value || null)}
+                                class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                              >
+                                <For each={sortedStarterBags()}>
+                                  {(bag) => <option value={bag.id}>{bag.name}</option>}
+                                </For>
+                                <option value="">No bag</option>
+                              </select>
+                            </div>
+                          </Show>
                         </div>
                         <div class="flex flex-wrap justify-center gap-2 sm:gap-3">
                           <For
