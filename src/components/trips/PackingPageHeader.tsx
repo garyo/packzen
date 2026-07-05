@@ -106,12 +106,30 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
       }
     };
 
+    const isTypingContext = (target: EventTarget | null): boolean => {
+      const el = target as HTMLElement | null;
+      if (!el) return false;
+      const tag = el.tagName;
+      return tag === 'INPUT' || tag === 'TEXTAREA' || el.isContentEditable;
+    };
+
+    const handleSlashShortcut = (e: KeyboardEvent) => {
+      if (e.key !== '/' || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (isTypingContext(e.target)) return;
+      if (!isSearchOpen()) {
+        e.preventDefault();
+        openSearch();
+      }
+    };
+
     document.addEventListener('mousedown', handleClickOutside);
     document.addEventListener('keydown', handleEscape);
+    document.addEventListener('keydown', handleSlashShortcut);
 
     onCleanup(() => {
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleEscape);
+      document.removeEventListener('keydown', handleSlashShortcut);
     });
   });
 
@@ -169,7 +187,7 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
                   <p class="text-xs text-gray-600">
                     {props.packedCount()} of {props.totalCount() - props.skippedCount()} packed
                     <Show when={props.skippedCount() > 0}>
-                      <span class="text-gray-400"> · {props.skippedCount()} skipped</span>
+                      <span class="text-gray-500"> · {props.skippedCount()} skipped</span>
                     </Show>
                     <Show when={props.unpackedCount() > 0 && props.viewMode() === 'pack'}>
                       {' · '}
@@ -327,6 +345,7 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
                       size="sm"
                       class="h-full !px-2 md:!px-3 [@media(max-height:500px)]:!py-0.5"
                       onClick={() => setShowMenu(!showMenu())}
+                      aria-label="More actions"
                     >
                       <MoreVerticalIcon class="h-4 w-4" />
                     </Button>

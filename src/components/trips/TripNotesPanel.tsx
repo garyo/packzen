@@ -55,15 +55,9 @@ export function TripNotesPanel(props: TripNotesPanelProps) {
   let saveTimeoutId: ReturnType<typeof setTimeout> | null = null;
   let textareaRef: HTMLTextAreaElement | undefined;
   let panelRef: HTMLDivElement | undefined;
-  let justEnteredEditMode = false; // Flag to prevent close when entering edit mode
 
   // Click outside to close
   const handleClickOutside = (e: MouseEvent) => {
-    // Skip if we just entered edit mode (the click that triggered edit mode)
-    if (justEnteredEditMode) {
-      justEnteredEditMode = false;
-      return;
-    }
     if (panelRef && !panelRef.contains(e.target as Node)) {
       // Save before closing if there are changes
       if (localNotes() !== props.notes) {
@@ -148,8 +142,11 @@ export function TripNotesPanel(props: TripNotesPanelProps) {
     }
   };
 
-  const enterEditMode = () => {
-    justEnteredEditMode = true;
+  const enterEditMode = (e: MouseEvent) => {
+    // Stop this click from bubbling to the document-level outside-click
+    // listener — it's the click that opened edit mode, not one that should
+    // close it.
+    e.stopPropagation();
     setIsEditing(true);
     // Focus textarea after render
     requestAnimationFrame(() => {
@@ -197,7 +194,7 @@ export function TripNotesPanel(props: TripNotesPanelProps) {
         when={isEditing()}
         fallback={
           <div
-            onClick={() => enterEditMode()}
+            onClick={enterEditMode}
             class="min-h-[80px] w-full cursor-text rounded border border-amber-200 bg-white p-2 text-sm whitespace-pre-wrap text-gray-800"
             style="font-size: 16px; max-height: 400px; overflow-y: auto"
           >

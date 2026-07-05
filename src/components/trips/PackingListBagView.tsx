@@ -216,7 +216,11 @@ function DraggableItem(props: {
 
   return (
     <Show when={props.enabled} fallback={<div>{props.children({ isDragging: false })}</div>}>
-      <div ref={draggable.ref}>
+      <div
+        ref={draggable.ref}
+        aria-label={`Drag handle: ${props.item.name}`}
+        aria-roledescription="draggable item"
+      >
         {props.children({
           dragActivators: draggable.dragActivators,
           isDragging: draggable.isActiveDraggable,
@@ -268,6 +272,39 @@ function PackingListBagViewInner(props: PackingListBagViewProps) {
   const [dragCancelled, setDragCancelled] = createSignal(false);
   const [replacingBagId, setReplacingBagId] = createSignal<string | null>(null);
   const autoScroll = useAutoScroll();
+
+  // Close bag/container add-menus on outside click or Escape (see U16). Menus are
+  // rendered per-bag/per-container inside a <For>, so we match on a data attribute
+  // rather than a single ref (contrast PackingPageHeader, which has only one menu).
+  onMount(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (openBagMenu()) {
+        const key = target?.closest('[data-bag-menu-key]')?.getAttribute('data-bag-menu-key');
+        if (key !== openBagMenu()) setOpenBagMenu(null);
+      }
+      if (openContainerMenu()) {
+        const key = target
+          ?.closest('[data-container-menu-key]')
+          ?.getAttribute('data-container-menu-key');
+        if (key !== openContainerMenu()) setOpenContainerMenu(null);
+      }
+    };
+
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (openBagMenu()) setOpenBagMenu(null);
+      if (openContainerMenu()) setOpenContainerMenu(null);
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscape);
+
+    onCleanup(() => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+    });
+  });
 
   // Handle drag end - dispatch to appropriate handler
   // Simplified: D&D only moves items between locations (bags, containers), never changes category
@@ -492,7 +529,9 @@ function PackingListBagViewInner(props: PackingListBagViewProps) {
   // Update observed elements when bags/containers change
   createEffect(() => {
     const bags = props.bags();
-    const containers = containerData().containers;
+    // Read (and thereby subscribe to) container changes so this effect re-runs
+    // and re-observes sections when containers are added/removed.
+    void containerData().containers;
 
     // Wait for bags to be loaded and observer to be created
     if (!bags || bags.length === 0 || !observer) return;
@@ -629,7 +668,7 @@ function PackingListBagViewInner(props: PackingListBagViewProps) {
                     {(() => {
                       const menuKey = bag.id ?? '__wearing__';
                       return (
-                        <div class="relative">
+                        <div class="relative" data-bag-menu-key={menuKey}>
                           <button
                             onClick={() =>
                               setOpenBagMenu(openBagMenu() === menuKey ? null : menuKey)
@@ -729,7 +768,7 @@ function PackingListBagViewInner(props: PackingListBagViewProps) {
                                 {category}
                                 {/* Inline packed count when all items in category are packed */}
                                 <Show when={allCategoryPacked()}>
-                                  <span class="ml-1 flex items-center gap-1 text-gray-400">
+                                  <span class="ml-1 flex items-center gap-1 text-gray-500">
                                     ·
                                     <CheckIcon class="h-3 w-3 text-green-600" />
                                     <span class="text-gray-500">{packedCount()} packed</span>
@@ -883,7 +922,7 @@ function PackingListBagViewInner(props: PackingListBagViewProps) {
                                     </svg>
                                   </button>
                                   {/* Add items button */}
-                                  <div class="relative">
+                                  <div class="relative" data-container-menu-key={container.id}>
                                     <button
                                       onClick={() =>
                                         setOpenContainerMenu(

@@ -129,7 +129,11 @@ function DraggableItem(props: {
 
   return (
     <Show when={props.enabled} fallback={<div>{props.children({ isDragging: false })}</div>}>
-      <div ref={draggable.ref}>
+      <div
+        ref={draggable.ref}
+        aria-label={`Drag handle: ${props.item.name}`}
+        aria-roledescription="draggable item"
+      >
         {props.children({
           dragActivators: draggable.dragActivators,
           isDragging: draggable.isActiveDraggable,
@@ -409,7 +413,7 @@ function PackingListCategoryViewInner(props: PackingListCategoryViewProps) {
                                 {bag()?.name || 'No bag'}
                                 {/* Inline packed count when all items in bag are packed */}
                                 <Show when={allBagPacked()}>
-                                  <span class="ml-1 flex items-center gap-1 text-gray-400">
+                                  <span class="ml-1 flex items-center gap-1 text-gray-500">
                                     ·
                                     <CheckIcon class="h-3 w-3 text-green-600" />
                                     <span class="text-gray-500">{packedCount()} packed</span>
@@ -531,7 +535,7 @@ function PackingListCategoryViewInner(props: PackingListCategoryViewProps) {
                                 </Show>
                                 {/* Inline packed count when all items in container are packed */}
                                 <Show when={allContainerPacked()}>
-                                  <span class="ml-1 flex items-center gap-1 text-gray-400">
+                                  <span class="ml-1 flex items-center gap-1 text-gray-500">
                                     ·
                                     <CheckIcon class="h-3 w-3 text-green-600" />
                                     <span class="text-gray-500">{packedCount()} packed</span>
