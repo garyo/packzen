@@ -60,6 +60,7 @@ export function CSVImportExport(props: CSVImportExportProps) {
           description: item.description ?? null,
           category: item.category_name,
           quantity: item.default_quantity,
+          is_container: item.is_container,
         })),
         masterItemsCache,
         categoriesCache,

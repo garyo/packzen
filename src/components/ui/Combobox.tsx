@@ -1,4 +1,13 @@
-import { createSignal, createEffect, For, Show, onMount, onCleanup, type JSX } from 'solid-js';
+import {
+  createSignal,
+  createEffect,
+  createUniqueId,
+  For,
+  Show,
+  onMount,
+  onCleanup,
+  type JSX,
+} from 'solid-js';
 import { cn } from '../../lib/utils';
 
 export interface ComboboxItem {
@@ -28,6 +37,10 @@ interface ComboboxProps {
 
 export function Combobox(props: ComboboxProps) {
   const minChars = () => props.minChars ?? 2;
+  // Unique per instance so two comboboxes mounted at once don't collide on
+  // element ids / aria-activedescendant references.
+  const listboxId = createUniqueId();
+  const itemId = (index: number) => `${listboxId}-item-${index}`;
 
   const [isOpen, setIsOpen] = createSignal(false);
   const [highlightedIndex, setHighlightedIndex] = createSignal(-1);
@@ -198,15 +211,13 @@ export function Combobox(props: ComboboxProps) {
         role="combobox"
         aria-autocomplete="list"
         aria-expanded={shouldShowDropdown() ? 'true' : 'false'}
-        aria-controls="combobox-listbox"
-        aria-activedescendant={
-          highlightedIndex() >= 0 ? `combobox-item-${highlightedIndex()}` : undefined
-        }
+        aria-controls={listboxId}
+        aria-activedescendant={highlightedIndex() >= 0 ? itemId(highlightedIndex()) : undefined}
       />
 
       <Show when={shouldShowDropdown()}>
         <div
-          id="combobox-listbox"
+          id={listboxId}
           role="listbox"
           class="absolute top-full right-0 left-0 z-10 mt-1 max-h-60 overflow-y-auto rounded-lg border border-gray-300 bg-white shadow-lg"
         >
@@ -229,7 +240,7 @@ export function Combobox(props: ComboboxProps) {
 
                 return (
                   <div
-                    id={`combobox-item-${index}`}
+                    id={itemId(index)}
                     role="option"
                     aria-selected={highlightedIndex() === index}
                     class={cn(
@@ -274,7 +285,7 @@ export function Combobox(props: ComboboxProps) {
 
                 return (
                   <div
-                    id={`combobox-item-${index}`}
+                    id={itemId(index)}
                     role="option"
                     aria-selected={highlightedIndex() === index}
                     class={cn(

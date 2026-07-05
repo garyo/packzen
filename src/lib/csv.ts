@@ -11,6 +11,7 @@ export function masterItemsToCSV(items: MasterItemWithCategory[]): string {
     description: item.description || '',
     category_name: item.category_name || '',
     default_quantity: item.default_quantity,
+    is_container: item.is_container ? 'true' : 'false',
   }));
 
   return Papa.unparse(data, {
@@ -28,6 +29,7 @@ export function csvToMasterItems(csv: string): Array<{
   description?: string;
   category_name?: string;
   default_quantity: number;
+  is_container: boolean;
 }> {
   const result = Papa.parse(csv, {
     header: true,
@@ -69,6 +71,7 @@ export function csvToMasterItems(csv: string): Array<{
         description: row.description?.trim() || undefined,
         category_name: row.category_name?.trim() || undefined,
         default_quantity: isNaN(quantity) || quantity < 1 ? 1 : quantity,
+        is_container: ['true', '1', 'yes'].includes(row.is_container?.trim().toLowerCase() ?? ''),
       };
     })
     .filter((item): item is NonNullable<typeof item> => item !== null);
@@ -77,7 +80,17 @@ export function csvToMasterItems(csv: string): Array<{
     throw new Error('No valid items found in CSV');
   }
 
-  return items;
+  // Dedupe repeated names (case-insensitive), keeping the first occurrence, so
+  // a file with duplicate rows doesn't drive duplicate create/update requests.
+  const seen = new Set<string>();
+  const deduped = items.filter((item) => {
+    const key = item.name.toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  return deduped;
 }
 
 /**
