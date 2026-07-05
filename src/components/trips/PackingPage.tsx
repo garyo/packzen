@@ -1449,10 +1449,13 @@ export function PackingPage(props: PackingPageProps) {
                           Start your packing list
                         </h3>
                         <p class="mb-4 text-gray-600">
-                          Tap a trip type to add the essentials instantly. Combine as many as you
-                          like.
+                          Pick a trip type below — one tap instantly adds its essentials to your
+                          list.
                         </p>
                         <div class="mb-5 flex flex-col items-center gap-3">
+                          <p class="text-xs text-gray-500">
+                            Optional: combine any of these add-ons first, then pick a trip type.
+                          </p>
                           <button
                             type="button"
                             onClick={() => setStarterIntl((v) => !v)}

@@ -4,6 +4,7 @@ import { BAG_TYPES } from '../../lib/types';
 import { BAG_COLORS, getBagColorSwatchClass } from '../../lib/color-utils';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
+import { showToast } from '../ui/Toast';
 
 export interface CustomBagData {
   name: string;
@@ -40,15 +41,14 @@ export function BagSelectionForm(props: BagSelectionFormProps) {
   const [newBagColor, setNewBagColor] = createSignal('blue');
   const [saveToMyBags, setSaveToMyBags] = createSignal(true);
 
-  const handleAddCustomBag = (e: Event) => {
-    e.preventDefault();
-
-    if (!newBagName().trim()) {
-      return;
-    }
+  // Commit whatever is typed in the add-bag form to the trip. Returns the bag
+  // name if one was added, or null when the name is blank (nothing to add).
+  const commitCustomBag = (): string | null => {
+    const name = newBagName().trim();
+    if (!name) return null;
 
     props.onAddCustomBag({
-      name: newBagName().trim(),
+      name,
       type: newBagType(),
       color: newBagColor(),
       saveToMyBags: saveToMyBags(),
@@ -60,6 +60,23 @@ export function BagSelectionForm(props: BagSelectionFormProps) {
     setNewBagColor('blue');
     setSaveToMyBags(true);
     setShowAddForm(false);
+    return name;
+  };
+
+  const handleAddCustomBag = (e: Event) => {
+    e.preventDefault();
+    commitCustomBag();
+  };
+
+  // Don't silently drop a bag the user filled in but didn't click "Add" on —
+  // that lost bags (and their "Save to My Bags" choice) on the way to creating
+  // the trip. Auto-commit the pending entry, then continue.
+  const handleSubmit = () => {
+    const added = commitCustomBag();
+    if (added) {
+      showToast('info', `Added “${added}” to this trip`);
+    }
+    props.onSubmit();
   };
 
   const totalBagsSelected = () => {
@@ -311,7 +328,7 @@ export function BagSelectionForm(props: BagSelectionFormProps) {
         <Button type="button" variant="secondary" onClick={props.onBack}>
           Back
         </Button>
-        <Button type="button" onClick={props.onSubmit}>
+        <Button type="button" onClick={handleSubmit}>
           {totalBagsSelected() > 0
             ? `Create Trip with ${totalBagsSelected()} ${totalBagsSelected() === 1 ? 'Bag' : 'Bags'}`
             : 'Create Trip'}
