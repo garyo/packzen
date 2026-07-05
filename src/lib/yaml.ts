@@ -140,13 +140,34 @@ export function tripToYAML(trip: Trip, bags: Bag[], items: TripItem[]): string {
 }
 
 /**
+ * DEFAULT_SCHEMA parses unquoted dates like `2026-06-01` into JS `Date` objects
+ * (that's also what gives us yes/no/on/off -> boolean, which we want to keep).
+ * The Zod schemas expect plain 'YYYY-MM-DD' strings, so walk the parsed tree and
+ * convert any Date back to that format before validation.
+ */
+function coerceDatesToStrings(value: unknown): unknown {
+  if (value instanceof Date) {
+    return value.toISOString().slice(0, 10);
+  }
+  if (Array.isArray(value)) {
+    return value.map(coerceDatesToStrings);
+  }
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, val]) => [key, coerceDatesToStrings(val)])
+    );
+  }
+  return value;
+}
+
+/**
  * Parse YAML and return trip data structure
  * Now includes comprehensive validation and sanitization
  */
 export function yamlToTrip(yamlString: string): TripExport {
   try {
     // Parse YAML with safe loader
-    const parsed = yaml.load(yamlString, { schema: yaml.DEFAULT_SCHEMA });
+    const parsed = coerceDatesToStrings(yaml.load(yamlString, { schema: yaml.DEFAULT_SCHEMA }));
 
     // Validate and sanitize the parsed data
     const validation = validateRequestSafe(yamlTripExportSchema, parsed);
@@ -282,7 +303,7 @@ export function fullBackupToYAML(
 export function yamlToFullBackup(yamlString: string): FullBackup {
   try {
     // Parse YAML with safe loader
-    const parsed = yaml.load(yamlString, { schema: yaml.DEFAULT_SCHEMA });
+    const parsed = coerceDatesToStrings(yaml.load(yamlString, { schema: yaml.DEFAULT_SCHEMA }));
 
     // Validate and sanitize the parsed data
     const validation = validateRequestSafe(yamlFullBackupSchema, parsed);

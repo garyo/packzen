@@ -16,6 +16,30 @@ interface RequestOptions extends RequestInit {
 let csrfToken: string | null = null;
 let csrfTokenPromise: Promise<string> | null = null;
 
+// Guards against scheduling more than one sign-in redirect at a time. Several
+// requests can 401 concurrently (or a 401 can race a Clerk session-change
+// event); only the first should schedule a navigation.
+let redirectScheduled = false;
+
+/**
+ * Schedule a one-time redirect to sign-in. Safe to call from multiple
+ * concurrent failure paths (e.g. several 401s, or a session-change listener
+ * racing a 401) — only the first call schedules a navigation.
+ */
+export function scheduleSignInRedirect(): void {
+  if (redirectScheduled) {
+    return;
+  }
+  const currentPath = window.location.pathname;
+  if (currentPath.includes('/sign-in') || currentPath.includes('/sign-up')) {
+    return;
+  }
+  redirectScheduled = true;
+  setTimeout(() => {
+    window.location.href = `/sign-in?redirect_url=${encodeURIComponent(currentPath)}`;
+  }, 1000);
+}
+
 /**
  * Fetch CSRF token from the server.
  * Caches the token and deduplicates concurrent requests so parallel
@@ -121,15 +145,10 @@ async function makeRequest<T>(
           (errorBody as Record<string, string>).error) ||
         `Request failed with status ${response.status}`;
 
-      // Handle 401 errors by redirecting to sign-in
+      // Handle 401 errors by redirecting to sign-in. Deduped: N concurrent
+      // 401s schedule exactly one redirect (see `scheduleSignInRedirect`).
       if (response.status === 401 && !options.skipErrorHandling) {
-        // Don't redirect if already on sign-in/sign-up pages
-        const currentPath = window.location.pathname;
-        if (!currentPath.includes('/sign-in') && !currentPath.includes('/sign-up')) {
-          setTimeout(() => {
-            window.location.href = `/sign-in?redirect_url=${encodeURIComponent(currentPath)}`;
-          }, 1000);
-        }
+        scheduleSignInRedirect();
       }
 
       // A 403 on a state-changing request likely means a stale CSRF token

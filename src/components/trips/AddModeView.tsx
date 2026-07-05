@@ -6,7 +6,7 @@
  * Right panel: Compact bag cards as drop targets
  */
 
-import { createSignal, createEffect, createMemo, Show, type Accessor } from 'solid-js';
+import { createSignal, createEffect, createMemo, onCleanup, Show, type Accessor } from 'solid-js';
 import {
   DragDropProvider,
   DragDropSensors,
@@ -114,6 +114,17 @@ export function AddModeView(props: AddModeViewProps) {
   });
 
   const autoScroll = usePanelAutoScroll(() => rightPanelRef);
+
+  // If this view unmounts mid-drag (e.g. navigating away), the drag never
+  // reaches handleDragEnd/handleCancel, which would otherwise leave the
+  // module-global pointer tracker's listeners attached and its "active" flag
+  // stuck on - corrupting collision detection for the pack views, which
+  // share this module. Tearing down here unconditionally is safe: stopping
+  // an already-stopped tracker is a no-op.
+  onCleanup(() => {
+    stopPointerTracking();
+    autoScroll.stop();
+  });
 
   const handleDragStart = (event: DragEvent) => {
     const data = event.draggable.data as SourceItemDragData;

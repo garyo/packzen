@@ -61,14 +61,6 @@ export function formatDateRange(
   return `${startMonth} ${startDay}-${endMonth} ${endDay}, ${startYear}`;
 }
 
-// Calculate trip duration in days
-export function getTripDuration(startDate: string, endDate: string): number {
-  const start = parseLocalDate(startDate);
-  const end = parseLocalDate(endDate);
-  const diff = end.getTime() - start.getTime();
-  return Math.ceil(diff / (1000 * 60 * 60 * 24)) + 1; // +1 to include both start and end days
-}
-
 // Check if trip is upcoming, active, or past
 export function getTripStatus(startDate: string, endDate: string): 'upcoming' | 'active' | 'past' {
   const now = new Date();

@@ -24,25 +24,14 @@ export function AddFromMasterList(props: AddFromMasterListProps) {
   const [pendingItems, setPendingItems] = createSignal<Set<string>>(new Set<string>());
   const [selectedBag, setSelectedBag] = createSignal<string | null>(null);
   const [selectedContainer, setSelectedContainer] = createSignal<string | null>(null);
-  const [tripItemOverrides, setTripItemOverrides] = createSignal<Map<string, Partial<TripItem>>>(
-    new Map()
-  );
-  const [removedTripItemIds, setRemovedTripItemIds] = createSignal<Set<string>>(new Set());
 
-  const effectiveTripItems = createMemo(() => {
-    const overrides = tripItemOverrides();
-    const removed = removedTripItemIds();
-    const base = props.tripItems() || [];
-    return base
-      .filter((item) => !removed.has(item.id))
-      .map((item) => (overrides.has(item.id) ? { ...item, ...overrides.get(item.id)! } : item));
-  });
-
-  createEffect(() => {
-    props.tripItems();
-    setTripItemOverrides(new Map());
-    setRemovedTripItemIds(new Set<string>());
-  });
+  // `onItemAdded`/`onItemUpdated`/`onItemRemoved` already write straight into
+  // the parent's store (fine-grained, synchronous), so there's no need for a
+  // separate local mirror here - one previously existed but could desync
+  // (its reset effect tracked `props.tripItems()`'s identity, which doesn't
+  // change under an in-place store `produce`, so it could silently miss
+  // resets). Reading the parent's store directly avoids that class of bug.
+  const effectiveTripItems = createMemo(() => props.tripItems() || []);
 
   const bagLookup = createMemo(() => {
     const map = new Map<string, string>();
@@ -152,11 +141,6 @@ export function AddFromMasterList(props: AddFromMasterListProps) {
 
         if (response.success) {
           showToast('success', `Updated ${item.name} count`);
-          setTripItemOverrides((prev) => {
-            const next = new Map(prev);
-            next.set(existingMatch.id, { quantity: newQuantity });
-            return next;
-          });
           // Use specific callback if available, otherwise fallback
           if (props.onItemUpdated) {
             props.onItemUpdated(existingMatch.id, { quantity: newQuantity });
@@ -215,16 +199,6 @@ export function AddFromMasterList(props: AddFromMasterListProps) {
 
       if (response.success) {
         showToast('success', `Removed ${item.name}`);
-        setRemovedTripItemIds((prev) => {
-          const next = new Set(prev);
-          next.add(existingMatch.id);
-          return next;
-        });
-        setTripItemOverrides((prev) => {
-          const next = new Map(prev);
-          next.delete(existingMatch.id);
-          return next;
-        });
         // Use specific callback if available, otherwise fallback
         if (props.onItemRemoved) {
           props.onItemRemoved(existingMatch.id);
