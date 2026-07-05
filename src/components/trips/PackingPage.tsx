@@ -107,12 +107,6 @@ export function PackingPage(props: PackingPageProps) {
   // hidden otherwise). `undefined` = not chosen yet, so it falls back to the
   // first bag by sort_order; `null` = user explicitly picked "No bag".
   const [starterBagId, setStarterBagId] = createSignal<string | null | undefined>(undefined);
-  // Sorted copy for a stable "first bag" default — never mutate the bags() resource.
-  const sortedStarterBags = createMemo(() =>
-    [...(bags() ?? [])].sort((a, b) => a.sort_order - b.sort_order)
-  );
-  const selectedStarterBagId = () =>
-    starterBagId() !== undefined ? starterBagId() : (sortedStarterBags()[0]?.id ?? null);
 
   // Debounce search query to avoid filtering on every keystroke
   createEffect(() => {
@@ -299,6 +293,15 @@ export function PackingPage(props: PackingPageProps) {
       'Failed to load bags'
     );
   });
+
+  // Which bag starter items go into when the trip has 2+ bags. Declared after
+  // `bags` so this eager memo never reads it in the temporal dead zone. A
+  // sorted copy gives a stable "first bag" default; never mutate bags() itself.
+  const sortedStarterBags = createMemo(() =>
+    [...(bags() ?? [])].sort((a, b) => a.sort_order - b.sort_order)
+  );
+  const selectedStarterBagId = () =>
+    starterBagId() !== undefined ? starterBagId() : (sortedStarterBags()[0]?.id ?? null);
 
   const [categories, { refetch: refetchCategories }] = createResource<Category[]>(async () => {
     return fetchWithErrorHandling(
