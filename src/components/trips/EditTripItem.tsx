@@ -13,6 +13,9 @@ interface EditTripItemProps {
   item: TripItem;
   allItems?: TripItem[]; // All trip items for container selection
   bags?: Bag[]; // Pre-loaded bags (avoids async fetch)
+  categories?: Category[]; // Pre-loaded categories (avoids async fetch)
+  /** Called after this form creates a category, so the parent can refresh its own copy. */
+  onDataChanged?: () => void;
   onClose: () => void;
   onSaved: (updatedItem?: TripItem) => void;
   onDeleted?: (deletedItemId: string, movedItemIds?: string[]) => void;
@@ -42,13 +45,32 @@ export function EditTripItem(props: EditTripItemProps) {
   // Use pre-loaded bags if available, otherwise fetch
   const bags = () => props.bags || [];
 
-  const [categories, { refetch: refetchCategories }] = createResource<Category[]>(async () => {
-    const response = await api.get<Category[]>(endpoints.categories);
-    if (response.success && response.data) {
-      return response.data;
+  // Use pre-loaded categories from the parent when available; only fetch when missing.
+  const [fetchedCategories, { refetch: refetchFetchedCategories }] = createResource<
+    Category[],
+    string
+  >(
+    () => (props.categories ? null : 'categories'), // Only fetch if categories not provided
+    async () => {
+      const response = await api.get<Category[]>(endpoints.categories);
+      if (response.success && response.data) {
+        return response.data;
+      }
+      return [];
     }
-    return [];
-  });
+  );
+  // Preserve undefined (loading) vs. [] (loaded but empty) so the
+  // categoryInitialized effect below correctly waits for real data.
+  const categories = () => props.categories ?? fetchedCategories();
+  // After creating a category, ask the parent to refresh (so the new one flows
+  // back down as a prop), or refetch locally if no parent data was provided.
+  const refreshCategories = async () => {
+    if (props.categories) {
+      props.onDataChanged?.();
+    } else {
+      await refetchFetchedCategories();
+    }
+  };
 
   // Get available containers (containers that are not this item, and not inside this item if this is a container)
   const availableContainers = () => {
@@ -106,7 +128,7 @@ export function EditTripItem(props: EditTripItemProps) {
         finalCategoryId = category.id;
         finalCategoryName = category.name;
         setCategoryId(finalCategoryId);
-        await refetchCategories();
+        await refreshCategories();
         showToast(
           'success',
           alreadyExists

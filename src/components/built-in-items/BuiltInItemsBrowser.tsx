@@ -22,12 +22,18 @@ interface BuiltInItemsBrowserProps {
   onClose: () => void;
   onImportToMaster?: (items: SelectedBuiltInItem[]) => Promise<void>;
   tripId?: string; // Optional: for "Add to Trip" workflow
+  bags?: Bag[]; // Pre-loaded bags (avoids refetching what the parent already has)
+  tripItems?: TripItem[]; // Pre-loaded trip items, used to find containers
   onAddToTrip?: (
     items: SelectedBuiltInItem[],
     bagId?: string | null,
     containerId?: string | null
   ) => Promise<void>;
 }
+
+// Built-in items aren't uniquely identified by name alone (the same name can
+// appear under multiple categories), so selection state is keyed by the pair.
+const itemKey = (item: { category: string; name: string }) => `${item.category}::${item.name}`;
 
 export function BuiltInItemsBrowser(props: BuiltInItemsBrowserProps) {
   const [searchQuery, setSearchQuery] = createSignal('');
@@ -40,23 +46,25 @@ export function BuiltInItemsBrowser(props: BuiltInItemsBrowserProps) {
   const [selectedContainer, setSelectedContainer] = createSignal<string | null>(null);
   const [keepOpen, setKeepOpen] = createSignal(false);
 
-  // Load bags if adding to trip
-  const [bags] = createResource<Bag[], string>(
-    () => props.tripId,
+  // Use pre-loaded bags/trip items if the parent (trip workflow) already has
+  // them; only fetch when they're missing (e.g. no parent-provided data).
+  const [fetchedBags] = createResource<Bag[], string>(
+    () => (props.bags ? undefined : props.tripId),
     async (tripId: string) => {
       const response = await api.get<Bag[]>(endpoints.tripBags(tripId));
       return response.success && response.data ? response.data : [];
     }
   );
+  const bags = () => props.bags ?? fetchedBags() ?? [];
 
-  // Load trip items to get containers
-  const [tripItems] = createResource<TripItem[], string>(
-    () => props.tripId,
+  const [fetchedTripItems] = createResource<TripItem[], string>(
+    () => (props.tripItems ? undefined : props.tripId),
     async (tripId: string) => {
       const response = await api.get<TripItem[]>(endpoints.tripItems(tripId));
       return response.success && response.data ? response.data : [];
     }
   );
+  const tripItems = () => props.tripItems ?? fetchedTripItems() ?? [];
 
   // Get available containers
   const availableContainers = () => {
@@ -138,13 +146,13 @@ export function BuiltInItemsBrowser(props: BuiltInItemsBrowserProps) {
     });
   };
 
-  const toggleItemSelection = (itemName: string, defaultQuantity: number) => {
+  const toggleItemSelection = (key: string, defaultQuantity: number) => {
     setSelectedItems((prev) => {
       const newMap = new Map(prev);
-      if (newMap.has(itemName)) {
-        newMap.delete(itemName);
+      if (newMap.has(key)) {
+        newMap.delete(key);
       } else {
-        newMap.set(itemName, defaultQuantity);
+        newMap.set(key, defaultQuantity);
       }
       return newMap;
     });
@@ -162,10 +170,10 @@ export function BuiltInItemsBrowser(props: BuiltInItemsBrowserProps) {
     });
   };
 
-  const updateItemQuantity = (itemName: string, quantity: number) => {
+  const updateItemQuantity = (key: string, quantity: number) => {
     setSelectedItems((prev) => {
       const newMap = new Map(prev);
-      newMap.set(itemName, Math.max(1, quantity));
+      newMap.set(key, Math.max(1, quantity));
       return newMap;
     });
   };
@@ -175,8 +183,9 @@ export function BuiltInItemsBrowser(props: BuiltInItemsBrowserProps) {
     setSelectedItems((prev) => {
       const newMap = new Map(prev);
       categoryItems.forEach((item) => {
-        if (!newMap.has(item.name)) {
-          newMap.set(item.name, item.default_quantity);
+        const key = itemKey(item);
+        if (!newMap.has(key)) {
+          newMap.set(key, item.default_quantity);
         }
       });
       return newMap;
@@ -188,7 +197,7 @@ export function BuiltInItemsBrowser(props: BuiltInItemsBrowserProps) {
     setSelectedItems((prev) => {
       const newMap = new Map(prev);
       categoryItems.forEach((item) => {
-        newMap.delete(item.name);
+        newMap.delete(itemKey(item));
       });
       return newMap;
     });
@@ -198,8 +207,8 @@ export function BuiltInItemsBrowser(props: BuiltInItemsBrowserProps) {
     if (selectedItems().size === 0) return;
 
     const items: SelectedBuiltInItem[] = Array.from(selectedItems().entries()).map(
-      ([name, quantity]) => {
-        const item = builtInItems.items.find((i) => i.name === name)!;
+      ([key, quantity]) => {
+        const item = builtInItems.items.find((i) => itemKey(i) === key)!;
         return {
           name: item.name,
           description: item.description,
@@ -348,9 +357,9 @@ export function BuiltInItemsBrowser(props: BuiltInItemsBrowserProps) {
               const categoryIcon = getCategoryIcon(category);
               const isExpanded = () => expandedCategories().has(category);
               const allSelected = () =>
-                categoryItems.every((item) => selectedItems().has(item.name));
+                categoryItems.every((item) => selectedItems().has(itemKey(item)));
               const someSelected = () =>
-                categoryItems.some((item) => selectedItems().has(item.name));
+                categoryItems.some((item) => selectedItems().has(itemKey(item)));
 
               return (
                 <div class="border-b border-gray-200 pb-4 last:border-0 last:pb-0">
@@ -394,18 +403,16 @@ export function BuiltInItemsBrowser(props: BuiltInItemsBrowserProps) {
                     <div class="space-y-2">
                       <For each={categoryItems}>
                         {(item) => {
-                          const isSelected = () => selectedItems().has(item.name);
-                          const quantity = () =>
-                            selectedItems().get(item.name) || item.default_quantity;
+                          const key = itemKey(item);
+                          const isSelected = () => selectedItems().has(key);
+                          const quantity = () => selectedItems().get(key) || item.default_quantity;
 
                           return (
                             <div class="flex items-start gap-3 rounded p-2 hover:bg-gray-50">
                               <input
                                 type="checkbox"
                                 checked={isSelected()}
-                                onChange={() =>
-                                  toggleItemSelection(item.name, item.default_quantity)
-                                }
+                                onChange={() => toggleItemSelection(key, item.default_quantity)}
                                 class="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                               />
                               <div class="flex-1">
@@ -427,7 +434,7 @@ export function BuiltInItemsBrowser(props: BuiltInItemsBrowserProps) {
                                   min="1"
                                   value={quantity()}
                                   onInput={(e) =>
-                                    updateItemQuantity(item.name, parseInt(e.target.value) || 1)
+                                    updateItemQuantity(key, parseInt(e.target.value) || 1)
                                   }
                                   class="w-16 rounded border border-gray-300 px-2 py-1 text-center text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                                 />

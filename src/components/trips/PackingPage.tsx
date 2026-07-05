@@ -300,12 +300,20 @@ export function PackingPage(props: PackingPageProps) {
     );
   });
 
-  const [categories] = createResource<Category[]>(async () => {
+  const [categories, { refetch: refetchCategories }] = createResource<Category[]>(async () => {
     return fetchWithErrorHandling(
       () => api.get<Category[]>(endpoints.categories),
       'Failed to load categories'
     );
   });
+
+  // Modals that create categories/master items (Add Item, Edit Item) hold their own
+  // in-flight copies and call this afterward so the newly created row flows back
+  // down as a prop instead of each modal refetching its own redundant copy.
+  const refetchCategoriesAndMasterItems = () => {
+    refetchCategories();
+    refetchMasterItems();
+  };
 
   const [masterItems, { refetch: refetchMasterItems }] = createResource<MasterItemWithCategory[]>(
     async () => {
@@ -811,8 +819,19 @@ export function PackingPage(props: PackingPageProps) {
     }
   };
 
-  const handleClearAll = async () => {
-    if (!confirm('Unpack all items? This will mark all items as unpacked.')) return;
+  const [showClearAllConfirm, setShowClearAllConfirm] = createSignal(false);
+
+  const handleClearAll = () => {
+    const packedItems = (items() || []).filter((item) => item.is_packed);
+    if (packedItems.length === 0) {
+      showToast('error', 'No packed items to clear');
+      return;
+    }
+    setShowClearAllConfirm(true);
+  };
+
+  const performClearAll = async () => {
+    setShowClearAllConfirm(false);
 
     const currentItems = items() || [];
     const packedItems = currentItems.filter((item) => item.is_packed);
@@ -1603,6 +1622,10 @@ export function PackingPage(props: PackingPageProps) {
           preSelectedBagId={preSelectedBagId()}
           preSelectedContainerId={preSelectedContainerId()}
           bags={bags()}
+          categories={categories()}
+          tripItems={items()}
+          masterItems={masterItems()}
+          onDataChanged={refetchCategoriesAndMasterItems}
           onClose={closeAddForm}
           onSaved={(createdItem) => {
             if (createdItem) {
@@ -1684,12 +1707,38 @@ export function PackingPage(props: PackingPageProps) {
         </Modal>
       </Show>
 
+      {/* Clear All confirmation dialog */}
+      <Show when={showClearAllConfirm()}>
+        <div class="bg-opacity-50 fixed inset-0 z-50 flex items-center justify-center bg-black p-4">
+          <div class="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
+            <h3 class="mb-4 text-lg font-semibold text-gray-900">Unpack All Items?</h3>
+            <p class="mb-6 text-sm text-gray-600">
+              This will mark all packed items as unpacked. You can undo this afterward.
+            </p>
+            <div class="flex gap-3">
+              <Button onClick={performClearAll} variant="secondary" class="flex-1 justify-center">
+                Unpack All
+              </Button>
+              <Button
+                onClick={() => setShowClearAllConfirm(false)}
+                variant="secondary"
+                class="flex-1 justify-center"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      </Show>
+
       <Show when={editingItem()}>
         <EditTripItem
           tripId={props.tripId}
           item={editingItem()!}
           allItems={items()}
           bags={bags()}
+          categories={categories()}
+          onDataChanged={refetchCategories}
           onClose={() => {
             setEditingItem(null);
           }}
@@ -1743,6 +1792,8 @@ export function PackingPage(props: PackingPageProps) {
       <Show when={showBuiltInItems()}>
         <BuiltInItemsBrowser
           tripId={props.tripId}
+          bags={bags()}
+          tripItems={items()}
           onClose={closeBrowseTemplates}
           onAddToTrip={handleAddBuiltInItemsToTrip}
         />

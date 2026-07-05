@@ -1,12 +1,4 @@
-import {
-  createSignal,
-  createResource,
-  createEffect,
-  createMemo,
-  untrack,
-  For,
-  Show,
-} from 'solid-js';
+import { createSignal, createResource, createEffect, createMemo, For, Show } from 'solid-js';
 import { api, endpoints } from '../../lib/api';
 import type { Bag, Category, MasterItemWithCategory, TripItem } from '../../lib/types';
 import { Modal } from '../ui/Modal';
@@ -23,6 +15,11 @@ interface AddTripItemFormProps {
   preSelectedBagId?: string | null;
   preSelectedContainerId?: string | null;
   bags?: Bag[]; // Pre-loaded bags (avoids async fetch)
+  categories?: Category[]; // Pre-loaded categories (avoids async fetch)
+  tripItems?: TripItem[]; // Pre-loaded trip items (avoids async fetch)
+  masterItems?: MasterItemWithCategory[]; // Pre-loaded master items (avoids async fetch)
+  /** Called after this form creates a category or master item, so the parent can refresh its own copies. */
+  onDataChanged?: () => void;
   onClose: () => void;
   onSaved: (createdItem?: TripItem) => void;
 }
@@ -39,7 +36,7 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
   const [saving, setSaving] = createSignal(false);
   let formRef: HTMLFormElement | undefined;
 
-  // Use pre-loaded bags if available, otherwise fetch
+  // Use pre-loaded data from the parent when available; only fetch what's missing.
   const [bags] = createResource<Bag[], string>(
     () => (props.bags ? null : props.tripId), // Only fetch if bags not provided
     async (tripId) => {
@@ -52,43 +49,86 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
     { initialValue: props.bags || [] } // Use provided bags as initial value
   );
 
-  // Set pre-selected values from props when bags/tripItems load.
-  // Use untrack for location() so user changes to the dropdown don't re-trigger this.
-  createEffect(() => {
-    const currentBags = bags();
-
-    if (currentBags) {
-      if (props.preSelectedBagId) {
-        setLocation(`bag:${props.preSelectedBagId}`);
-      } else if (currentBags.length === 1 && !untrack(location)) {
-        // Auto-select if there's only one bag
-        setLocation(`bag:${currentBags[0].id}`);
+  const [fetchedCategories, { refetch: refetchFetchedCategories }] = createResource<
+    Category[],
+    string
+  >(
+    () => (props.categories ? null : 'categories'), // Only fetch if categories not provided
+    async () => {
+      const response = await api.get<Category[]>(endpoints.categories);
+      if (response.success && response.data) {
+        return response.data;
       }
+      return [];
     }
-    if (tripItems() && props.preSelectedContainerId) {
+  );
+  // Preserve undefined (loading) vs. [] (loaded but empty) so downstream
+  // effects that gate on "has data arrived yet?" keep working correctly.
+  const categories = () => props.categories ?? fetchedCategories();
+  // After creating a category, ask the parent to refresh (so the new one flows
+  // back down as a prop), or refetch locally if no parent data was provided.
+  const refreshCategories = async () => {
+    if (props.categories) {
+      props.onDataChanged?.();
+    } else {
+      await refetchFetchedCategories();
+    }
+  };
+
+  const [fetchedTripItems, { refetch: refetchFetchedTripItems }] = createResource<
+    TripItem[],
+    string
+  >(
+    () => (props.tripItems ? null : props.tripId), // Only fetch if tripItems not provided
+    async (tripId) => {
+      const response = await api.get<TripItem[]>(endpoints.tripItems(tripId));
+      if (response.success && response.data) {
+        return response.data;
+      }
+      return [];
+    }
+  );
+  const tripItems = () => props.tripItems ?? fetchedTripItems();
+  // The parent keeps its trip-items store current via `onSaved`, which flows
+  // back down through the `tripItems` prop; only refetch locally when this
+  // form is fetching its own copy (no parent data provided).
+  const refreshTripItemsIfLocal = async () => {
+    if (!props.tripItems) {
+      await refetchFetchedTripItems();
+    }
+  };
+
+  const [fetchedMasterItems] = createResource<MasterItemWithCategory[], string>(
+    () => (props.masterItems ? null : 'master-items'), // Only fetch if masterItems not provided
+    async () => {
+      const response = await api.get<MasterItemWithCategory[]>(endpoints.masterItems);
+      return response.success && response.data ? response.data : [];
+    }
+  );
+  const masterItems = () => props.masterItems ?? fetchedMasterItems();
+
+  // Apply the initial pre-selected bag/container exactly once, as soon as bag
+  // and trip-item data is available. Guarded by `initialLocationSet` so this
+  // never re-runs later and clobbers the "Add Another" restore logic below,
+  // which also calls setLocation (this replaces a previous 250ms setTimeout
+  // hack that raced the two).
+  const [initialLocationSet, setInitialLocationSet] = createSignal(false);
+  createEffect(() => {
+    if (initialLocationSet()) return;
+
+    const currentBags = bags();
+    if (!currentBags) return;
+
+    if (props.preSelectedContainerId) {
+      if (!tripItems()) return; // wait for trip items before resolving the container
       setLocation(`container:${props.preSelectedContainerId}`);
+    } else if (props.preSelectedBagId) {
+      setLocation(`bag:${props.preSelectedBagId}`);
+    } else if (currentBags.length === 1) {
+      // Auto-select if there's only one bag
+      setLocation(`bag:${currentBags[0].id}`);
     }
-  });
-
-  const [categories, { refetch: refetchCategories }] = createResource<Category[]>(async () => {
-    const response = await api.get<Category[]>(endpoints.categories);
-    if (response.success && response.data) {
-      return response.data;
-    }
-    return [];
-  });
-
-  const [tripItems, { refetch: refetchTripItems }] = createResource<TripItem[]>(async () => {
-    const response = await api.get<TripItem[]>(endpoints.tripItems(props.tripId));
-    if (response.success && response.data) {
-      return response.data;
-    }
-    return [];
-  });
-
-  const [masterItems] = createResource<MasterItemWithCategory[]>(async () => {
-    const response = await api.get<MasterItemWithCategory[]>(endpoints.masterItems);
-    return response.success && response.data ? response.data : [];
+    setInitialLocationSet(true);
   });
 
   // Get available containers
@@ -331,7 +371,7 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
       if (category) {
         finalCategoryId = category.id;
         setCategoryId(finalCategoryId);
-        await refetchCategories();
+        await refreshCategories();
         showToast(
           'success',
           alreadyExists
@@ -373,6 +413,9 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
         masterItemId = createdMasterItem.id;
         categoryName = createdMasterItem.category_name;
         showToast('success', `Added "${itemName}" to My Items`);
+        if (props.masterItems) {
+          props.onDataChanged?.();
+        }
       }
     } else if (existingMasterItem) {
       categoryName = existingMasterItem.category_name;
@@ -428,26 +471,21 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
         setLocation(''); // Clear location so restoration triggers a signal change
         setSaving(false);
 
-        // Call onSaved with created item to update store (important for containers to appear in list)
+        // Call onSaved with created item to update store (important for containers to appear in list).
+        // When tripItems comes from the parent's store, this update flows back down through the
+        // `tripItems` prop synchronously; only forms fetching their own copy need an explicit refetch.
         props.onSaved(createdItem);
-        await refetchTripItems();
+        await refreshTripItemsIfLocal();
 
         if (wasContainer && createdItem) {
           // If we just created a container, pre-select it as the container for the next item
-          const newContainerId = createdItem.id;
-          setTimeout(() => {
-            setLocation(`container:${newContainerId}`);
-            setCategoryId(lastCategoryId);
-            formRef?.querySelector<HTMLInputElement>('input[type="text"]')?.focus();
-          }, 250);
+          setLocation(`container:${createdItem.id}`);
         } else {
-          // For regular items, restore location and category after refetch
-          setTimeout(() => {
-            setLocation(lastLocation);
-            setCategoryId(lastCategoryId);
-            formRef?.querySelector<HTMLInputElement>('input[type="text"]')?.focus();
-          }, 250);
+          // For regular items, restore the previous location
+          setLocation(lastLocation);
         }
+        setCategoryId(lastCategoryId);
+        formRef?.querySelector<HTMLInputElement>('input[type="text"]')?.focus();
       } else {
         props.onSaved(createdItem);
         props.onClose();
