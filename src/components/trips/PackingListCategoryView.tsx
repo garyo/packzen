@@ -21,6 +21,19 @@ import { getBagColorClass, getBagColorStyle } from '../../lib/color-utils';
 import { liveRectCollision, useAutoScroll, EscapeCancelHandler } from './drag-drop-utils';
 import { CheckIcon } from '../ui/Icons';
 
+// Virtual "Wearing / No Bag" entry, module-level so it keeps a stable identity
+// across recomputes — otherwise <For> tears down and rebuilds the section on
+// every structural change. See U12.
+const WEARING_BAG: Bag = {
+  id: null as any,
+  trip_id: '',
+  name: 'Wearing / No Bag',
+  type: 'wearing' as any,
+  color: null,
+  sort_order: 999,
+  created_at: new Date(0),
+};
+
 // Drop zone types - bag sections and container sections
 const DROP_ZONE_TYPES = {
   BAG: 'bag-section',
@@ -251,19 +264,8 @@ function PackingListCategoryViewInner(props: PackingListCategoryViewProps) {
         categoryContainers.get(containerId)!.push(item);
       });
 
-    // Add virtual "Wearing" bag to the list
-    const bagsWithWearing = [
-      ...allBags,
-      {
-        id: null as any,
-        trip_id: '',
-        name: 'Wearing / No Bag',
-        type: 'wearing' as any,
-        color: null,
-        sort_order: 999,
-        created_at: new Date(),
-      },
-    ];
+    // Add virtual "Wearing" bag to the list (stable identity — see WEARING_BAG)
+    const bagsWithWearing = [...allBags, WEARING_BAG];
 
     return { bagGrouped, containerGrouped, allBags: bagsWithWearing, containers };
   });

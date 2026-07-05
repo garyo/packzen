@@ -35,6 +35,20 @@ import { liveRectCollision, useAutoScroll, EscapeCancelHandler } from './drag-dr
 import { CheckIcon, SwitchBagIcon } from '../ui/Icons';
 import { ReplaceBagModal } from './ReplaceBagModal';
 
+// Virtual "Wearing / No Bag" entry, module-level so it keeps a stable identity
+// across recomputes — otherwise <For> tears down and rebuilds the section on
+// every structural change (breaking IntersectionObserver re-observe and
+// closing open add-menus in that section). See U12.
+const WEARING_BAG: Bag = {
+  id: null as any,
+  trip_id: '',
+  name: 'Wearing / No Bag',
+  type: 'wearing' as any,
+  color: null,
+  sort_order: 999,
+  created_at: new Date(0),
+};
+
 // Drop zone type identifiers
 // Simplified: D&D only moves items between locations (bags, containers), never changes category
 const DROP_ZONE_TYPES = {
@@ -354,6 +368,7 @@ function PackingListBagViewInner(props: PackingListBagViewProps) {
   const itemsByBag = createMemo(() => {
     const allItems = props.items() || [];
     const allBags = props.bags() || [];
+    const knownBagIds = new Set(allBags.map((b) => b.id));
     const grouped = new Map<string | null, Map<string, TripItem[]>>();
 
     // Group items by bag_id, then by category
@@ -361,7 +376,9 @@ function PackingListBagViewInner(props: PackingListBagViewProps) {
     allItems
       .filter((item) => !item.container_item_id)
       .forEach((item) => {
-        const bagId = item.bag_id || null;
+        // Bag-orphans (bag_id set but referencing no known bag) fall back to
+        // "No Bag" so they're still rendered somewhere (see U13).
+        const bagId = item.bag_id && knownBagIds.has(item.bag_id) ? item.bag_id : null;
         const category = item.category_name || 'Uncategorized';
 
         if (!grouped.has(bagId)) {
@@ -376,19 +393,8 @@ function PackingListBagViewInner(props: PackingListBagViewProps) {
         bagCategories.get(category)!.push(item);
       });
 
-    // Add virtual "Wearing" bag to the list
-    const bagsWithWearing = [
-      ...allBags,
-      {
-        id: null as any,
-        trip_id: '',
-        name: 'Wearing / No Bag',
-        type: 'wearing' as any,
-        color: null,
-        sort_order: 999,
-        created_at: new Date(),
-      },
-    ];
+    // Add virtual "Wearing" bag to the list (stable identity — see WEARING_BAG)
+    const bagsWithWearing = [...allBags, WEARING_BAG];
 
     return { grouped, allBags: bagsWithWearing };
   });

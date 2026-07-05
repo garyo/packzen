@@ -125,7 +125,6 @@ test('Bag template API enforces free-plan limits and allows standard plan', asyn
 
 test('Trip API enforces trip limits and returns stats', async () => {
   const d1 = await createTestDatabase();
-  const db = drizzle(d1);
   const userId = 'trip_test_user';
   const limit = getLimitsForPlan({
     activePlan: 'free_user',

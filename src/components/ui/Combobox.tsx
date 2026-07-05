@@ -28,7 +28,6 @@ interface ComboboxProps {
 
 export function Combobox(props: ComboboxProps) {
   const minChars = () => props.minChars ?? 2;
-  const maxResults = () => props.maxResults ?? 8;
 
   const [isOpen, setIsOpen] = createSignal(false);
   const [highlightedIndex, setHighlightedIndex] = createSignal(-1);

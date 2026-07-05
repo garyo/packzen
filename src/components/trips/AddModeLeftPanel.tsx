@@ -5,14 +5,10 @@
  * Items are draggable to bag cards in the right panel
  */
 
-import { createSignal, Show, For, createMemo, createEffect, type Accessor } from 'solid-js';
+import { createSignal, Show, For, createMemo, type Accessor } from 'solid-js';
 import { createDraggable } from '@thisbeyond/solid-dnd';
 import type { TripItem, Category, MasterItemWithCategory } from '../../lib/types';
-import {
-  builtInItems,
-  getItemsByTripTypes,
-  getCategoriesForTripTypes,
-} from '../../lib/built-in-items';
+import { builtInItems, getItemsByTripTypes } from '../../lib/built-in-items';
 import type { SourceItemDragData, SelectedTarget } from './AddModeView';
 import { TrashIcon, PlusIcon } from '../ui/Icons';
 

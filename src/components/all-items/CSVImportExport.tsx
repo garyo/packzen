@@ -5,12 +5,12 @@
  * Extracted from AllItemsPage for better separation of concerns
  */
 
-import type { Accessor } from 'solid-js';
+import { createSignal, Show, type Accessor } from 'solid-js';
 import type { Category, MasterItemWithCategory } from '../../lib/types';
 import { Button } from '../ui/Button';
 import { showToast } from '../ui/Toast';
 import { masterItemsToCSV, csvToMasterItems, downloadCSV } from '../../lib/csv';
-import { api, endpoints } from '../../lib/api';
+import { resolveMasterItems } from '../../lib/item-helpers';
 
 interface CSVImportExportProps {
   items: Accessor<MasterItemWithCategory[] | undefined>;
@@ -19,6 +19,10 @@ interface CSVImportExportProps {
 }
 
 export function CSVImportExport(props: CSVImportExportProps) {
+  const [importProgress, setImportProgress] = createSignal<{ done: number; total: number } | null>(
+    null
+  );
+
   const handleExport = () => {
     const itemsList = props.items();
     if (!itemsList || itemsList.length === 0) {
@@ -40,73 +44,35 @@ export function CSVImportExport(props: CSVImportExportProps) {
     try {
       const text = await file.text();
       const parsedItems = csvToMasterItems(text);
-      const existingItems = props.items() || [];
-      const existingCategories = props.categories() || [];
+      const masterItemsCache = [...(props.items() || [])];
+      const categoriesCache = [...(props.categories() || [])];
+      const categoriesBefore = categoriesCache.length;
 
-      let createdCount = 0;
-      let updatedCount = 0;
-      let createdCategoriesCount = 0;
-      let failedCount = 0;
+      setImportProgress({ done: 0, total: parsedItems.length });
 
-      // Helper to get or create category by name
-      const getCategoryId = async (categoryName: string | undefined): Promise<string | null> => {
-        if (!categoryName) return null;
-
-        // Check if category exists (case-insensitive)
-        let category = existingCategories.find(
-          (c) => c.name.toLowerCase() === categoryName.toLowerCase()
-        );
-
-        // Create category if it doesn't exist
-        if (!category) {
-          const response = await api.post(endpoints.categories, { name: categoryName });
-          if (response.success && response.data) {
-            category = response.data as (typeof existingCategories)[number];
-            existingCategories.push(category);
-            createdCategoriesCount++;
-          }
+      // Rows resolve concurrently instead of one request at a time; CSV import
+      // treats the file as the source of truth for rows that already exist
+      // (updateIfExists), unlike the quick-add flows which leave a matched
+      // master item's saved metadata alone.
+      const results = await resolveMasterItems(
+        parsedItems.map((item) => ({
+          name: item.name,
+          description: item.description ?? null,
+          category: item.category_name,
+          quantity: item.default_quantity,
+        })),
+        masterItemsCache,
+        categoriesCache,
+        {
+          updateIfExists: true,
+          onProgress: (done, total) => setImportProgress({ done, total }),
         }
+      );
 
-        return category?.id || null;
-      };
-
-      for (const item of parsedItems) {
-        // Get or create category
-        const category_id = await getCategoryId(item.category_name);
-
-        // Check if item with same name exists (case-insensitive)
-        const existing = existingItems.find(
-          (e) => e.name.toLowerCase() === item.name.toLowerCase()
-        );
-
-        if (existing) {
-          // Update existing item
-          const response = await api.put(endpoints.masterItem(existing.id), {
-            name: existing.name,
-            description: item.description || existing.description,
-            category_id: category_id || existing.category_id,
-            default_quantity: item.default_quantity,
-          });
-          if (response.success) {
-            updatedCount++;
-          } else {
-            failedCount++;
-          }
-        } else {
-          // Create new item
-          const response = await api.post(endpoints.masterItems, {
-            name: item.name,
-            description: item.description,
-            category_id,
-            default_quantity: item.default_quantity,
-          });
-          if (response.success) {
-            createdCount++;
-          } else {
-            failedCount++;
-          }
-        }
-      }
+      const createdCount = results.filter((r) => r.status === 'created').length;
+      const updatedCount = results.filter((r) => r.status === 'updated').length;
+      const failedCount = results.filter((r) => r.status === 'failed').length;
+      const createdCategoriesCount = categoriesCache.length - categoriesBefore;
 
       let message = `Imported: ${createdCount} items created, ${updatedCount} updated`;
       if (createdCategoriesCount > 0) {
@@ -121,19 +87,36 @@ export function CSVImportExport(props: CSVImportExportProps) {
     } catch (error) {
       showToast('error', error instanceof Error ? error.message : 'Failed to import CSV');
     } finally {
+      setImportProgress(null);
       input.value = ''; // Reset file input
     }
   };
 
   return (
-    <div class="flex gap-2">
-      <Button variant="secondary" size="sm" onClick={handleExport}>
+    <div class="flex items-center gap-2">
+      <Button variant="secondary" size="sm" onClick={handleExport} disabled={!!importProgress()}>
         Export
       </Button>
-      <label class="inline-flex cursor-pointer items-center justify-center rounded-lg bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-900 transition-colors hover:bg-gray-300 focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:outline-none">
+      <label
+        class="inline-flex cursor-pointer items-center justify-center rounded-lg bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-900 transition-colors hover:bg-gray-300 focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:outline-none aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
+        aria-disabled={!!importProgress()}
+      >
         Import
-        <input type="file" accept=".csv" onChange={handleImport} class="hidden" />
+        <input
+          type="file"
+          accept=".csv"
+          onChange={handleImport}
+          disabled={!!importProgress()}
+          class="hidden"
+        />
       </label>
+      <Show when={importProgress()}>
+        {(progress) => (
+          <span class="text-sm text-gray-500">
+            Importing… {progress().done}/{progress().total}
+          </span>
+        )}
+      </Show>
     </div>
   );
 }

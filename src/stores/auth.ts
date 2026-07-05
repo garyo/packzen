@@ -1,4 +1,4 @@
-import { createSignal, createEffect } from 'solid-js';
+import { createSignal } from 'solid-js';
 import { getClerk, getCurrentUser, signOut as clerkSignOut } from '../lib/clerk';
 import type { User } from '../lib/types';
 
@@ -11,7 +11,7 @@ const [isAuthenticated, setIsAuthenticated] = createSignal(false);
 async function initAuth() {
   try {
     setIsLoading(true);
-    const clerk = await getClerk();
+    await getClerk();
     const clerkUser = await getCurrentUser();
 
     if (clerkUser) {

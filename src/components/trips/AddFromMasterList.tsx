@@ -321,7 +321,6 @@ export function AddFromMasterList(props: AddFromMasterListProps) {
                       {(item) => {
                         const isAdding = () => pendingItems().has(item.id);
                         const existingItems = () => getExistingItemsForMaster(item.id);
-                        const targetExisting = () => getTargetExistingItem(item.id);
                         const bagSummary = () => summarizeBagLocations(existingItems());
                         const alreadyPacked = () => existingItems().length > 0;
                         const totalExistingQuantity = () =>

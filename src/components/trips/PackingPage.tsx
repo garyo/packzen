@@ -44,6 +44,7 @@ import {
   type StarterModifier,
 } from '../../lib/built-in-items';
 import { fetchWithErrorHandling, fetchSingleWithErrorHandling } from '../../lib/resource-helpers';
+import { getOrCreateMasterItem, resolveMasterItems } from '../../lib/item-helpers';
 import { syncManager } from '../../lib/sync-manager';
 import { tripToYAML, downloadYAML } from '../../lib/yaml';
 import { deleteTripWithConfirm } from '../../lib/trip-actions';
@@ -173,8 +174,11 @@ export function PackingPage(props: PackingPageProps) {
     }
   };
 
-  // Refresh data when tab becomes visible (handles multi-device sync)
-  createEffect(() => {
+  // Refresh data when tab becomes visible (handles multi-device sync).
+  // This reads no reactive signals, so it only ever needs to run once, at
+  // mount — onMount is the correct primitive (a dependency-less createEffect
+  // happens to run once too, but that's incidental, not its contract).
+  onMount(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
         silentRefresh();
@@ -298,7 +302,10 @@ export function PackingPage(props: PackingPageProps) {
     return allItems.filter((item) => matches.has(item.id));
   });
 
-  const visibleItems = () => filteredItems();
+  // Not dead: used below (search-result checks, header count, both list views).
+  // It's aliased to `filteredItems` (rather than wrapped in a new closure) so
+  // there's no pointless extra indirection.
+  const visibleItems = filteredItems;
   const isSearching = createMemo(() => searchQuery().trim().length > 0);
   const hasSearchResults = createMemo(() => (visibleItems()?.length || 0) > 0);
   const noSearchResults = createMemo(() => isSearching() && !hasSearchResults());
@@ -972,92 +979,31 @@ export function PackingPage(props: PackingPageProps) {
    * Returns mutable arrays that helpers can append to (for caching new creates).
    */
   async function ensureResourcesLoaded(): Promise<{
-    masterItemsList: any[];
-    categoriesList: any[];
+    masterItemsList: MasterItemWithCategory[];
+    categoriesList: Category[];
   }> {
-    let masterItemsList: any[] = masterItems() ? [...masterItems()!] : [];
-    let categoriesList: any[] = categories() ? [...categories()!] : [];
+    let masterItemsList: MasterItemWithCategory[] = masterItems() ? [...masterItems()!] : [];
+    let categoriesList: Category[] = categories() ? [...categories()!] : [];
 
     if (!masterItemsList.length || !categoriesList.length) {
       const [masterItemsResponse, categoriesResponse] = await Promise.all([
         masterItemsList.length
           ? Promise.resolve({ success: true, data: masterItemsList })
-          : api.get(endpoints.masterItems),
+          : api.get<MasterItemWithCategory[]>(endpoints.masterItems),
         categoriesList.length
           ? Promise.resolve({ success: true, data: categoriesList })
-          : api.get(endpoints.categories),
+          : api.get<Category[]>(endpoints.categories),
       ]);
 
       if (!masterItemsResponse.success || !categoriesResponse.success) {
         throw new Error('Failed to fetch master items or categories');
       }
 
-      masterItemsList = masterItemsResponse.data as any[];
-      categoriesList = categoriesResponse.data as any[];
+      masterItemsList = masterItemsResponse.data as MasterItemWithCategory[];
+      categoriesList = categoriesResponse.data as Category[];
     }
 
     return { masterItemsList, categoriesList };
-  }
-
-  /** Get or create a category by name, appending to the cache array */
-  async function getOrCreateCategory(
-    categoryName: string,
-    categoriesList: any[]
-  ): Promise<string | null> {
-    let category = categoriesList.find(
-      (c: any) => c.name.toLowerCase() === categoryName.toLowerCase()
-    );
-
-    if (!category) {
-      const builtInCategory = builtInItems.categories.find(
-        (c) => c.name.toLowerCase() === categoryName.toLowerCase()
-      );
-      const response = await api.post(endpoints.categories, {
-        name: categoryName,
-        icon: builtInCategory?.icon || null,
-      });
-      if (response.success && response.data) {
-        category = response.data;
-        categoriesList.push(category);
-      }
-    }
-
-    return category?.id || null;
-  }
-
-  /** Get or create a master item, appending to the cache array */
-  async function getOrCreateMasterItem(
-    item: {
-      name: string;
-      description: string | null;
-      category: string;
-      quantity: number;
-      is_container?: boolean;
-    },
-    masterItemsList: any[],
-    categoriesList: any[]
-  ): Promise<string | null> {
-    let masterItem = masterItemsList.find(
-      (m: any) => m.name.toLowerCase() === item.name.toLowerCase()
-    );
-
-    if (!masterItem) {
-      const categoryId = await getOrCreateCategory(item.category, categoriesList);
-      const response = await api.post(endpoints.masterItems, {
-        name: item.name,
-        description: item.description,
-        category_id: categoryId,
-        default_quantity: item.quantity,
-        is_container: item.is_container || false,
-      });
-
-      if (response.success && response.data) {
-        masterItem = response.data;
-        masterItemsList.push(masterItem);
-      }
-    }
-
-    return masterItem?.id || null;
   }
 
   const [addingBuiltIn, setAddingBuiltIn] = createSignal(false);
@@ -1072,36 +1018,51 @@ export function PackingPage(props: PackingPageProps) {
     try {
       const { masterItemsList, categoriesList } = await ensureResourcesLoaded();
 
-      let addedCount = 0;
-      for (const item of itemsToAdd) {
-        const masterItemId = await getOrCreateMasterItem(item, masterItemsList, categoriesList);
-
-        const response = await api.post(endpoints.tripItems(props.tripId), {
-          name: item.name,
-          category_name: item.category,
-          quantity: item.quantity,
-          notes: item.description,
-          bag_id: containerId ? null : bagId || null,
-          container_item_id: containerId || null,
-          master_item_id: masterItemId,
-          is_container: item.is_container || false,
-        });
-
-        if (response.success && response.data) {
-          addItemToStore(response.data as TripItem);
-          addedCount++;
-        }
-      }
-
-      if (addedCount === itemsToAdd.length) {
-        showToast('success', `Added ${addedCount} items to trip and My Items`);
-      } else {
-        showToast(
-          'error',
-          `Added ${addedCount} of ${itemsToAdd.length} items; ${itemsToAdd.length - addedCount} failed`
-        );
-      }
+      // Resolve every item's master item concurrently (categories needed for
+      // new master items are pre-created first, so items sharing a brand-new
+      // category don't race to create duplicate rows for it), then add all
+      // trip items in a single batch request — replacing what used to be up
+      // to 3 serial round trips per item.
+      const masterItemResults = await resolveMasterItems(
+        itemsToAdd,
+        masterItemsList,
+        categoriesList
+      );
       refetchMasterItems();
+
+      const payload = itemsToAdd.map((item, i) => ({
+        name: item.name,
+        category_name: item.category,
+        quantity: item.quantity,
+        notes: item.description,
+        bag_id: containerId ? null : bagId || null,
+        container_item_id: containerId || null,
+        master_item_id: masterItemResults[i].item?.id ?? null,
+        is_container: item.is_container || false,
+      }));
+
+      const response = await api.post<TripItem[]>(endpoints.tripItems(props.tripId), {
+        items: payload,
+      });
+
+      if (response.success && response.data) {
+        response.data.forEach((item) => addItemToStore(item));
+        const addedCount = response.data.length;
+        if (addedCount === itemsToAdd.length) {
+          showToast('success', `Added ${addedCount} items to trip and My Items`);
+        } else {
+          // The batch endpoint dedups by name against items already in the
+          // trip (and within the batch itself) rather than merging/bumping
+          // quantity the way the single-item route does — same tradeoff
+          // handleAddStarterList already makes, for the same perf win.
+          showToast(
+            'info',
+            `Added ${addedCount} of ${itemsToAdd.length} items (${itemsToAdd.length - addedCount} already in trip or over the plan limit)`
+          );
+        }
+      } else {
+        showToast('error', (response as { error?: string }).error || 'Failed to add items');
+      }
     } catch (error) {
       showToast('error', 'Failed to add items');
       console.error('Error adding built-in items to trip:', error);
@@ -1253,7 +1214,11 @@ export function PackingPage(props: PackingPageProps) {
   ) => {
     try {
       const { masterItemsList, categoriesList } = await ensureResourcesLoaded();
-      const masterItemId = await getOrCreateMasterItem(item, masterItemsList, categoriesList);
+      const { item: masterItem } = await getOrCreateMasterItem(
+        item,
+        masterItemsList,
+        categoriesList
+      );
 
       const tripItemResponse = await api.post(endpoints.tripItems(props.tripId), {
         name: item.name,
@@ -1262,7 +1227,7 @@ export function PackingPage(props: PackingPageProps) {
         notes: item.description,
         bag_id: containerId ? null : bagId,
         container_item_id: containerId,
-        master_item_id: masterItemId,
+        master_item_id: masterItem?.id ?? null,
         is_container: item.is_container || false,
       });
 

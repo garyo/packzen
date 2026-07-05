@@ -17,7 +17,6 @@ interface AddModeBagCardsProps {
   items: Accessor<TripItem[] | undefined>;
   bags: Accessor<Bag[] | undefined>;
   categories: Accessor<Category[] | undefined>;
-  onManageBags?: () => void;
   onBagReplaced?: () => void;
   // For click-to-add: selected target (bag or container) gets highlighted border
   selectedTarget?: Accessor<SelectedTarget | undefined>;

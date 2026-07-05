@@ -6,6 +6,7 @@ import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { showToast } from '../ui/Toast';
 import { TrashIcon } from '../ui/Icons';
+import { getOrCreateCategory } from '../../lib/item-helpers';
 
 interface EditTripItemProps {
   tripId: string;
@@ -93,15 +94,25 @@ export function EditTripItem(props: EditTripItemProps) {
         setSaving(false);
         return;
       }
-      const createCategoryResponse = await api.post(endpoints.categories, {
-        name: newCatName,
-      });
-      if (createCategoryResponse.success && createCategoryResponse.data) {
-        finalCategoryId = (createCategoryResponse.data as { id: string }).id;
-        finalCategoryName = newCatName;
+      const categoriesCache = categories() ? [...categories()!] : [];
+      // Dedup case-insensitively like the other get-or-create call sites,
+      // instead of always creating — retyping (or re-selecting a built-in
+      // name) used to silently create a duplicate category.
+      const alreadyExists = categoriesCache.some(
+        (c) => c.name.toLowerCase() === newCatName.toLowerCase()
+      );
+      const category = await getOrCreateCategory(newCatName, categoriesCache);
+      if (category) {
+        finalCategoryId = category.id;
+        finalCategoryName = category.name;
         setCategoryId(finalCategoryId);
         await refetchCategories();
-        showToast('success', `Created category "${newCatName}"`);
+        showToast(
+          'success',
+          alreadyExists
+            ? `Using existing category "${category.name}"`
+            : `Created category "${newCatName}"`
+        );
       } else {
         showToast('error', 'Failed to create category');
         setSaving(false);

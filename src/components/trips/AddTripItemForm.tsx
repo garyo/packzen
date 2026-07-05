@@ -16,6 +16,7 @@ import { Combobox, type ComboboxItem } from '../ui/Combobox';
 import { showToast } from '../ui/Toast';
 import { searchItems } from '../../lib/search';
 import { builtInItems } from '../../lib/built-in-items';
+import { getOrCreateCategory, getOrCreateMasterItem } from '../../lib/item-helpers';
 
 interface AddTripItemFormProps {
   tripId: string;
@@ -319,14 +320,24 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
         setSaving(false);
         return;
       }
-      const createCategoryResponse = await api.post(endpoints.categories, {
-        name: newCatName,
-      });
-      if (createCategoryResponse.success && createCategoryResponse.data) {
-        finalCategoryId = (createCategoryResponse.data as { id: string }).id;
+      const newCategoryCache = categories() ? [...categories()!] : [];
+      // Dedup case-insensitively like the other get-or-create call sites,
+      // instead of always creating — retyping (or re-selecting a built-in
+      // name) used to silently create a duplicate category.
+      const alreadyExists = newCategoryCache.some(
+        (c) => c.name.toLowerCase() === newCatName.toLowerCase()
+      );
+      const category = await getOrCreateCategory(newCatName, newCategoryCache);
+      if (category) {
+        finalCategoryId = category.id;
         setCategoryId(finalCategoryId);
         await refetchCategories();
-        showToast('success', `Created category "${newCatName}"`);
+        showToast(
+          'success',
+          alreadyExists
+            ? `Using existing category "${category.name}"`
+            : `Created category "${newCatName}"`
+        );
       } else {
         showToast('error', 'Failed to create category');
         setSaving(false);
@@ -340,22 +351,27 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
     );
 
     let masterItemId = existingMasterItem?.id;
-    const categoriesList = categories() || [];
+    const categoriesList = categories() ? [...categories()!] : [];
     let categoryName: string | null | undefined = finalCategoryId
       ? categoriesList.find((cat) => cat.id === finalCategoryId)?.name || newCatNameInput || null
       : null;
 
     // If not in master list, add it (unless explicitly disabled)
     if (!existingMasterItem && !skipMasterAddition()) {
-      const createMasterResponse = await api.post<MasterItemWithCategory>(endpoints.masterItems, {
-        name: itemName,
-        category_id: finalCategoryId,
-        default_quantity: quantity(),
-        is_container: isContainer(),
-      });
-      if (createMasterResponse.success && createMasterResponse.data) {
-        masterItemId = createMasterResponse.data.id;
-        categoryName = createMasterResponse.data.category_name;
+      const masterItemsCache = masterItems() ? [...masterItems()!] : [];
+      const { item: createdMasterItem } = await getOrCreateMasterItem(
+        {
+          name: itemName,
+          category: categoryName,
+          quantity: quantity(),
+          is_container: isContainer(),
+        },
+        masterItemsCache,
+        categoriesList
+      );
+      if (createdMasterItem) {
+        masterItemId = createdMasterItem.id;
+        categoryName = createdMasterItem.category_name;
         showToast('success', `Added "${itemName}" to My Items`);
       }
     } else if (existingMasterItem) {
