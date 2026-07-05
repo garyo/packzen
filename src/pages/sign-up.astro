@@ -1,6 +1,7 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { SignUp, SignedIn, SignedOut } from '@clerk/astro/components';
+import { DEV_FAKE_AUTH } from '../lib/dev-auth';
 ---
 
 <BaseLayout title="Sign Up - PackZen">
@@ -25,6 +26,16 @@ import { SignUp, SignedIn, SignedOut } from '@clerk/astro/components';
           <p class="text-gray-600">You're already signed in. Redirecting…</p>
         </SignedIn>
       </div>
+
+      {
+        DEV_FAKE_AUTH && (
+          <div class="mt-6 text-center">
+            <a href="/dev/login" class="text-sm text-gray-500 underline hover:text-gray-700">
+              → Dev login (fake auth)
+            </a>
+          </div>
+        )
+      }
     </div>
   </div>
 </BaseLayout>

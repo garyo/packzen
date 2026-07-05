@@ -1,6 +1,7 @@
 import { createSignal } from 'solid-js';
 import { getClerk, getCurrentUser, signOut as clerkSignOut } from '../lib/clerk';
 import { scheduleSignInRedirect } from '../lib/api';
+import { DEV_FAKE_AUTH, getFakeUser } from '../lib/dev-auth';
 import type { User } from '../lib/types';
 
 // Auth state
@@ -20,6 +21,25 @@ let unsubscribeSessionListener: (() => void) | null = null;
 async function initAuth() {
   try {
     setIsLoading(true);
+
+    // Dev-only fake auth: when a fake user is selected, reflect it directly and
+    // skip Clerk (including the session listener below, which a fake session
+    // has no counterpart for). With the gate off or no fake user chosen, this
+    // is skipped and real Clerk runs as usual.
+    if (DEV_FAKE_AUTH) {
+      const fake = getFakeUser();
+      if (fake) {
+        setUser({
+          id: fake.id,
+          email: fake.email,
+          firstName: fake.firstName || undefined,
+          lastName: fake.lastName || undefined,
+        });
+        setIsAuthenticated(true);
+        return;
+      }
+    }
+
     const clerk = await getClerk();
     const clerkUser = await getCurrentUser();
 
@@ -60,12 +80,14 @@ async function initAuth() {
 
 // Sign out
 async function signOut() {
+  // In fake mode, return to the dev login picker rather than the marketing home.
+  const wasFake = DEV_FAKE_AUTH && !!getFakeUser();
   try {
     isSigningOut = true;
     await clerkSignOut();
     setUser(null);
     setIsAuthenticated(false);
-    window.location.href = '/';
+    window.location.href = wasFake ? '/dev/login' : '/';
   } catch (error) {
     console.error('Failed to sign out:', error);
   } finally {

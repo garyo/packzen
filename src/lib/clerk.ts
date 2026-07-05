@@ -1,4 +1,5 @@
 import { $clerkStore, $isLoadedStore } from '@clerk/astro/client';
+import { DEV_FAKE_AUTH, getFakeUser, fakeUserToken, clearFakeUser } from './dev-auth';
 
 /**
  * Single Clerk client managed by the `@clerk/astro` integration.
@@ -45,6 +46,10 @@ export async function getClerk(): Promise<ClerkClient> {
 
 // Helper to get the current session token
 export async function getSessionToken(): Promise<string | null> {
+  if (DEV_FAKE_AUTH) {
+    const fake = getFakeUser();
+    if (fake) return fakeUserToken(fake);
+  }
   try {
     const clerk = await waitForClerk();
     return (await clerk.session?.getToken()) ?? null;
@@ -56,6 +61,7 @@ export async function getSessionToken(): Promise<string | null> {
 
 // Helper to check if user is signed in
 export async function isSignedIn(): Promise<boolean> {
+  if (DEV_FAKE_AUTH && getFakeUser()) return true;
   try {
     const clerk = await waitForClerk();
     return !!clerk.user;
@@ -67,6 +73,19 @@ export async function isSignedIn(): Promise<boolean> {
 
 // Helper to get current user
 export async function getCurrentUser(): Promise<ClerkClient['user']> {
+  if (DEV_FAKE_AUTH) {
+    const fake = getFakeUser();
+    if (fake) {
+      // Shaped like the subset of Clerk's UserResource that callers read.
+      return {
+        id: fake.id,
+        primaryEmailAddress: { emailAddress: fake.email },
+        firstName: fake.firstName ?? null,
+        lastName: fake.lastName ?? null,
+        imageUrl: '',
+      } as unknown as ClerkClient['user'];
+    }
+  }
   try {
     const clerk = await waitForClerk();
     return clerk.user;
@@ -78,6 +97,10 @@ export async function getCurrentUser(): Promise<ClerkClient['user']> {
 
 // Sign out helper
 export async function signOut(): Promise<void> {
+  if (DEV_FAKE_AUTH && getFakeUser()) {
+    clearFakeUser();
+    return;
+  }
   const clerk = await waitForClerk();
   await clerk.signOut();
 }

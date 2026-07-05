@@ -1,6 +1,7 @@
 import { clerkMiddleware, clerkClient } from '@clerk/astro/server';
 import { validateCsrfToken } from './lib/csrf';
 import { checkBillingStatus, logBillingStatus } from './lib/billing';
+import { DEV_FAKE_AUTH, parseFakeAuth, devFakeBillingStatus } from './lib/dev-auth';
 
 export const onRequest = clerkMiddleware(async (auth, context, next) => {
   // Only apply auth to API routes
@@ -11,6 +12,21 @@ export const onRequest = clerkMiddleware(async (auth, context, next) => {
   // Skip auth/CSRF checks for webhook endpoints (they use signature verification)
   if (context.url.pathname.startsWith('/api/webhooks/')) {
     return next();
+  }
+
+  // Dev-only fake auth: a `Bearer devfake:<id>~<plan>` request stands in for a
+  // real Clerk session so local/automated testing can create and switch users
+  // without email verification. Gated on DEV_FAKE_AUTH, which is a compile-time
+  // `false` in production builds, so this branch is dead-code eliminated there.
+  // Only triggers when the client actually sends a fake token; real Clerk
+  // requests fall through untouched.
+  if (DEV_FAKE_AUTH) {
+    const fake = parseFakeAuth(context.request.headers.get('authorization'));
+    if (fake) {
+      context.locals.userId = fake.userId;
+      context.locals.billingStatus = devFakeBillingStatus(fake.plan);
+      return next();
+    }
   }
 
   // Get auth state from Clerk

@@ -1,0 +1,17 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import DevLogin from '../../components/dev/DevLogin';
+import { DEV_FAKE_AUTH } from '../../lib/dev-auth';
+
+// Only reachable when dev fake auth is enabled. In a production build
+// DEV_FAKE_AUTH is a compile-time `false`, so this always redirects away.
+if (!DEV_FAKE_AUTH) {
+  return Astro.redirect('/');
+}
+---
+
+<BaseLayout title="Dev Login - PackZen">
+  <div class="min-h-screen bg-gray-50">
+    <DevLogin client:load />
+  </div>
+</BaseLayout>
