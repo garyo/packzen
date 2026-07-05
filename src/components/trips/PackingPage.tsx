@@ -1448,73 +1448,95 @@ export function PackingPage(props: PackingPageProps) {
                         <h3 class="mb-1 text-xl font-semibold text-gray-900">
                           Start your packing list
                         </h3>
-                        <p class="mb-4 text-gray-600">
-                          Pick a trip type below — one tap instantly adds its essentials to your
-                          list.
+                        <p class="mb-5 text-gray-600">
+                          Add a ready-made set of essentials in one tap.
                         </p>
-                        <div class="mb-5 flex flex-col items-center gap-3">
-                          <p class="text-xs text-gray-500">
-                            Optional: combine any of these add-ons first, then pick a trip type.
+
+                        {/* Optional add-ons in their own labeled card, so they read as
+                            settings for your pick — not as part of the main choice. */}
+                        <div class="mx-auto mb-6 max-w-md rounded-xl border border-gray-200 bg-gray-50 p-4 text-left">
+                          <p class="mb-3 text-xs font-semibold tracking-wide text-gray-500 uppercase">
+                            Options (applied to your pick)
                           </p>
-                          <button
-                            type="button"
-                            onClick={() => setStarterIntl((v) => !v)}
-                            aria-pressed={starterIntl()}
-                            class="rounded-full border px-3 py-1 text-sm transition-colors"
-                            classList={{
-                              'border-blue-500 bg-blue-50 text-blue-700': starterIntl(),
-                              'border-gray-200 bg-white text-gray-600 hover:border-blue-400':
-                                !starterIntl(),
-                            }}
-                          >
-                            🌍 International trip
-                          </button>
-                          <div class="flex flex-wrap items-center justify-center gap-2">
-                            <span class="text-sm text-gray-500">Add clothing:</span>
-                            <button
-                              type="button"
-                              onClick={() => setStarterFeminine((v) => !v)}
-                              aria-pressed={starterFeminine()}
-                              class="rounded-full border px-3 py-1 text-sm transition-colors"
-                              classList={{
-                                'border-blue-500 bg-blue-50 text-blue-700': starterFeminine(),
-                                'border-gray-200 bg-white text-gray-600 hover:border-blue-400':
-                                  !starterFeminine(),
-                              }}
-                            >
-                              Feminine
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setStarterMasculine((v) => !v)}
-                              aria-pressed={starterMasculine()}
-                              class="rounded-full border px-3 py-1 text-sm transition-colors"
-                              classList={{
-                                'border-blue-500 bg-blue-50 text-blue-700': starterMasculine(),
-                                'border-gray-200 bg-white text-gray-600 hover:border-blue-400':
-                                  !starterMasculine(),
-                              }}
-                            >
-                              Masculine
-                            </button>
-                          </div>
-                          <Show when={(bags()?.length ?? 0) >= 2}>
-                            <div class="flex items-center gap-2 text-sm text-gray-600">
-                              <label for="starter-bag-select">Add to:</label>
-                              <select
-                                id="starter-bag-select"
-                                value={selectedStarterBagId() ?? ''}
-                                onChange={(e) => setStarterBagId(e.currentTarget.value || null)}
-                                class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                          <div class="flex flex-col gap-3">
+                            <div class="flex items-center gap-3">
+                              <span class="w-24 shrink-0 text-sm text-gray-500">Trip style:</span>
+                              <button
+                                type="button"
+                                onClick={() => setStarterIntl((v) => !v)}
+                                aria-pressed={starterIntl()}
+                                class="rounded-full border px-3 py-1 text-sm transition-colors"
+                                classList={{
+                                  'border-blue-500 bg-blue-50 text-blue-700': starterIntl(),
+                                  'border-gray-200 bg-white text-gray-600 hover:border-blue-400':
+                                    !starterIntl(),
+                                }}
                               >
-                                <For each={sortedStarterBags()}>
-                                  {(bag) => <option value={bag.id}>{bag.name}</option>}
-                                </For>
-                                <option value="">No bag</option>
-                              </select>
+                                🌍 International
+                              </button>
                             </div>
-                          </Show>
+                            <div class="flex items-center gap-3">
+                              <span class="w-24 shrink-0 text-sm text-gray-500">Add clothing:</span>
+                              <div class="flex flex-wrap gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setStarterFeminine((v) => !v)}
+                                  aria-pressed={starterFeminine()}
+                                  class="rounded-full border px-3 py-1 text-sm transition-colors"
+                                  classList={{
+                                    'border-blue-500 bg-blue-50 text-blue-700': starterFeminine(),
+                                    'border-gray-200 bg-white text-gray-600 hover:border-blue-400':
+                                      !starterFeminine(),
+                                  }}
+                                >
+                                  Feminine
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setStarterMasculine((v) => !v)}
+                                  aria-pressed={starterMasculine()}
+                                  class="rounded-full border px-3 py-1 text-sm transition-colors"
+                                  classList={{
+                                    'border-blue-500 bg-blue-50 text-blue-700': starterMasculine(),
+                                    'border-gray-200 bg-white text-gray-600 hover:border-blue-400':
+                                      !starterMasculine(),
+                                  }}
+                                >
+                                  Masculine
+                                </button>
+                              </div>
+                            </div>
+                            {/* Show which bag the essentials will go into — a selector when
+                                there's a choice, otherwise the single bag's name as confirmation. */}
+                            <Show when={(bags()?.length ?? 0) >= 1}>
+                              <div class="flex items-center gap-3">
+                                <span class="w-24 shrink-0 text-sm text-gray-500">Add to bag:</span>
+                                <Show
+                                  when={(bags()?.length ?? 0) >= 2}
+                                  fallback={
+                                    <span class="text-sm font-medium text-gray-900">
+                                      {sortedStarterBags()[0]?.name}
+                                    </span>
+                                  }
+                                >
+                                  <select
+                                    id="starter-bag-select"
+                                    value={selectedStarterBagId() ?? ''}
+                                    onChange={(e) => setStarterBagId(e.currentTarget.value || null)}
+                                    class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                                  >
+                                    <For each={sortedStarterBags()}>
+                                      {(bag) => <option value={bag.id}>{bag.name}</option>}
+                                    </For>
+                                    <option value="">No bag</option>
+                                  </select>
+                                </Show>
+                              </div>
+                            </Show>
+                          </div>
                         </div>
+
+                        <p class="mb-3 text-sm font-medium text-gray-700">Pick a trip type:</p>
                         <div class="flex flex-wrap justify-center gap-2 sm:gap-3">
                           <For
                             each={builtInItems.trip_types.filter((t) => t.id !== 'international')}
