@@ -101,11 +101,32 @@ function clearCsrfToken(): void {
   csrfTokenPromise = null;
 }
 
+// Abort idempotent requests that outlive this window — a stalled Worker/D1
+// call otherwise hangs the UI ("Saving..." forever) with no way to recover.
+// Observed D1 brownouts stall for ~30s before erroring; timing out at 15s and
+// retrying once covers that window. POSTs are exempt: they can't be retried
+// (duplicates), so aborting one that would eventually commit just converts a
+// slow success into a false failure.
+const REQUEST_TIMEOUT_MS = 15_000;
+
 async function makeRequest<T>(
   endpoint: string,
   options: RequestOptions = {},
-  csrfRetried = false
+  csrfRetried = false,
+  transientRetried = false
 ): Promise<ApiResponse<T>> {
+  // Non-POST requests are idempotent here (PATCH/PUT/DELETE re-apply cleanly,
+  // GET has no effect), so a transient failure — a 5xx or a dropped
+  // connection, which can arrive *after* the server already committed the
+  // write — is safe to retry once. Retrying a POST could create duplicates.
+  const method = options.method?.toUpperCase() ?? 'GET';
+  const canRetryTransient = method !== 'POST' && !transientRetried;
+  const retryTransient = (cause: string): Promise<ApiResponse<T>> => {
+    console.warn(`${method} ${endpoint} failed (${cause}); retrying once...`);
+    return makeRequest<T>(endpoint, options, csrfRetried, true);
+  };
+
+  let timedOut = false;
   try {
     const token = await getSessionToken();
 
@@ -118,22 +139,39 @@ async function makeRequest<T>(
     }
 
     // Get CSRF token for state-changing requests
-    const method = options.method?.toUpperCase();
     const needsCsrf =
       method === 'POST' || method === 'PUT' || method === 'PATCH' || method === 'DELETE';
     const csrfTokenValue = needsCsrf ? await getCsrfToken() : null;
 
-    const response = await fetch(url.toString(), {
-      ...options,
-      credentials: 'same-origin',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token && { Authorization: `Bearer ${token}` }),
-        ...(csrfTokenValue && { [getCsrfHeaderName()]: csrfTokenValue }),
-        ...(needsCsrf && { 'X-Source-ID': sourceId }),
-        ...options.headers,
-      },
-    });
+    const timeoutController = method === 'POST' ? null : new AbortController();
+    const timeoutId = timeoutController
+      ? setTimeout(() => {
+          timedOut = true;
+          timeoutController.abort();
+        }, REQUEST_TIMEOUT_MS)
+      : null;
+
+    const signals = [options.signal, timeoutController?.signal].filter(
+      (s): s is AbortSignal => s != null
+    );
+
+    let response: Response;
+    try {
+      response = await fetch(url.toString(), {
+        ...options,
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { Authorization: `Bearer ${token}` }),
+          ...(csrfTokenValue && { [getCsrfHeaderName()]: csrfTokenValue }),
+          ...(needsCsrf && { 'X-Source-ID': sourceId }),
+          ...options.headers,
+        },
+        signal: signals.length > 1 ? AbortSignal.any(signals) : signals[0],
+      });
+    } finally {
+      if (timeoutId !== null) clearTimeout(timeoutId);
+    }
 
     if (!response.ok) {
       const errorBody: unknown = await response.json().catch(() => null);
@@ -157,7 +195,14 @@ async function makeRequest<T>(
       if (response.status === 403 && needsCsrf && !csrfRetried && !options.skipErrorHandling) {
         clearCsrfToken();
         console.warn('Request rejected with 403; refreshing CSRF token and retrying once...');
-        return makeRequest<T>(endpoint, options, true);
+        return makeRequest<T>(endpoint, options, true, transientRetried);
+      }
+
+      // 5xx responses are usually transient (e.g. a D1 stall that errors after
+      // the write already committed). The retry both recovers the request and
+      // re-records the sync change-log event the failed attempt skipped.
+      if (response.status >= 500 && canRetryTransient) {
+        return retryTransient(`status ${response.status}`);
       }
 
       return {
@@ -173,10 +218,18 @@ async function makeRequest<T>(
       data,
     };
   } catch (error) {
+    // Retry dropped connections and our own timeout, but not a caller abort.
+    if (canRetryTransient && !options.signal?.aborted) {
+      return retryTransient(timedOut ? 'timeout' : 'network error');
+    }
     console.error('API request error:', error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'An unknown error occurred',
+      error: timedOut
+        ? 'Request timed out'
+        : error instanceof Error
+          ? error.message
+          : 'An unknown error occurred',
     };
   }
 }

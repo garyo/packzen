@@ -55,6 +55,10 @@ export function BagTemplateManagerContent(props: BagTemplateManagerContentProps)
       props.onSaved();
     } else {
       showToast('error', response.error || 'Failed to add bag');
+      // A "failed" write may still have committed server-side (e.g. a D1
+      // stall that errors after the insert) — refetch so the list shows the
+      // truth rather than trusting the error. Form keeps its values for retry.
+      props.onSaved();
     }
   };
 
@@ -68,6 +72,7 @@ export function BagTemplateManagerContent(props: BagTemplateManagerContentProps)
       props.onSaved();
     } else {
       showToast('error', response.error || 'Failed to delete bag');
+      props.onSaved(); // the delete may have committed despite the error
     }
   };
 
@@ -109,6 +114,9 @@ export function BagTemplateManagerContent(props: BagTemplateManagerContentProps)
       props.onSaved();
     } else {
       showToast('error', response.error || 'Failed to update bag');
+      // The update may have committed despite the error — refetch so the list
+      // shows the truth. The edit form stays open so a retry is one click.
+      props.onSaved();
     }
   };
 
