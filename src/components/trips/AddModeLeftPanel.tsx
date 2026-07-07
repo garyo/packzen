@@ -7,7 +7,12 @@
 
 import { createSignal, Show, For, createMemo, type Accessor } from 'solid-js';
 import { createDraggable } from '@thisbeyond/solid-dnd';
-import type { TripItem, Category, MasterItemWithCategory } from '../../lib/types';
+import type {
+  TripItem,
+  Category,
+  MasterItemWithCategory,
+  SelectedBuiltInItem,
+} from '../../lib/types';
 import { builtInItems, getItemsByTripTypes } from '../../lib/built-in-items';
 import type { SourceItemDragData, SelectedTarget } from './AddModeView';
 import { TrashIcon, PlusIcon } from '../ui/Icons';
@@ -24,6 +29,8 @@ interface AddModeLeftPanelProps {
   // For click-to-add (bag or container selection)
   selectedTarget?: Accessor<SelectedTarget | undefined>;
   onAddToSelectedBag?: (dragData: SourceItemDragData) => void;
+  // Bulk-add a category of suggestions (items not yet in the trip)
+  onAddAllBuiltIn?: (items: SelectedBuiltInItem[]) => void;
 }
 
 interface DraggableItemProps {
@@ -491,59 +498,85 @@ export function AddModeLeftPanel(props: AddModeLeftPanelProps) {
             }
           >
             <For each={filteredBuiltInItems()}>
-              {([category, items]) => (
-                <div class="mb-2">
-                  <button
-                    class="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm font-semibold text-gray-700 hover:bg-gray-100"
-                    onClick={() => toggleCategory(`built-in-${category}`)}
-                  >
-                    <span
-                      class="transition-transform"
-                      classList={{ 'rotate-90': isCategoryExpanded(`built-in-${category}`) }}
-                    >
-                      ▶
-                    </span>
-                    {category}
-                    <span class="text-xs font-normal text-gray-500">({items.length})</span>
-                  </button>
-                  <Show when={isCategoryExpanded(`built-in-${category}`)}>
-                    <div class="ml-2">
-                      <For each={items}>
-                        {(item) => {
-                          const dragData: SourceItemDragData = {
-                            type: 'source-item',
-                            sourceType: 'built-in',
-                            builtInItem: {
-                              name: item.name,
-                              description: item.description,
-                              category: item.category,
-                              quantity: item.default_quantity,
-                              is_container: item.is_container,
-                            },
-                          };
-                          return (
-                            <DraggableSourceItem
-                              id={`built-in-${item.name}`}
-                              name={item.name}
-                              category={item.category}
-                              quantity={item.default_quantity}
-                              description={item.description}
-                              isInTrip={isItemInTrip('', item.name, 'built-in')}
-                              isPacked={isItemPacked('', item.name, 'built-in')}
-                              isContainer={item.is_container}
-                              tripItemId={getTripItemId('', item.name, 'built-in')}
-                              onRemove={props.onRemoveFromTrip}
-                              dragData={dragData}
-                              canClickToAdd={props.selectedTarget?.() !== undefined}
-                              onClickAdd={() => props.onAddToSelectedBag?.(dragData)}
-                            />
-                          );
-                        }}
-                      </For>
+              {([category, items]) => {
+                const addableItems = () =>
+                  items.filter((item) => !isItemInTrip('', item.name, 'built-in'));
+                return (
+                  <div class="mb-2">
+                    <div class="flex items-center gap-1">
+                      <button
+                        class="flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm font-semibold text-gray-700 hover:bg-gray-100"
+                        onClick={() => toggleCategory(`built-in-${category}`)}
+                      >
+                        <span
+                          class="transition-transform"
+                          classList={{ 'rotate-90': isCategoryExpanded(`built-in-${category}`) }}
+                        >
+                          ▶
+                        </span>
+                        {category}
+                        <span class="text-xs font-normal text-gray-500">({items.length})</span>
+                      </button>
+                      <Show when={props.onAddAllBuiltIn && addableItems().length > 0}>
+                        <button
+                          type="button"
+                          class="flex-shrink-0 rounded-md px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50"
+                          onClick={() =>
+                            props.onAddAllBuiltIn!(
+                              addableItems().map((item) => ({
+                                name: item.name,
+                                description: item.description,
+                                category: item.category,
+                                quantity: item.default_quantity,
+                                is_container: item.is_container,
+                              }))
+                            )
+                          }
+                          title={`Add all ${category} items not yet on this trip`}
+                        >
+                          Add all ({addableItems().length})
+                        </button>
+                      </Show>
                     </div>
-                  </Show>
-                </div>
-              )}
+                    <Show when={isCategoryExpanded(`built-in-${category}`)}>
+                      <div class="ml-2">
+                        <For each={items}>
+                          {(item) => {
+                            const dragData: SourceItemDragData = {
+                              type: 'source-item',
+                              sourceType: 'built-in',
+                              builtInItem: {
+                                name: item.name,
+                                description: item.description,
+                                category: item.category,
+                                quantity: item.default_quantity,
+                                is_container: item.is_container,
+                              },
+                            };
+                            return (
+                              <DraggableSourceItem
+                                id={`built-in-${item.name}`}
+                                name={item.name}
+                                category={item.category}
+                                quantity={item.default_quantity}
+                                description={item.description}
+                                isInTrip={isItemInTrip('', item.name, 'built-in')}
+                                isPacked={isItemPacked('', item.name, 'built-in')}
+                                isContainer={item.is_container}
+                                tripItemId={getTripItemId('', item.name, 'built-in')}
+                                onRemove={props.onRemoveFromTrip}
+                                dragData={dragData}
+                                canClickToAdd={props.selectedTarget?.() !== undefined}
+                                onClickAdd={() => props.onAddToSelectedBag?.(dragData)}
+                              />
+                            );
+                          }}
+                        </For>
+                      </div>
+                    </Show>
+                  </div>
+                );
+              }}
             </For>
           </Show>
         </Show>

@@ -36,8 +36,6 @@ interface PackingPageHeaderProps {
   onToggleViewMode: () => void;
   onAddItem: () => void;
   onManageBags: () => void;
-  onAddFromMaster: () => void;
-  onBrowseTemplates: () => void;
   onExport: () => void;
   onImport: () => void;
   onClearAll: () => void;

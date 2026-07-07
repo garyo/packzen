@@ -13,7 +13,13 @@ import {
   DragOverlay,
   type DragEvent,
 } from '@thisbeyond/solid-dnd';
-import type { TripItem, Bag, Category, MasterItemWithCategory } from '../../lib/types';
+import type {
+  TripItem,
+  Bag,
+  Category,
+  MasterItemWithCategory,
+  SelectedBuiltInItem,
+} from '../../lib/types';
 import { AddModeLeftPanel } from './AddModeLeftPanel';
 import { AddModeBagCards } from './AddModeBagCards';
 import {
@@ -37,6 +43,11 @@ interface AddModeViewProps {
   ) => Promise<void>;
   onAddBuiltInItem: (
     item: { name: string; description: string | null; category: string; quantity: number },
+    bagId: string | null,
+    containerId: string | null
+  ) => Promise<void>;
+  onAddBuiltInItems: (
+    items: SelectedBuiltInItem[],
     bagId: string | null,
     containerId: string | null
   ) => Promise<void>;
@@ -187,6 +198,12 @@ export function AddModeView(props: AddModeViewProps) {
     autoScroll.stop();
   };
 
+  // Bulk-add a category's suggestions to the selected target (or No Bag if none)
+  const handleAddAllBuiltIn = async (items: SelectedBuiltInItem[]) => {
+    const target = selectedTarget();
+    await props.onAddBuiltInItems(items, target?.bagId ?? null, target?.containerId ?? null);
+  };
+
   // Handle click-to-add for items
   const handleAddToSelectedBag = async (dragData: SourceItemDragData) => {
     const target = selectedTarget();
@@ -272,6 +289,7 @@ export function AddModeView(props: AddModeViewProps) {
               isDragging={() => draggedItem() !== null}
               selectedTarget={selectedTarget}
               onAddToSelectedBag={handleAddToSelectedBag}
+              onAddAllBuiltIn={handleAddAllBuiltIn}
             />
           </div>
 

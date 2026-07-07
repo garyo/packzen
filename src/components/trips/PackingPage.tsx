@@ -26,7 +26,6 @@ import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Toast, showToast } from '../ui/Toast';
 import { getPackingProgress, isSmallScreen } from '../../lib/utils';
-import { AddFromMasterList } from './AddFromMasterList';
 import { BagManager } from './BagManager';
 import { EditTripItem } from './EditTripItem';
 import { AddTripItemForm } from './AddTripItemForm';
@@ -36,7 +35,6 @@ import { PackingListBagView } from './PackingListBagView';
 import { PackingListCategoryView } from './PackingListCategoryView';
 import { AddModeView } from './AddModeView';
 import { SelectModeActionBar } from './SelectModeActionBar';
-import { BuiltInItemsBrowser } from '../built-in-items/BuiltInItemsBrowser';
 import {
   builtInItems,
   getStarterItems,
@@ -68,14 +66,12 @@ async function runBatch<R extends { success: boolean }>(
 }
 
 export function PackingPage(props: PackingPageProps) {
-  const [showAddFromMaster, setShowAddFromMaster] = createSignal(false);
   const [showBagManager, setShowBagManager] = createSignal(false);
   const [showAddForm, setShowAddForm] = createSignal(false);
   const [editingItem, setEditingItem] = createSignal<TripItem | null>(null);
   const [selectMode, setSelectMode] = createSignal(false);
   const [selectedItems, setSelectedItems] = createSignal<Set<string>>(new Set());
   const [showImport, setShowImport] = createSignal(false);
-  const [showBuiltInItems, setShowBuiltInItems] = createSignal(false);
   const [showEditTrip, setShowEditTrip] = createSignal(false);
   const [sortBy, setSortBy] = createSignal<'bag' | 'category'>('bag');
   const [viewMode, setViewMode] = createSignal<'pack' | 'add'>('pack');
@@ -561,14 +557,8 @@ export function PackingPage(props: PackingPageProps) {
 
   const openAddForm = (bagId?: string, containerId?: string) =>
     openModalWithPreSelection(setShowAddForm, bagId, containerId);
-  const openAddFromMaster = (bagId?: string, containerId?: string) =>
-    openModalWithPreSelection(setShowAddFromMaster, bagId, containerId);
-  const openBrowseTemplates = (bagId?: string, containerId?: string) =>
-    openModalWithPreSelection(setShowBuiltInItems, bagId, containerId);
 
   const closeAddForm = () => closeModalWithPreSelection(setShowAddForm);
-  const closeAddFromMaster = () => closeModalWithPreSelection(setShowAddFromMaster);
-  const closeBrowseTemplates = () => closeModalWithPreSelection(setShowBuiltInItems);
 
   const toggleSelectMode = () => {
     setSelectMode(!selectMode());
@@ -1376,8 +1366,6 @@ export function PackingPage(props: PackingPageProps) {
         onToggleSortBy={() => setSortBy(sortBy() === 'bag' ? 'category' : 'bag')}
         onAddItem={handleAddItem}
         onManageBags={() => setShowBagManager(true)}
-        onAddFromMaster={() => setShowAddFromMaster(true)}
-        onBrowseTemplates={() => setShowBuiltInItems(true)}
         onExport={handleExport}
         onImport={() => setShowImport(true)}
         onClearAll={handleClearAll}
@@ -1404,6 +1392,7 @@ export function PackingPage(props: PackingPageProps) {
               masterItems={masterItems}
               onAddMasterItem={handleAddMasterItemFromAddMode}
               onAddBuiltInItem={handleAddBuiltInItemFromAddMode}
+              onAddBuiltInItems={handleAddBuiltInItemsToTrip}
               onRemoveFromTrip={handleRemoveFromTrip}
               onAddNewItem={() => setShowAddForm(true)}
               onManageBags={() => setShowBagManager(true)}
@@ -1614,14 +1603,6 @@ export function PackingPage(props: PackingPageProps) {
                         onUpdateQuantity={handleUpdateQuantity}
                         onAddToBag={(bagId) => openAddForm(bagId ?? undefined)}
                         onAddToContainer={(containerId) => openAddForm(undefined, containerId)}
-                        onAddFromMasterToBag={(bagId) => openAddFromMaster(bagId ?? undefined)}
-                        onAddFromMasterToContainer={(containerId) =>
-                          openAddFromMaster(undefined, containerId)
-                        }
-                        onBrowseTemplatesToBag={(bagId) => openBrowseTemplates(bagId ?? undefined)}
-                        onBrowseTemplatesToContainer={(containerId) =>
-                          openBrowseTemplates(undefined, containerId)
-                        }
                         onMoveItemToBag={handleMoveItemToBag}
                         onRequestMoveItem={hasMoveTargets() ? setMovingItem : undefined}
                         onMoveItemToContainer={handleMoveItemToContainer}
@@ -1787,23 +1768,6 @@ export function PackingPage(props: PackingPageProps) {
         />
       </Show>
 
-      {/* Add from All Items Modal */}
-      <Show when={showAddFromMaster()}>
-        <AddFromMasterList
-          tripId={props.tripId}
-          preSelectedBagId={preSelectedBagId()}
-          preSelectedContainerId={preSelectedContainerId()}
-          bags={bags}
-          tripItems={items}
-          masterItems={masterItems}
-          onClose={closeAddFromMaster}
-          onAdded={() => refetch()}
-          onItemAdded={(item) => addItemToStore(item)}
-          onItemUpdated={(itemId, updates) => updateItemInStore(itemId, updates)}
-          onItemRemoved={(itemId) => deleteItemsFromStore([itemId])}
-        />
-      </Show>
-
       {/* Import Trip Modal */}
       <Show when={showImport()}>
         <TripImportModal
@@ -1813,17 +1777,6 @@ export function PackingPage(props: PackingPageProps) {
             refetch();
             refetchBags();
           }}
-        />
-      </Show>
-
-      {/* Built-in Items Browser Modal */}
-      <Show when={showBuiltInItems()}>
-        <BuiltInItemsBrowser
-          tripId={props.tripId}
-          bags={bags()}
-          tripItems={items()}
-          onClose={closeBrowseTemplates}
-          onAddToTrip={handleAddBuiltInItemsToTrip}
         />
       </Show>
 

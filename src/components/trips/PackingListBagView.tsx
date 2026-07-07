@@ -245,10 +245,6 @@ interface PackingListBagViewProps {
   // Add item callbacks for bags and containers
   onAddToBag?: (bagId: string | null) => void;
   onAddToContainer?: (containerId: string) => void;
-  onAddFromMasterToBag?: (bagId: string | null) => void;
-  onAddFromMasterToContainer?: (containerId: string) => void;
-  onBrowseTemplatesToBag?: (bagId: string | null) => void;
-  onBrowseTemplatesToContainer?: (containerId: string) => void;
   // Drag-and-drop handlers
   onMoveItemToBag?: (itemId: string, bagId: string | null) => void;
   onRequestMoveItem?: (item: TripItem) => void;
@@ -266,45 +262,10 @@ interface PackingListBagViewProps {
 
 // Inner component that uses swipe context
 function PackingListBagViewInner(props: PackingListBagViewProps) {
-  const [openBagMenu, setOpenBagMenu] = createSignal<string | null>(null);
-  const [openContainerMenu, setOpenContainerMenu] = createSignal<string | null>(null);
   const [activeItem, setActiveItem] = createSignal<TripItem | null>(null);
   const [dragCancelled, setDragCancelled] = createSignal(false);
   const [replacingBagId, setReplacingBagId] = createSignal<string | null>(null);
   const autoScroll = useAutoScroll();
-
-  // Close bag/container add-menus on outside click or Escape (see U16). Menus are
-  // rendered per-bag/per-container inside a <For>, so we match on a data attribute
-  // rather than a single ref (contrast PackingPageHeader, which has only one menu).
-  onMount(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      const target = e.target as HTMLElement | null;
-      if (openBagMenu()) {
-        const key = target?.closest('[data-bag-menu-key]')?.getAttribute('data-bag-menu-key');
-        if (key !== openBagMenu()) setOpenBagMenu(null);
-      }
-      if (openContainerMenu()) {
-        const key = target
-          ?.closest('[data-container-menu-key]')
-          ?.getAttribute('data-container-menu-key');
-        if (key !== openContainerMenu()) setOpenContainerMenu(null);
-      }
-    };
-
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
-      if (openBagMenu()) setOpenBagMenu(null);
-      if (openContainerMenu()) setOpenContainerMenu(null);
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    document.addEventListener('keydown', handleEscape);
-
-    onCleanup(() => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('keydown', handleEscape);
-    });
-  });
 
   // Handle drag end - dispatch to appropriate handler
   // Simplified: D&D only moves items between locations (bags, containers), never changes category
@@ -664,66 +625,21 @@ function PackingListBagViewInner(props: PackingListBagViewProps) {
                         />
                       </Show>
                     </Show>
-                    {/* Add items button - all bags including Wearing/No Bag */}
-                    {(() => {
-                      const menuKey = bag.id ?? '__wearing__';
-                      return (
-                        <div class="relative" data-bag-menu-key={menuKey}>
-                          <button
-                            onClick={() =>
-                              setOpenBagMenu(openBagMenu() === menuKey ? null : menuKey)
-                            }
-                            class="flex h-7 w-7 items-center justify-center rounded-full bg-blue-500 text-white hover:bg-blue-600"
-                            title="Add items to this bag"
-                          >
-                            <svg
-                              class="h-4 w-4"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                            >
-                              <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M12 4v16m8-8H4"
-                              />
-                            </svg>
-                          </button>
-                          <Show when={openBagMenu() === menuKey}>
-                            <div class="absolute top-full right-0 z-20 mt-1 w-48 rounded-lg border border-gray-200 bg-white shadow-lg">
-                              <button
-                                onClick={() => {
-                                  props.onAddToBag?.(bag.id);
-                                  setOpenBagMenu(null);
-                                }}
-                                class="w-full px-4 py-2 text-left text-sm font-bold hover:bg-gray-100"
-                              >
-                                ✏️ New Item
-                              </button>
-                              <button
-                                onClick={() => {
-                                  props.onAddFromMasterToBag?.(bag.id);
-                                  setOpenBagMenu(null);
-                                }}
-                                class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
-                              >
-                                📋 From My Items
-                              </button>
-                              <button
-                                onClick={() => {
-                                  props.onBrowseTemplatesToBag?.(bag.id);
-                                  setOpenBagMenu(null);
-                                }}
-                                class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
-                              >
-                                📚 Suggestions
-                              </button>
-                            </div>
-                          </Show>
-                        </div>
-                      );
-                    })()}
+                    {/* Add item button - all bags including Wearing/No Bag */}
+                    <button
+                      onClick={() => props.onAddToBag?.(bag.id)}
+                      class="flex h-7 w-7 items-center justify-center rounded-full bg-blue-500 text-white hover:bg-blue-600"
+                      title="Add an item to this bag"
+                    >
+                      <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M12 4v16m8-8H4"
+                        />
+                      </svg>
+                    </button>
                   </div>
                   {/* Show "All packed" summary if filtering and everything is packed */}
                   <Show
@@ -921,63 +837,26 @@ function PackingListBagViewInner(props: PackingListBagViewProps) {
                                       />
                                     </svg>
                                   </button>
-                                  {/* Add items button */}
-                                  <div class="relative" data-container-menu-key={container.id}>
-                                    <button
-                                      onClick={() =>
-                                        setOpenContainerMenu(
-                                          openContainerMenu() === container.id ? null : container.id
-                                        )
-                                      }
-                                      class="flex h-6 w-6 items-center justify-center rounded-full bg-blue-500 text-white hover:bg-blue-600"
-                                      title="Add items to this container"
+                                  {/* Add item button */}
+                                  <button
+                                    onClick={() => props.onAddToContainer?.(container.id)}
+                                    class="flex h-6 w-6 items-center justify-center rounded-full bg-blue-500 text-white hover:bg-blue-600"
+                                    title="Add an item to this container"
+                                  >
+                                    <svg
+                                      class="h-3.5 w-3.5"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      stroke="currentColor"
                                     >
-                                      <svg
-                                        class="h-3.5 w-3.5"
-                                        fill="none"
-                                        viewBox="0 0 24 24"
-                                        stroke="currentColor"
-                                      >
-                                        <path
-                                          stroke-linecap="round"
-                                          stroke-linejoin="round"
-                                          stroke-width="2"
-                                          d="M12 4v16m8-8H4"
-                                        />
-                                      </svg>
-                                    </button>
-                                    <Show when={openContainerMenu() === container.id}>
-                                      <div class="absolute top-full right-0 z-20 mt-1 w-48 rounded-lg border border-gray-200 bg-white shadow-lg">
-                                        <button
-                                          onClick={() => {
-                                            props.onAddToContainer?.(container.id);
-                                            setOpenContainerMenu(null);
-                                          }}
-                                          class="w-full px-4 py-2 text-left text-sm font-bold hover:bg-gray-100"
-                                        >
-                                          ✏️ New Item
-                                        </button>
-                                        <button
-                                          onClick={() => {
-                                            props.onAddFromMasterToContainer?.(container.id);
-                                            setOpenContainerMenu(null);
-                                          }}
-                                          class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
-                                        >
-                                          📋 From My Items
-                                        </button>
-                                        <button
-                                          onClick={() => {
-                                            props.onBrowseTemplatesToContainer?.(container.id);
-                                            setOpenContainerMenu(null);
-                                          }}
-                                          class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
-                                        >
-                                          📚 Suggestions
-                                        </button>
-                                      </div>
-                                    </Show>
-                                  </div>
+                                      <path
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        stroke-width="2"
+                                        d="M12 4v16m8-8H4"
+                                      />
+                                    </svg>
+                                  </button>
                                 </div>
                                 <Show
                                   when={contents().length > 0}
