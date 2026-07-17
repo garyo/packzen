@@ -56,6 +56,12 @@ const ogImageURL = new URL(ogImage, Astro.site || 'https://packzen.org');
 
     <meta name="generator" content={Astro.generator} />
     <title>{title}</title>
+    <script
+      is:inline
+      defer
+      src="https://analytics.oberbrunner.com/script.js"
+      data-website-id="02fcf573-fc08-4e95-89d7-3541b6ff7296"
+      data-domains="packzen.org,www.packzen.org"></script>
   </head>
   <body>
     <slot />
