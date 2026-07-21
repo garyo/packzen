@@ -2,7 +2,7 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 ---
 
-<BaseLayout title="PackZen - Travel Packing Made Easy">
+<BaseLayout title="PackZen - Travel Packing Made Easy" enhancedTracking>
   <!--
     The landing page renders immediately for everyone (good for SEO and for
     visitors where Clerk is slow/blocked — it fails open). Once Clerk loads,
@@ -40,12 +40,16 @@ import BaseLayout from '../layouts/BaseLayout.astro';
         <div class="flex flex-col justify-center gap-4 sm:flex-row">
           <a
             href="/sign-up"
+            data-umami-track="cta"
+            data-umami-data-name="hero-sign-up"
             class="inline-flex items-center justify-center rounded-lg bg-blue-600 px-8 py-4 text-lg font-semibold text-white transition-colors hover:bg-blue-700"
           >
             Get Started Free
           </a>
           <a
             href="/sign-in"
+            data-umami-track="cta"
+            data-umami-data-name="hero-sign-in"
             class="inline-flex items-center justify-center rounded-lg border-2 border-blue-600 bg-white px-8 py-4 text-lg font-semibold text-blue-600 transition-colors hover:bg-blue-50"
           >
             Sign In

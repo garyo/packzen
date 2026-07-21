@@ -13,6 +13,39 @@ import { drizzle } from 'drizzle-orm/d1';
 import type { D1Database } from '@cloudflare/workers-types';
 import { deleteAllUserData } from '../../../lib/user-data-cleanup';
 
+// Same self-hosted Umami site as the client snippet in BaseLayout.astro.
+const UMAMI_ENDPOINT = 'https://analytics.oberbrunner.com/api/send';
+const UMAMI_WEBSITE_ID = '02fcf573-fc08-4e95-89d7-3541b6ff7296';
+
+/**
+ * Report an account creation to Umami so signups appear in the same
+ * dashboard as the marketing-page funnel. Best-effort: analytics must
+ * never fail the webhook. Umami's collect endpoint drops requests with
+ * bot-like User-Agents, hence the browser-style UA.
+ */
+async function reportSignupToUmami(): Promise<void> {
+  try {
+    await fetch(UMAMI_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (compatible; PackZen-server/1.0)',
+      },
+      body: JSON.stringify({
+        type: 'event',
+        payload: {
+          website: UMAMI_WEBSITE_ID,
+          hostname: 'packzen.org',
+          url: '/sign-up',
+          name: 'account-created',
+        },
+      }),
+    });
+  } catch (error) {
+    console.error('Failed to report signup to Umami:', error);
+  }
+}
+
 interface ClerkWebhookEvent {
   data: {
     id: string; // User ID
@@ -95,8 +128,16 @@ export const POST: APIRoute = async (context) => {
       }
     }
 
+    if (type === 'user.created') {
+      await reportSignupToUmami();
+      return new Response(JSON.stringify({ success: true, message: 'Signup recorded' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
     // You can add more event handlers here if needed
-    // Example: user.created, user.updated, etc.
+    // Example: user.updated, etc.
 
     return new Response(JSON.stringify({ success: true, message: 'Webhook received' }), {
       status: 200,
