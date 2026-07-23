@@ -73,6 +73,21 @@ const ogImageURL = new URL(ogImage, Astro.site || 'https://packzen.org');
       src="https://analytics.oberbrunner.com/script.js"
       data-website-id="02fcf573-fc08-4e95-89d7-3541b6ff7296"
       data-domains="packzen.org,www.packzen.org"></script>
+    <!-- Matomo (trial alongside Umami); cookie-less, prod hostnames only -->
+    <script is:inline>
+      if (['packzen.org', 'www.packzen.org'].includes(location.hostname)) {
+        var _paq = (window._paq = window._paq || []);
+        _paq.push(['disableCookies']);
+        _paq.push(['trackPageView']);
+        _paq.push(['enableLinkTracking']);
+        _paq.push(['setTrackerUrl', 'https://matomo.oberbrunner.com/matomo.php']);
+        _paq.push(['setSiteId', '6']);
+        var mg = document.createElement('script');
+        mg.async = true;
+        mg.src = 'https://matomo.oberbrunner.com/matomo.js';
+        document.head.appendChild(mg);
+      }
+    </script>
     {
       /* umami-kit (vendored from https://github.com/rhelmer/umami-kit);
          auto-inits from the data-umami-* attributes on <html>. */
