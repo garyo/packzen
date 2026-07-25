@@ -4,12 +4,6 @@ interface Props {
   description?: string;
   ogImage?: string;
   ogType?: string;
-  /**
-   * Adds umami-kit event tracking (scroll depth, time-on-page, clicks,
-   * page-exit) on top of the basic Umami pageview. Enabled only on the
-   * public marketing/signup pages — the logged-in app is not instrumented.
-   */
-  enhancedTracking?: boolean;
 }
 
 const {
@@ -17,7 +11,6 @@ const {
   description = 'PackZen - A mobile-first packing list app for mindful travel',
   ogImage = '/packzen-og-image.png',
   ogType = 'website',
-  enhancedTracking = false,
 } = Astro.props;
 
 const canonicalURL = new URL(Astro.url.pathname, Astro.site || 'https://packzen.org');
@@ -25,11 +18,7 @@ const ogImageURL = new URL(ogImage, Astro.site || 'https://packzen.org');
 ---
 
 <!doctype html>
-<html
-  lang="en"
-  data-umami-auto-track={enhancedTracking || undefined}
-  data-umami-auto-track-all-clicks={enhancedTracking ? 'true' : undefined}
->
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="description" content={description} />
@@ -67,13 +56,7 @@ const ogImageURL = new URL(ogImage, Astro.site || 'https://packzen.org');
 
     <meta name="generator" content={Astro.generator} />
     <title>{title}</title>
-    <script
-      is:inline
-      defer
-      src="https://analytics.oberbrunner.com/script.js"
-      data-website-id="02fcf573-fc08-4e95-89d7-3541b6ff7296"
-      data-domains="packzen.org,www.packzen.org"></script>
-    <!-- Matomo (trial alongside Umami); cookie-less, prod hostnames only -->
+    <!-- Matomo analytics; cookie-less, prod hostnames only -->
     <script is:inline>
       if (['packzen.org', 'www.packzen.org'].includes(location.hostname)) {
         var _paq = (window._paq = window._paq || []);
@@ -89,11 +72,6 @@ const ogImageURL = new URL(ogImage, Astro.site || 'https://packzen.org');
         document.head.appendChild(mg);
       }
     </script>
-    {
-      /* umami-kit (vendored from https://github.com/rhelmer/umami-kit);
-         auto-inits from the data-umami-* attributes on <html>. */
-      enhancedTracking && <script is:inline defer src="/umami-kit.js" />
-    }
   </head>
   <body>
     <slot />

@@ -13,36 +13,33 @@ import { drizzle } from 'drizzle-orm/d1';
 import type { D1Database } from '@cloudflare/workers-types';
 import { deleteAllUserData } from '../../../lib/user-data-cleanup';
 
-// Same self-hosted Umami site as the client snippet in BaseLayout.astro.
-const UMAMI_ENDPOINT = 'https://analytics.oberbrunner.com/api/send';
-const UMAMI_WEBSITE_ID = '02fcf573-fc08-4e95-89d7-3541b6ff7296';
+// Same self-hosted Matomo site as the client snippet in BaseLayout.astro.
+const MATOMO_ENDPOINT = 'https://matomo.oberbrunner.com/matomo.php';
+const MATOMO_SITE_ID = '6';
 
 /**
- * Report an account creation to Umami so signups appear in the same
+ * Report an account creation to Matomo so signups appear in the same
  * dashboard as the marketing-page funnel. Best-effort: analytics must
- * never fail the webhook. Umami's collect endpoint drops requests with
- * bot-like User-Agents, hence the browser-style UA.
+ * never fail the webhook. Recorded as an event rather than a pageview,
+ * and attributed to this server's IP, not the user's.
  */
-async function reportSignupToUmami(): Promise<void> {
+async function reportSignupToMatomo(): Promise<void> {
   try {
-    await fetch(UMAMI_ENDPOINT, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (compatible; PackZen-server/1.0)',
-      },
-      body: JSON.stringify({
-        type: 'event',
-        payload: {
-          website: UMAMI_WEBSITE_ID,
-          hostname: 'packzen.org',
-          url: '/sign-up',
-          name: 'account-created',
-        },
-      }),
+    const params = new URLSearchParams({
+      idsite: MATOMO_SITE_ID,
+      rec: '1',
+      apiv: '1',
+      url: 'https://packzen.org/sign-up',
+      e_c: 'signup',
+      e_a: 'account-created',
+      send_image: '0',
+    });
+    await fetch(`${MATOMO_ENDPOINT}?${params}`, {
+      method: 'GET',
+      headers: { 'User-Agent': 'PackZen-server/1.0' },
     });
   } catch (error) {
-    console.error('Failed to report signup to Umami:', error);
+    console.error('Failed to report signup to Matomo:', error);
   }
 }
 
@@ -129,7 +126,7 @@ export const POST: APIRoute = async (context) => {
     }
 
     if (type === 'user.created') {
-      await reportSignupToUmami();
+      await reportSignupToMatomo();
       return new Response(JSON.stringify({ success: true, message: 'Signup recorded' }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
