@@ -14,7 +14,7 @@ import type { D1Database } from '@cloudflare/workers-types';
 import { deleteAllUserData } from '../../../lib/user-data-cleanup';
 
 // Same self-hosted Matomo site as the client snippet in BaseLayout.astro.
-const MATOMO_ENDPOINT = 'https://matomo.oberbrunner.com/matomo.php';
+const MATOMO_ENDPOINT = 'https://analytics.oberbrunner.com/matomo.php';
 const MATOMO_SITE_ID = '6';
 
 /**
