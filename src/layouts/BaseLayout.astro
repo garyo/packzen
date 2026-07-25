@@ -78,6 +78,7 @@ const ogImageURL = new URL(ogImage, Astro.site || 'https://packzen.org');
       if (['packzen.org', 'www.packzen.org'].includes(location.hostname)) {
         var _paq = (window._paq = window._paq || []);
         _paq.push(['disableCookies']);
+        _paq.push(['enableHeartBeatTimer', 15]);
         _paq.push(['trackPageView']);
         _paq.push(['enableLinkTracking']);
         _paq.push(['setTrackerUrl', 'https://matomo.oberbrunner.com/matomo.php']);
