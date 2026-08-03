@@ -11,7 +11,7 @@ A mobile-first packing list web app for travel with all-items management, trip p
 - **Database**: Cloudflare D1 (SQLite at the edge)
 - **ORM**: Drizzle ORM
 - **Auth**: Clerk
-- **Deployment**: Cloudflare Pages
+- **Deployment**: Cloudflare Workers, auto-deployed on push to `main`
 
 ## Features
 
@@ -160,7 +160,13 @@ bun run db:studio
 
 ## Deployment to Cloudflare
 
-### 1. Build and Deploy
+This is a **Worker**, not a Pages project — `wrangler.jsonc` is the
+serving config, and it is committed and load-bearing. Pushing to `main`
+auto-deploys via Cloudflare Workers Builds.
+
+### 1. Deploying by hand
+
+Only needed if Workers Builds is unavailable, or to ship without a push:
 
 ```bash
 # Build the project
