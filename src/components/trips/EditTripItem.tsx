@@ -2,6 +2,7 @@ import { createSignal, For, Show } from 'solid-js';
 import { api, endpoints } from '../../lib/api';
 import type { TripItem, Bag, Category } from '../../lib/types';
 import { Modal } from '../ui/Modal';
+import { QuantityInput } from '../ui/QuantityInput';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { showToast } from '../ui/Toast';
@@ -220,12 +221,11 @@ export function EditTripItem(props: EditTripItemProps) {
             >
               −
             </button>
-            <Input
-              type="number"
-              min="1"
+            <QuantityInput
               value={quantity()}
-              onInput={(e) => setQuantity(parseInt(e.currentTarget.value) || 1)}
-              class="w-20 text-center"
+              onChange={setQuantity}
+              aria-label="Quantity"
+              class="w-20 px-3 py-2 text-center"
             />
             <button
               type="button"

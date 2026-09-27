@@ -1,9 +1,17 @@
-import { createSignal, createEffect, createMemo, onMount, For, Show } from 'solid-js';
+import {
+  createSignal,
+  createEffect,
+  createMemo,
+  createUniqueId,
+  onMount,
+  For,
+  Show,
+} from 'solid-js';
 import { api, endpoints } from '../../lib/api';
 import type { Bag, Category, MasterItemWithCategory, TripItem } from '../../lib/types';
 import { Modal } from '../ui/Modal';
+import { QuantityInput } from '../ui/QuantityInput';
 import { Button } from '../ui/Button';
-import { Input } from '../ui/Input';
 import { Combobox, type ComboboxItem } from '../ui/Combobox';
 import { showToast } from '../ui/Toast';
 import { searchItems } from '../../lib/search';
@@ -38,6 +46,7 @@ interface AddTripItemFormProps {
 export function AddTripItemForm(props: AddTripItemFormProps) {
   const [name, setName] = createSignal(props.initialName ?? '');
   const [quantity, setQuantity] = createSignal(1);
+  const quantityId = createUniqueId();
   const [category, setCategory] = createSignal<CategoryChoice>('');
   const [location, setLocation] = createSignal<string>('');
   const [isContainer, setIsContainer] = createSignal(false);
@@ -403,12 +412,14 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
         </div>
 
         <div>
-          <label class="mb-1 block text-sm font-medium text-gray-700">Quantity</label>
-          <Input
-            type="number"
-            min="1"
+          <label for={quantityId} class="mb-1 block text-sm font-medium text-gray-700">
+            Quantity
+          </label>
+          <QuantityInput
+            id={quantityId}
             value={quantity()}
-            onInput={(e) => setQuantity(parseInt(e.currentTarget.value) || 1)}
+            onChange={setQuantity}
+            class="w-full px-3 py-2"
           />
         </div>
 
