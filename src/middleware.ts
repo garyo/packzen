@@ -1,27 +1,64 @@
-import { clerkMiddleware, clerkClient } from '@clerk/astro/server';
-import { validateCsrfToken } from './lib/csrf';
+import type { APIContext, MiddlewareNext } from 'astro';
+import { clerkMiddleware, clerkClient, type AuthFn } from '@clerk/astro/server';
 import { createBilling, planFromClaims } from './lib/billing';
 import { DEV_FAKE_AUTH, parseFakeAuth } from './lib/dev-auth';
 
-export const onRequest = clerkMiddleware(async (auth, context, next) => {
-  // Only apply auth to API routes
-  if (!context.url.pathname.startsWith('/api/')) {
-    return next();
+// Verified by its Svix signature instead of a Clerk session.
+const CLERK_WEBHOOK_PATH = '/api/webhooks/clerk';
+
+const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+
+// Static assets get the same headers from public/_headers.
+const SECURITY_HEADERS: Record<string, string> = {
+  'Content-Security-Policy': "frame-ancestors 'none'; base-uri 'self'; object-src 'none'",
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+  'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+};
+
+function setSecurityHeaders(headers: Headers): void {
+  for (const [name, value] of Object.entries(SECURITY_HEADERS)) headers.set(name, value);
+}
+
+function withSecurityHeaders(response: Response): Response {
+  try {
+    setSecurityHeaders(response.headers);
+    return response;
+  } catch {
+    // Some responses (e.g. Response.redirect) have immutable headers; copy those.
+    const copy = new Response(response.body, response);
+    setSecurityHeaders(copy.headers);
+    return copy;
+  }
+}
+
+function unauthorized(): Response {
+  return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+    status: 401,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+async function authenticateApi(
+  auth: AuthFn,
+  context: APIContext,
+  next: MiddlewareNext
+): Promise<Response> {
+  const authorization = context.request.headers.get('authorization');
+
+  // Writes must carry a Bearer token. Browsers never attach one to a
+  // cross-site request (setting it forces a CORS preflight we don't grant),
+  // so this is the CSRF defense: cookie-only writes are rejected.
+  if (WRITE_METHODS.has(context.request.method) && !/^bearer\s+\S/i.test(authorization ?? '')) {
+    return unauthorized();
   }
 
-  // Skip auth/CSRF checks for webhook endpoints (they use signature verification)
-  if (context.url.pathname.startsWith('/api/webhooks/')) {
-    return next();
-  }
-
-  // Dev-only fake auth: a `Bearer devfake:<id>~<plan>` request stands in for a
-  // real Clerk session so local/automated testing can create and switch users
-  // without email verification. Gated on DEV_FAKE_AUTH, which is a compile-time
-  // `false` in production builds, so this branch is dead-code eliminated there.
-  // Only triggers when the client actually sends a fake token; real Clerk
-  // requests fall through untouched.
-  if (DEV_FAKE_AUTH) {
-    const fake = parseFakeAuth(context.request.headers.get('authorization'));
+  // Dev-only fake auth (see lib/dev-auth.ts): a `Bearer devfake:<id>~<plan>`
+  // token stands in for a Clerk session. The inline `import.meta.env.DEV` is
+  // a build-time `false` in production, so this branch and parseFakeAuth are
+  // removed from the production bundle.
+  if (import.meta.env.DEV && DEV_FAKE_AUTH) {
+    const fake = parseFakeAuth(authorization);
     if (fake) {
       context.locals.userId = fake.userId;
       context.locals.billing = createBilling(fake.plan);
@@ -29,20 +66,11 @@ export const onRequest = clerkMiddleware(async (auth, context, next) => {
     }
   }
 
-  // Get auth state from Clerk
   const authObject = await auth();
+  if (!authObject.userId) return unauthorized();
 
-  if (!authObject.userId) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-      status: 401,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
-
-  // Add user ID to locals for API routes to use
   const userId = authObject.userId;
   context.locals.userId = userId;
-
   // The plan comes from the session token; the billing override needs a
   // Clerk API call, made only if a plan-limit check needs it.
   context.locals.billing = createBilling(planFromClaims(authObject), async () => {
@@ -50,30 +78,14 @@ export const onRequest = clerkMiddleware(async (auth, context, next) => {
     return user.publicMetadata?.billingOverride;
   });
 
-  // CSRF protection for state-changing requests.
-  //
-  // CSRF only threatens cookie-authenticated requests, where the browser
-  // auto-attaches credentials to a cross-site request. A request carrying a
-  // Bearer token in the Authorization header is immune: a cross-site attacker
-  // cannot set that header (doing so forces a CORS preflight we don't grant)
-  // and has no valid token. So we skip the double-submit-cookie check for
-  // Bearer-authenticated requests — which is what the app's client always
-  // sends, and which also fixes mobile browsers that drop the HttpOnly CSRF
-  // cookie. Cookie-only state-changing requests still require a matching token.
-  const method = context.request.method.toUpperCase();
-  const isStateChanging =
-    method === 'POST' || method === 'PUT' || method === 'PATCH' || method === 'DELETE';
-  const authHeader = context.request.headers.get('authorization') ?? '';
-  const hasBearerToken = /^bearer\s+\S/i.test(authHeader);
-
-  if (isStateChanging && !hasBearerToken) {
-    if (!validateCsrfToken(context.request)) {
-      return new Response(JSON.stringify({ error: 'CSRF token validation failed' }), {
-        status: 403,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
-  }
-
   return next();
+}
+
+export const onRequest = clerkMiddleware(async (auth, context, next) => {
+  const { pathname } = context.url;
+  const response =
+    pathname.startsWith('/api/') && pathname !== CLERK_WEBHOOK_PATH
+      ? await authenticateApi(auth, context, next)
+      : await next();
+  return withSecurityHeaders(response);
 });

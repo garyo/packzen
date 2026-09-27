@@ -4,11 +4,11 @@
 // automation) without going through Clerk's real sign-up + email verification.
 //
 // SAFETY: every branch that trusts a fake identity is gated on DEV_FAKE_AUTH,
-// whose first term is `import.meta.env.DEV`. That is a compile-time literal —
-// `true` under `astro dev`, `false` under `astro build` — so in a production
-// build DEV_FAKE_AUTH is `false` and every guarded branch is dead-code
-// eliminated from the bundle. It cannot be turned on in production, and even in
-// a dev build you must opt in with PUBLIC_DEV_FAKE_AUTH=true.
+// which requires `import.meta.env.DEV` (false in any `astro build`) and an
+// explicit opt-in with PUBLIC_DEV_FAKE_AUTH=true. It cannot be turned on in
+// production. The server-side trust point, middleware.ts, also checks
+// `import.meta.env.DEV` inline, which the build replaces with `false`, so the
+// fake-token parsing is removed from the production Worker entirely.
 //
 // "Available" (DEV_FAKE_AUTH) is distinct from "active": fake auth only
 // overrides real Clerk once a fake user has actually been selected (getFakeUser
@@ -18,9 +18,9 @@
 import type { BillingPlan } from './billing';
 
 // The `typeof` guard is for non-Vite runtimes (the tsx test runner) where
-// `import.meta.env` is undefined; under Vite (dev and build) it's a defined
-// object, so `import.meta.env.DEV` is still replaced with a boolean literal and
-// the production branch is dead-code eliminated as intended.
+// `import.meta.env` is undefined. It also stops the build from replacing
+// these reads with literals, so DEV_FAKE_AUTH is a runtime `false` in
+// production rather than a compile-time one.
 export const DEV_FAKE_AUTH: boolean =
   typeof import.meta.env !== 'undefined' &&
   import.meta.env.DEV === true &&
