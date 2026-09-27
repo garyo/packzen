@@ -80,6 +80,34 @@ test('api: no session token sends nothing, reports 401, and redirects back here'
   );
 });
 
+test('api: a failed token lookup is transient: retried once, never treated as signed out', async () => {
+  const calls: string[] = [];
+  let tokenCalls = 0;
+  const api = createApi({
+    getToken: async () => {
+      if (++tokenCalls === 1) throw new Error('token refresh failed');
+      return 'tok';
+    },
+    fetch: async (url) => {
+      calls.push(url);
+      return json(200, []);
+    },
+  });
+  assert.deepEqual(await api.get('/api/trips'), { success: true, data: [] });
+  assert.equal(tokenCalls, 2);
+  assert.equal(calls.length, 1);
+
+  const failing = createApi({
+    getToken: async () => {
+      throw new Error('Clerk did not load');
+    },
+    fetch: async () => json(200, {}),
+  });
+  const result = await failing.post('/api/trips', {});
+  assert.equal(result.success, false);
+  assert.notEqual(result.statusCode, 401);
+});
+
 test('api: writes carry the Bearer token and X-Source-ID; GETs have no source id', async () => {
   const { api, calls } = scriptedApi([json(200, { id: 1 }), json(200, [])]);
   await api.patch('/api/trips/t', { name: 'x' });

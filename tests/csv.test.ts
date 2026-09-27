@@ -76,3 +76,8 @@ test('CSV export neutralizes spreadsheet formulas and import restores the text',
   assert.equal(parsed[1].name, "'90s tee", 'an ordinary leading apostrophe is kept');
   assert.equal(parsed[1].description, '-dash');
 });
+
+test('CSV without an is_container column leaves the container flag unset', () => {
+  const parsed = csvToMasterItems('name,default_quantity\nToiletry Kit,1\n');
+  assert.equal(parsed[0].is_container, undefined);
+});

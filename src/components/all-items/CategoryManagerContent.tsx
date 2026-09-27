@@ -23,15 +23,24 @@ export function CategoryManagerContent(props: CategoryManagerContentProps) {
   const handleAdd = async (e: Event) => {
     e.preventDefault();
 
-    if (!newName().trim()) {
+    const name = newName().trim();
+    if (!name) {
       showToast('error', 'Category name is required');
+      return;
+    }
+    // The server would just return the existing one (get-or-create).
+    const existing = props.categories.find(
+      (c) => c.name.trim().toLowerCase() === name.toLowerCase()
+    );
+    if (existing) {
+      showToast('info', `“${existing.name}” already exists`);
       return;
     }
 
     setAdding(true);
 
     const response = await api.post(endpoints.categories, {
-      name: newName().trim(),
+      name,
       icon: newIcon().trim() || null,
       sort_order: props.categories.length,
     });

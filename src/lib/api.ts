@@ -40,6 +40,7 @@ const REQUEST_TIMEOUT_MS = 15_000;
 /** External calls the client needs, injectable so tests can drive every path. */
 export interface ApiDeps {
   fetch: (input: string, init: RequestInit) => Promise<Response>;
+  /** Resolves null when signed out; rejects when that can't be determined. */
   getToken: () => Promise<string | null>;
   timeoutMs: number;
 }
@@ -128,8 +129,10 @@ export function createApi(deps: Partial<ApiDeps> = {}) {
       }
 
       // 5xx responses are usually transient (e.g. a D1 stall that errors after
-      // the write already committed). The retry both recovers the request and
-      // re-records the sync change-log event the failed attempt skipped.
+      // the write already committed). The retry recovers the request and, for
+      // a PATCH/PUT, re-records the sync change-log event the failed attempt
+      // skipped. A DELETE retry finds the row gone (the 404 above) and logs
+      // nothing, so other devices only see that delete on their next refresh.
       if (response.status >= 500 && canRetry) {
         return retry(`status ${response.status}`);
       }

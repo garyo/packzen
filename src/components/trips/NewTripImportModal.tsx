@@ -51,8 +51,14 @@ export function NewTripImportModal(props: NewTripImportModalProps) {
         throw new Error(`Could not create trip: ${tripResponse.error}`);
       }
 
-      const result = await restoreTripContents(tripResponse.data.id, tripData);
-      showToast(result.failures.length > 0 ? 'error' : 'success', describeTripRestore(result));
+      // The trip exists now, so finish either way: a retry would duplicate it.
+      try {
+        const result = await restoreTripContents(tripResponse.data.id, tripData);
+        showToast(result.failures.length > 0 ? 'error' : 'success', describeTripRestore(result));
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : 'unknown error';
+        showToast('error', `Trip created, but its bags and items could not be imported: ${reason}`);
+      }
       props.onImported();
       props.onClose();
     } catch (error) {

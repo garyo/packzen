@@ -57,19 +57,20 @@ export async function getClerk(): Promise<ClerkClient> {
   return waitForClerk();
 }
 
-// Helper to get the current session token
+/**
+ * The current session token, or null when there is no signed-in session.
+ * Rejects when that can't be determined (Clerk failed to load, or the token
+ * refresh failed), so callers can treat it as a transient failure rather than
+ * as being signed out.
+ */
 export async function getSessionToken(): Promise<string | null> {
   if (DEV_FAKE_AUTH) {
     const fake = getFakeUser();
     if (fake) return fakeUserToken(fake);
   }
-  try {
-    const clerk = await waitForClerk();
-    return (await clerk.session?.getToken()) ?? null;
-  } catch (error) {
-    console.error('Error getting session token:', error);
-    return null;
-  }
+  const clerk = await waitForClerk();
+  if (!clerk.session) return null;
+  return (await clerk.session.getToken()) ?? null;
 }
 
 /**

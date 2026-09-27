@@ -5,7 +5,12 @@ import { eq } from 'drizzle-orm';
 import { bags, categories, tripItems, trips } from '../db/schema';
 import { tripToYAML, yamlToTrip, fullBackupToYAML, yamlToFullBackup } from '../src/lib/yaml';
 import { deleteAllUserData } from '../src/lib/user-data-cleanup';
-import { exportBackupData, restoreBackupData, restoreTripContents } from '../src/lib/backup';
+import {
+  describeTripRestore,
+  exportBackupData,
+  restoreBackupData,
+  restoreTripContents,
+} from '../src/lib/backup';
 import {
   createTestDatabase,
   seedUserData,
@@ -747,7 +752,7 @@ test('restoreTripContents restores every field, nesting, and same-name items int
   const tripId = created.data!.id;
 
   const result = await restoreTripContents(tripId, tripExport, { api });
-  assert.deepEqual(result, { created: 5, updated: 0, failures: [] });
+  assert.deepEqual(result, { created: 5, updated: 0, failed: 0, failures: [] });
 
   const restored = await tripItemsIn(db, tripId);
   const [duffel] = await db.select().from(bags).where(eq(bags.trip_id, tripId)).all();
@@ -800,10 +805,28 @@ test('restoreTripContents merge: matches bags case-insensitively and takes items
   }
 
   const result = await restoreTripContents(trip.id, tripExport, { merge: true, api });
-  assert.deepEqual(result, { created: 0, updated: 3, failures: [] });
+  assert.deepEqual(result, { created: 0, updated: 3, failed: 0, failures: [] });
 
   assert.equal((await db.select().from(bags).where(eq(bags.trip_id, trip.id)).all()).length, 1);
   const sandals = (await tripItemsIn(db, trip.id)).find((i) => i.name === 'Sandals');
   assert.equal(sandals?.bag_id, bagList[0].id);
   assert.equal(sandals?.container_item_id, null);
+});
+
+test('describeTripRestore counts an item that was restored but not nested only once', () => {
+  const nestOnly = describeTripRestore({
+    created: 2,
+    updated: 0,
+    failed: 0,
+    failures: ['Item "Sunscreen": could not find container "Kit"'],
+  });
+  assert.equal(nestOnly, 'Imported 2 of 2 items. Item "Sunscreen": could not find container "Kit"');
+
+  const mixed = describeTripRestore({
+    created: 1,
+    updated: 0,
+    failed: 1,
+    failures: ['Item "A": boom', 'Item "B": could not find container "Kit"'],
+  });
+  assert.match(mixed, /^Imported 1 of 2 items; 1 failed\. /);
 });

@@ -297,11 +297,23 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
     const existingMasterItem = masterItems()?.find(
       (item) => item.name.toLowerCase() === itemName.toLowerCase()
     );
-    let masterItemId = existingMasterItem?.id;
 
-    // If not in master list, add it (unless explicitly disabled)
-    if (!existingMasterItem && !skipMasterAddition()) {
-      const { item: createdMasterItem } = await getOrCreateMasterItem(
+    const response = await api.post<TripItem>(endpoints.tripItems(props.tripId), {
+      name: itemName,
+      category_name: categoryName,
+      quantity: quantity(),
+      bag_id: bagId,
+      master_item_id: existingMasterItem?.id,
+      is_container: isContainer(),
+      container_item_id: containerItemId,
+    });
+
+    // Save it as a My Item (unless opted out) only once the trip has accepted
+    // it, so a rejected add (e.g. the plan limit) leaves My Items alone.
+    let createdItem = response.data;
+    let savedToMyItems = false;
+    if (createdItem && !createdItem.master_item_id && !skipMasterAddition()) {
+      const { item: masterItem, status } = await getOrCreateMasterItem(
         {
           name: itemName,
           category: categoryName,
@@ -311,34 +323,22 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
         [...(masterItems() ?? [])],
         categoriesCache
       );
-      if (createdMasterItem) {
-        masterItemId = createdMasterItem.id;
-        dataChanged = true;
+      if (masterItem) {
+        if (status === 'created') savedToMyItems = dataChanged = true;
+        const linked = await api.patch<TripItem>(endpoints.tripItems(props.tripId), {
+          id: createdItem.id,
+          master_item_id: masterItem.id,
+        });
+        if (linked.success && linked.data) createdItem = linked.data;
       }
     }
     if (dataChanged) props.onDataChanged();
 
-    // Add to trip
-    const response = await api.post(endpoints.tripItems(props.tripId), {
-      name: itemName,
-      category_name: categoryName,
-      quantity: quantity(),
-      bag_id: bagId,
-      master_item_id: masterItemId,
-      is_container: isContainer(),
-      container_item_id: containerItemId,
-    });
-
     if (response.success) {
       showToast(
         'success',
-        masterItemId && !existingMasterItem
-          ? `Added "${itemName}" to trip and My Items`
-          : `Added "${itemName}" to trip`
+        savedToMyItems ? `Added "${itemName}" to trip and My Items` : `Added "${itemName}" to trip`
       );
-
-      // Get the created item from the response
-      const createdItem = response.data as TripItem | undefined;
 
       if (keepOpenAfterSubmit) {
         // Smart reuse logic for Add Another

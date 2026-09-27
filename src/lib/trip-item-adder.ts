@@ -20,6 +20,7 @@ export const itemCount = (n: number) => (n === 1 ? '1 item' : `${n} items`);
 const TOILETRY_CATEGORY = 'Toiletries';
 const TOILET_KIT = 'Toilet Kit';
 const isToiletry = (item: BuiltInItem) => item.category === TOILETRY_CATEGORY && !item.is_container;
+const ALREADY_ON_LIST = 'Those items are already on your list';
 
 /** A page's copy of a list, which the adder updates with what it creates. */
 interface SharedList<T> {
@@ -100,7 +101,7 @@ export function createTripItemAdder(
       return true;
     });
     if (toAdd.length === 0) {
-      showToast('info', 'Those items are already on your list');
+      showToast('info', ALREADY_ON_LIST);
       return;
     }
 
@@ -126,12 +127,19 @@ export function createTripItemAdder(
         };
       })
     );
+    // A rejected add (including the plan limit, a 403) was already reported.
     if (!added) return;
 
+    // The server skips names another device added meanwhile, and anything
+    // over the plan's item limit once some items fit.
+    if (added.length === 0) {
+      showToast('info', ALREADY_ON_LIST);
+      return;
+    }
     if (added.length < toAdd.length) {
       showToast(
         'info',
-        `Added ${added.length} of ${toAdd.length} items; the rest are over your plan's item limit`
+        `Added ${added.length} of ${toAdd.length} items; the rest were already on your list or over your plan's item limit`
       );
     } else if (!options.quiet) {
       showToast(
@@ -159,7 +167,7 @@ export function createTripItemAdder(
       (item) => !taken.has(item.name.toLowerCase())
     );
     if (starter.length === 0) {
-      showToast('info', 'Those items are already on your list');
+      showToast('info', ALREADY_ON_LIST);
       return 0;
     }
     await ensureCategories([...new Set(starter.map((item) => item.category))]);
@@ -189,11 +197,12 @@ export function createTripItemAdder(
       }))
     );
 
-    if (!added) {
-      // Don't leave a new container behind, empty, when its items failed.
+    if (!added?.length) {
+      // Don't leave a new container behind, empty, when its items weren't added.
       if (createdKit) {
         await store.deleteItems([createdKit.id], { label: `Removed ${TOILET_KIT}`, quiet: true });
       }
+      if (added) showToast('info', ALREADY_ON_LIST);
       return 0;
     }
     const count = added.length + (createdKit ? 1 : 0);
@@ -220,7 +229,7 @@ export function createTripItemAdder(
   const addStarter = (tripTypeId: string, modifiers: StarterModifier[], bagId: string | null) =>
     enqueue(() => addStarterNow(tripTypeId, modifiers, bagId));
 
-  return { addItems, addStarter, ensureCategories };
+  return { addItems, addStarter };
 }
 
 export type TripItemAdder = ReturnType<typeof createTripItemAdder>;

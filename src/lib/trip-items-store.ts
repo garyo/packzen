@@ -120,14 +120,16 @@ export function createTripItemsStore(tripId: string) {
 
   async function tracked<T>(write: () => Promise<T>): Promise<T> {
     pendingWrites++;
-    const result = await write();
-    pendingWrites--;
-    epoch++;
-    if (pendingWrites === 0 && refreshWanted) {
-      refreshWanted = false;
-      void refresh(true);
+    try {
+      return await write();
+    } finally {
+      pendingWrites--;
+      epoch++;
+      if (pendingWrites === 0 && refreshWanted) {
+        refreshWanted = false;
+        void refresh(true);
+      }
     }
-    return result;
   }
 
   // Sync events replay through here after a load (see LoadGate), so every

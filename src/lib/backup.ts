@@ -75,7 +75,12 @@ export async function exportBackupData(
 export interface TripRestoreResult {
   created: number;
   updated: number;
-  /** One message per item that could not be restored (or not nested in its container). */
+  /** Items that could not be restored at all. */
+  failed: number;
+  /**
+   * One message per item that could not be restored, or was restored but not
+   * nested in its container.
+   */
   failures: string[];
 }
 
@@ -138,8 +143,13 @@ export async function restoreTripContents(
 
   // Items
   const failures: string[] = [];
-  const fail = (item: BackupItem, reason?: string) =>
+  let failed = 0;
+  const report = (item: BackupItem, reason?: string) =>
     failures.push(`Item "${item.name}": ${reason || 'unknown error'}`);
+  const fail = (item: BackupItem, reason?: string) => {
+    failed++;
+    report(item, reason);
+  };
   const hasContainer = (item: BackupItem) => !!(item.container_source_id || item.container_name);
 
   const unclaimedItems = [...existingItems];
@@ -248,7 +258,7 @@ export async function restoreTripContents(
     const parent = findParent(item);
     const parentId = parent && restoredIds.get(parent);
     if (!parentId) {
-      return fail(
+      return report(
         item,
         `could not find container "${item.container_name || item.container_source_id}"`
       );
@@ -257,14 +267,19 @@ export async function restoreTripContents(
       id: restoredIds.get(item),
       container_item_id: parentId,
     });
-    if (!response.success) fail(item, `could not put it in its container (${response.error})`);
+    if (!response.success) report(item, `could not put it in its container (${response.error})`);
   });
 
-  return { created, updated, failures };
+  return { created, updated, failed, failures };
 }
 
 /** One-line summary of a trip import for a toast, naming the first few failures. */
-export function describeTripRestore({ created, updated, failures }: TripRestoreResult): string {
+export function describeTripRestore({
+  created,
+  updated,
+  failed,
+  failures,
+}: TripRestoreResult): string {
   const restored = created + updated;
   const counts = updated > 0 ? `${created} new, ${updated} updated` : `${created} new`;
   if (failures.length === 0) {
@@ -272,7 +287,8 @@ export function describeTripRestore({ created, updated, failures }: TripRestoreR
   }
   const shown = failures.slice(0, 3).join('; ');
   const more = failures.length > 3 ? `; and ${failures.length - 3} more` : '';
-  return `Imported ${restored} of ${restored + failures.length} items; ${failures.length} failed. ${shown}${more}`;
+  const failedCount = failed > 0 ? `; ${failed} failed` : '';
+  return `Imported ${restored} of ${restored + failed} items${failedCount}. ${shown}${more}`;
 }
 
 export async function restoreBackupData(

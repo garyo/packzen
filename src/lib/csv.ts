@@ -35,7 +35,8 @@ export function csvToMasterItems(csv: string): Array<{
   description?: string;
   category_name?: string;
   default_quantity: number;
-  is_container: boolean;
+  /** Omitted when the CSV has no is_container column, so imports leave the flag alone. */
+  is_container?: boolean;
 }> {
   const result = Papa.parse(csv, {
     header: true,
@@ -55,11 +56,10 @@ export function csvToMasterItems(csv: string): Array<{
 
   // Find name column (required)
   const firstRow = result.data[0] as Record<string, string>;
-  const hasNameColumn = 'name' in firstRow;
-
-  if (!hasNameColumn) {
+  if (!('name' in firstRow)) {
     throw new Error('CSV must have a "name" column');
   }
+  const hasContainerColumn = 'is_container' in firstRow;
 
   // Parse and validate items
   const items = (result.data as Array<Record<string, string>>)
@@ -78,7 +78,9 @@ export function csvToMasterItems(csv: string): Array<{
         description: row.description?.trim() || undefined,
         category_name: row.category_name?.trim() || undefined,
         default_quantity: isNaN(quantity) || quantity < 1 ? 1 : quantity,
-        is_container: ['true', '1', 'yes'].includes(row.is_container?.trim().toLowerCase() ?? ''),
+        is_container: hasContainerColumn
+          ? ['true', '1', 'yes'].includes(row.is_container?.trim().toLowerCase() ?? '')
+          : undefined,
       };
     })
     .filter((item): item is NonNullable<typeof item> => item !== null);

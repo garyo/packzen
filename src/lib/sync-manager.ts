@@ -57,9 +57,12 @@ export class SyncManager {
   }
 
   /**
-   * Resolves once the first poll has completed (successfully or not), i.e.
-   * once the sync checkpoint is established. Await it before fetching a
-   * snapshot so no change can fall between the snapshot and the checkpoint.
+   * Resolves once the first poll has finished, successfully or not. Await it
+   * before fetching a snapshot: after a successful poll the sync checkpoint is
+   * established, so no change can fall between the snapshot and the
+   * checkpoint. A failed first poll establishes none, so a change made before
+   * the next successful poll can be missed until the page next refreshes; it
+   * still resolves so a failing network doesn't hold up the page.
    */
   ready(): Promise<void> {
     return this.readyPromise;
