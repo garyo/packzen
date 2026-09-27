@@ -2,7 +2,7 @@
  * OnboardingModal Component
  *
  * The full "How PackZen works" walkthrough, opened on demand from the Account
- * menu rather than auto-firing. Day-to-day guidance is contextual (empty
+ * menu or a new user's My Trips rather than auto-firing. Day-to-day guidance is contextual (empty
  * states, the container checkbox label), so there's no per-browser flag.
  */
 
@@ -19,22 +19,29 @@ export function OnboardingModal(props: OnboardingModalProps) {
         <div class="text-gray-700">
           <ol class="list-inside list-decimal space-y-3">
             <li>
-              <strong>Create a trip</strong> with <em>+ New Trip</em> on My Trips. Fill in as much
-              or as little as you like.
+              <strong>Start a trip.</strong> Pick a kind of trip to begin with a ready-made list of
+              essentials, or use <em>+ New Trip</em> on My Trips to set one up yourself. Tap the
+              trip's name to rename it or add dates.
             </li>
             <li>
-              <strong>Add one or more bags</strong>; you can add more any time.
+              <strong>Add items.</strong> Switch the trip to <em>Add</em> and tap anything from My
+              Items (things you've added before) or <em>Suggestions</em>; it goes into the bag shown
+              at the top, and <em>Change</em> picks another. Can't find something? Search for it and
+              add it by name.
             </li>
             <li>
-              <strong>Add items</strong> from your saved items (My Items) or from{' '}
-              <em>Suggestions</em>, curated lists for each kind of trip. Pick a category and bag for
-              each item; you can change those later too.
-            </li>
-            <li>
-              <strong>Pack.</strong> Check things off as you pack, and drag items to change bags. To
-              print your list, use the printer icon at the top of the trip.
+              <strong>Pack.</strong> Switch back to <em>Pack</em> and tap items to check them off.
+              An item's <strong>⋯</strong> button moves it to another bag, skips it for this trip,
+              or edits it. The printer icon prints your list.
             </li>
           </ol>
+        </div>
+
+        <div class="border-t border-gray-200 pt-4">
+          <h4 class="mb-2 font-semibold text-gray-900">Bags</h4>
+          <p class="text-sm text-gray-600">
+            Bags are optional. Add or change them with <strong>Bags…</strong> in a trip's ⋮ menu.
+          </p>
         </div>
 
         <div class="border-t border-gray-200 pt-4">
@@ -48,8 +55,8 @@ export function OnboardingModal(props: OnboardingModalProps) {
         <div class="border-t border-gray-200 pt-4">
           <h4 class="mb-2 font-semibold text-gray-900">Selecting several items</h4>
           <p class="text-sm text-gray-600">
-            In the packing list, use <strong>Select</strong> to pick several items at once and move
-            them to a bag, category or container.
+            <strong>Select</strong> in a trip's ⋮ menu lets you pick several items at once and move
+            them to a bag, category or container, skip them, or delete them.
           </p>
         </div>
 

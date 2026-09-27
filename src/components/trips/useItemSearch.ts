@@ -52,6 +52,11 @@ export function useItemSearch(
 
   const isSearching = () => query().trim().length > 0;
   const noResults = () => isSearching() && (results()?.length ?? 0) === 0;
+  /** An item on the list is named exactly like the search (ignoring case). */
+  const hasExactMatch = () => {
+    const needle = query().trim().toLowerCase();
+    return !!items()?.some((item) => item.name.toLowerCase() === needle);
+  };
 
   // Once search closes (e.g. by tapping a result), scroll to the chosen item.
   createEffect(() => {
@@ -65,5 +70,13 @@ export function useItemSearch(
     });
   });
 
-  return { query, setQuery, results, isSearching, noResults, scrollToItem: setScrollTarget };
+  return {
+    query,
+    setQuery,
+    results,
+    isSearching,
+    noResults,
+    hasExactMatch,
+    scrollToItem: setScrollTarget,
+  };
 }

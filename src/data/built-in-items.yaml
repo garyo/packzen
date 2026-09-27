@@ -42,39 +42,57 @@ categories:
     icon: '📦'
     sort_order: 13
 
+# trip_name: default name for a trip started from this type.
+# keywords: words in a trip's name that suggest this type (whole words, plural ok).
 trip_types:
   - id: 'overnight'
     name: 'Overnight'
     description: '1-2 nights'
     nights: 2
+    trip_name: 'Overnight trip'
+    keywords: ['overnight', 'sleepover']
   - id: 'weekend'
     name: 'Weekend'
     description: '3-4 nights'
     nights: 4
+    trip_name: 'Weekend trip'
+    keywords: ['weekend']
   - id: 'week'
     name: 'Week-long'
     description: '5-7 nights'
     nights: 7
+    trip_name: 'Week-long trip'
+    keywords: ['week', 'vacation', 'holiday']
   - id: 'beach'
     name: 'Beach Day'
     description: 'Beach or pool'
     nights: 3
+    trip_name: 'Beach trip'
+    keywords: ['beach', 'pool', 'island', 'resort', 'tropical', 'surf', 'lake']
   - id: 'business'
     name: 'Business'
     description: 'Work travel'
     nights: 4
+    trip_name: 'Business trip'
+    keywords: ['business', 'work', 'conference', 'meeting', 'client', 'office']
   - id: 'international'
     name: 'International'
     description: 'Cross-border travel'
     nights: 7
+    trip_name: 'International trip'
+    keywords: ['international', 'abroad', 'overseas']
   - id: 'hiking'
     name: 'Hiking/Camping'
     description: 'Outdoor adventure'
     nights: 3
+    trip_name: 'Hiking trip'
+    keywords: ['hike', 'hiking', 'camp', 'camping', 'trek', 'trekking', 'backpacking', 'trail']
   - id: 'ski'
     name: 'Ski Trip'
     description: 'Winter sports'
     nights: 5
+    trip_name: 'Ski trip'
+    keywords: ['ski', 'skiing', 'snowboard', 'snowboarding', 'snow']
 
 items:
   # Clothing

@@ -1,11 +1,12 @@
 /**
  * AddModeLeftPanel Component
  *
- * Left panel with tabs for item sources (My Saved Items, Built-in)
- * Items are draggable to bag cards in the right panel
+ * Item sources for Add mode: My Items and Suggestions (with starter lists).
+ * Tap a row to add it to the current target; on desktop rows can also be
+ * dragged onto a bag.
  */
 
-import { createSignal, Show, For, createMemo, type Accessor } from 'solid-js';
+import { createSignal, Show, For, createMemo, type Accessor, type JSX } from 'solid-js';
 import { createDraggable } from '@thisbeyond/solid-dnd';
 import type {
   BuiltInItem,
@@ -13,8 +14,9 @@ import type {
   MasterItemWithCategory,
   SelectedBuiltInItem,
 } from '../../lib/types';
-import { builtInItems, getItemsByTripTypes } from '../../lib/built-in-items';
+import { builtInItems, getItemsByTripTypes, type StarterModifier } from '../../lib/built-in-items';
 import type { SourceItemDragData } from './AddModeView';
+import { StarterPicker } from './StarterListPanel';
 import { TrashIcon, PlusIcon } from '../ui/Icons';
 
 interface AddModeLeftPanelProps {
@@ -23,13 +25,13 @@ interface AddModeLeftPanelProps {
   items: Accessor<TripItem[] | undefined>;
   masterItems: Accessor<MasterItemWithCategory[] | undefined>;
   onRemoveFromTrip: (tripItemId: string) => void;
-  onAddNewItem: () => void;
+  /** Open the new-item form, optionally with a name filled in. */
+  onAddNewItem: (name?: string) => void;
   isDragging: Accessor<boolean>;
-  // Click-to-add needs a selected bag or container
-  hasTarget: Accessor<boolean>;
   onAdd: (item: SelectedBuiltInItem) => void;
   // Bulk-add a category of suggestions (items not yet in the trip)
   onAddAll: (items: SelectedBuiltInItem[]) => void;
+  onAddStarter: (tripTypeId: string, modifiers: StarterModifier[]) => Promise<number>;
 }
 
 const fromMasterItem = (item: MasterItemWithCategory): SelectedBuiltInItem => ({
@@ -60,9 +62,7 @@ interface DraggableItemProps {
   tripItemId?: string; // ID of the trip item (for removal)
   dragData: SourceItemDragData;
   onRemove: (tripItemId: string) => void;
-  // For click-to-add
-  canClickToAdd: boolean;
-  onClickAdd: () => void;
+  onAdd: () => void;
 }
 
 function DraggableSourceItem(props: DraggableItemProps) {
@@ -71,90 +71,104 @@ function DraggableSourceItem(props: DraggableItemProps) {
   return (
     <div
       ref={draggable.ref}
-      class="flex items-center gap-1 rounded-md px-0 py-1.5 transition-colors md:gap-2 md:px-3 md:py-2"
+      class="flex min-h-11 items-center gap-2 rounded-md pl-2 transition-colors md:pl-1"
       classList={{
-        'opacity-50': props.isInTrip,
-        'hover:bg-gray-50': !props.isInTrip,
+        'cursor-pointer hover:bg-gray-50': !props.isInTrip,
         'bg-blue-50': draggable.isActiveDraggable,
       }}
+      onClick={() => !props.isInTrip && props.onAdd()}
     >
-      {/* Drag handle or remove button */}
+      {/* Drag handle (desktop: phones show items and bags on separate panes) */}
+      <div
+        class="hidden cursor-grab flex-col gap-0.5 p-1 text-gray-400 md:flex"
+        classList={{ invisible: props.isInTrip }}
+        style={{ 'touch-action': 'none' }}
+        aria-hidden="true"
+        {...draggable.dragActivators}
+      >
+        <For each={[0, 1, 2]}>
+          {() => (
+            <div class="flex gap-0.5">
+              <span class="h-1 w-1 rounded-full bg-current" />
+              <span class="h-1 w-1 rounded-full bg-current" />
+            </div>
+          )}
+        </For>
+      </div>
+
+      <div class="min-w-0 flex-1" classList={{ 'opacity-50': props.isInTrip }}>
+        <div class="flex items-center gap-2">
+          <Show when={props.isContainer}>
+            <span class="text-xs" title="Container">
+              📦
+            </span>
+          </Show>
+          <span class="truncate font-medium text-gray-900">{props.name}</span>
+          <Show when={(props.quantity ?? 1) > 1}>
+            <span class="text-xs text-gray-500">×{props.quantity}</span>
+          </Show>
+        </div>
+        <Show when={props.description}>
+          <p class="truncate text-xs text-gray-500">{props.description}</p>
+        </Show>
+      </div>
+
       <Show
-        when={!props.isInTrip}
+        when={props.isInTrip}
         fallback={
-          props.tripItemId ? (
+          <button
+            type="button"
+            class="flex flex-shrink-0 items-center justify-center"
+            onClick={(e) => {
+              e.stopPropagation();
+              props.onAdd();
+            }}
+            aria-label={`Add ${props.name}`}
+          >
+            <span class="flex h-7 w-7 items-center justify-center rounded-full bg-green-500 text-white">
+              <PlusIcon class="h-4 w-4" />
+            </span>
+          </button>
+        }
+      >
+        <span class="flex-shrink-0 text-xs text-gray-500">
+          {props.isPacked ? '✓ Packed' : '✓ Added'}
+        </span>
+        <Show when={props.tripItemId}>
+          {(tripItemId) => (
             <button
               type="button"
-              class="btn-compact flex h-5 w-7 cursor-pointer items-center justify-center rounded text-gray-400 hover:bg-red-100 hover:text-red-600"
-              onClick={() => props.onRemove(props.tripItemId!)}
+              class="flex flex-shrink-0 items-center justify-center text-gray-400 hover:text-red-600"
+              onClick={() => props.onRemove(tripItemId())}
+              aria-label={`Remove ${props.name} from trip`}
               title="Remove from trip"
             >
               <TrashIcon class="h-4 w-4" />
             </button>
-          ) : (
-            <div class="h-6 w-6" /> // Spacer when no remove handler
-          )
-        }
-      >
-        {/* Drag handle - only this area triggers drag on touch */}
-        <div
-          class="flex cursor-grab flex-col gap-0.5 p-1 pl-2 text-gray-400"
-          style={{ 'touch-action': 'none' }}
-          {...draggable.dragActivators}
-        >
-          <div class="flex gap-0.5">
-            <span class="h-1 w-1 rounded-full bg-current" />
-            <span class="h-1 w-1 rounded-full bg-current" />
-          </div>
-          <div class="flex gap-0.5">
-            <span class="h-1 w-1 rounded-full bg-current" />
-            <span class="h-1 w-1 rounded-full bg-current" />
-          </div>
-          <div class="flex gap-0.5">
-            <span class="h-1 w-1 rounded-full bg-current" />
-            <span class="h-1 w-1 rounded-full bg-current" />
-          </div>
-        </div>
+          )}
+        </Show>
       </Show>
+    </div>
+  );
+}
 
-      {/* Item info */}
-      <div class="min-w-0 flex-1">
-        <div class="flex items-center gap-2">
-          {props.isContainer && (
-            <span class="text-xs" title="Container">
-              📦
-            </span>
-          )}
-          <span class="truncate font-medium text-gray-900">{props.name}</span>
-          {props.quantity && props.quantity > 1 && (
-            <span class="text-xs text-gray-500">x{props.quantity}</span>
-          )}
-        </div>
-        {props.description && <p class="truncate text-xs text-gray-500">{props.description}</p>}
-      </div>
-
-      {/* Status indicator */}
-      {props.isInTrip && (
-        <span
-          class={`flex-shrink-0 ${props.isPacked ? 'text-green-600' : 'text-gray-400'}`}
-          title={props.isPacked ? 'Packed' : 'Added'}
-        >
-          {props.isPacked ? '✓' : '☐'}
-        </span>
-      )}
-
-      {/* Click-to-add button - shown when bag is selected and item not in trip */}
-      <Show when={props.canClickToAdd && !props.isInTrip}>
+/** Empty list: offer to add what was searched for, or explain why it's empty. */
+function NoMatches(props: {
+  query: string;
+  onAddNamed: (name: string) => void;
+  empty: JSX.Element;
+}) {
+  return (
+    <div class="px-2 py-8 text-center text-gray-500">
+      <Show when={props.query} fallback={props.empty}>
+        <p>Nothing matches “{props.query}”</p>
         <button
           type="button"
-          class="ml-1 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-green-500 text-white hover:bg-green-600 md:h-6 md:w-6"
-          onClick={(e) => {
-            e.stopPropagation();
-            props.onClickAdd();
-          }}
-          title="Add to selected bag"
+          onClick={() => props.onAddNamed(props.query)}
+          class="mt-2 inline-flex items-center gap-1 rounded-md px-3 font-medium text-blue-700 hover:bg-blue-50"
         >
           <PlusIcon class="h-4 w-4" />
+          Add “{props.query}”
         </button>
       </Show>
     </div>
@@ -163,6 +177,7 @@ function DraggableSourceItem(props: DraggableItemProps) {
 
 export function AddModeLeftPanel(props: AddModeLeftPanelProps) {
   const [searchQuery, setSearchQuery] = createSignal('');
+  const [showStarters, setShowStarters] = createSignal(false);
   const [selectedTripTypes, setSelectedTripTypes] = createSignal<Set<string>>(new Set());
   // Track manually expanded categories (all categories start collapsed), persisted in localStorage
   const STORAGE_KEY = 'packzen-addmode-expanded-categories';
@@ -329,28 +344,30 @@ export function AddModeLeftPanel(props: AddModeLeftPanelProps) {
       <div class="flex gap-1.5 border-b border-gray-200 p-2 md:gap-2 md:p-3">
         <input
           type="text"
-          placeholder="Search..."
+          placeholder="Search items…"
+          aria-label="Search items"
           value={searchQuery()}
           onInput={(e) => setSearchQuery(e.currentTarget.value)}
           class="flex-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none md:px-3 md:py-2"
         />
         <button
           type="button"
-          onClick={props.onAddNewItem}
-          class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-blue-600 text-white hover:bg-blue-700 md:h-9 md:w-9"
-          title="Add new item"
+          onClick={() => props.onAddNewItem()}
+          class="flex flex-shrink-0 items-center justify-center gap-1 rounded-md bg-blue-600 px-3 text-sm font-medium text-white hover:bg-blue-700"
+          title="Add an item that isn't listed"
         >
-          <PlusIcon class="h-4 w-4 md:h-5 md:w-5" />
+          <PlusIcon class="h-4 w-4" />
+          New
         </button>
       </div>
 
       {/* Trip Type Filters (built-in tab only) */}
       <Show when={props.activeTab() === 'built-in'}>
-        <div class="flex flex-wrap gap-1 border-b border-gray-200 p-2 md:p-3">
+        <div class="flex gap-1 overflow-x-auto border-b border-gray-200 p-2 md:flex-wrap md:p-3">
           <For each={builtInItems.trip_types}>
             {(type) => (
               <button
-                class="rounded-full px-2 py-1 text-xs transition-colors"
+                class="btn-compact flex-shrink-0 rounded-full px-3 py-1.5 text-xs whitespace-nowrap transition-colors"
                 classList={{
                   'bg-blue-100 text-blue-700': selectedTripTypes().has(type.id),
                   'bg-gray-100 text-gray-600 hover:bg-gray-200': !selectedTripTypes().has(type.id),
@@ -376,10 +393,26 @@ export function AddModeLeftPanel(props: AddModeLeftPanelProps) {
           <Show
             when={groupedMasterItems().length > 0}
             fallback={
-              <div class="py-8 text-center text-gray-500">
-                <p>No items in My Items list</p>
-                <p class="mt-1 text-sm">Add items on the My Items page first</p>
-              </div>
+              <NoMatches
+                query={searchQuery().trim()}
+                onAddNamed={props.onAddNewItem}
+                empty={
+                  <>
+                    <p>No saved items yet</p>
+                    <p class="mt-1 text-sm">
+                      Items you add are saved here for next time. Try{' '}
+                      <button
+                        type="button"
+                        class="btn-compact text-blue-600 underline"
+                        onClick={() => props.onTabChange('built-in')}
+                      >
+                        Suggestions
+                      </button>
+                      , or tap New.
+                    </p>
+                  </>
+                }
+              />
             }
           >
             <For each={groupedMasterItems()}>
@@ -417,8 +450,7 @@ export function AddModeLeftPanel(props: AddModeLeftPanelProps) {
                               tripItemId={tripItem()?.id}
                               onRemove={props.onRemoveFromTrip}
                               dragData={{ type: 'source-item', item: source }}
-                              canClickToAdd={props.hasTarget()}
-                              onClickAdd={() => props.onAdd(source)}
+                              onAdd={() => props.onAdd(source)}
                             />
                           );
                         }}
@@ -432,13 +464,35 @@ export function AddModeLeftPanel(props: AddModeLeftPanelProps) {
         </Show>
 
         <Show when={props.activeTab() === 'built-in'}>
+          <Show when={!searchQuery().trim()}>
+            <div class="mb-2 rounded-lg border border-blue-100 bg-blue-50/50">
+              <button
+                type="button"
+                class="flex w-full items-center gap-2 rounded-md px-2 text-left text-sm font-semibold text-gray-700"
+                aria-expanded={showStarters()}
+                onClick={() => setShowStarters(!showStarters())}
+              >
+                <span class="transition-transform" classList={{ 'rotate-90': showStarters() }}>
+                  ▶
+                </span>
+                Starter lists
+                <span class="text-xs font-normal text-gray-500">a whole set in one tap</span>
+              </button>
+              <Show when={showStarters()}>
+                <div class="px-2 pb-3">
+                  <StarterPicker onPick={props.onAddStarter} compact />
+                </div>
+              </Show>
+            </div>
+          </Show>
           <Show
             when={filteredBuiltInItems().length > 0}
             fallback={
-              <div class="py-8 text-center text-gray-500">
-                <p>No matching items found</p>
-                <p class="mt-1 text-sm">Try adjusting your search or filters</p>
-              </div>
+              <NoMatches
+                query={searchQuery().trim()}
+                onAddNamed={props.onAddNewItem}
+                empty={<p>No suggestions match those trip types</p>}
+              />
             }
           >
             <For each={filteredBuiltInItems()}>
@@ -490,8 +544,7 @@ export function AddModeLeftPanel(props: AddModeLeftPanelProps) {
                                 tripItemId={tripItem()?.id}
                                 onRemove={props.onRemoveFromTrip}
                                 dragData={{ type: 'source-item', item: source }}
-                                canClickToAdd={props.hasTarget()}
-                                onClickAdd={() => props.onAdd(source)}
+                                onAdd={() => props.onAdd(source)}
                               />
                             );
                           }}

@@ -1,6 +1,6 @@
 import { For, Show, type JSX } from 'solid-js';
 import { BAG_TYPES, type Bag } from '../../lib/types';
-import { BAG_COLORS, getBagColorSwatchClass } from '../../lib/color-utils';
+import { BAG_COLORS, getBagColorClass, getBagColorStyle } from '../../lib/color-utils';
 import { Input } from '../ui/Input';
 
 export interface BagFieldValues {
@@ -66,6 +66,17 @@ export function BagFields(props: {
   );
 }
 
+/** A bag's color dot; named colors and #hex both work. Size it with `class`. */
+export function BagSwatch(props: { color: string | null; class?: string }) {
+  return (
+    <span
+      class={`inline-block flex-shrink-0 rounded-full border border-gray-300 ${getBagColorClass(props.color) ?? ''} ${props.class ?? 'h-4 w-4'}`}
+      style={getBagColorStyle(props.color)}
+      aria-hidden="true"
+    />
+  );
+}
+
 /**
  * A bag's color swatch, name and type, for use inside a card or button. The
  * type line is left out when it would only repeat the name (e.g. "Carry-on").
@@ -82,9 +93,7 @@ export function BagChip(props: {
 
   return (
     <>
-      <div
-        class={`h-4 w-4 flex-shrink-0 rounded-full border border-gray-300 ${getBagColorSwatchClass(props.bag.color)}`}
-      />
+      <BagSwatch color={props.bag.color} />
       <div class="min-w-0 flex-1">
         <p class="truncate text-sm font-medium text-gray-900">{props.bag.name}</p>
         <Show when={typeLabel() || props.note}>

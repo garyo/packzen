@@ -29,13 +29,12 @@ export interface PackingListProps {
   selectedItems: Accessor<Set<string>>;
   showUnpackedOnly: Accessor<boolean>;
   onTogglePacked: (item: TripItem) => void;
-  onToggleSkipped: (item: TripItem) => void;
   onEditItem: (item: TripItem) => void;
+  /** Open the item's action sheet (move, skip, edit, delete). */
+  onOpenItemActions: (item: TripItem) => void;
   onToggleItemSelection: (itemId: string) => void;
   onMoveItemToBag: (itemId: string, bagId: string | null) => void;
   onMoveItemToContainer: (itemId: string, containerId: string) => void;
-  /** Opens the move sheet; omitted when there's nowhere to move to. */
-  onRequestMoveItem?: (item: TripItem) => void;
 }
 
 // Virtual bag for items not in any bag. Module-level so it keeps a stable
@@ -223,9 +222,7 @@ export function createCardRenderer(
               : undefined
           }
           onTogglePacked={() => props.onTogglePacked(item)}
-          onToggleSkipped={() => props.onToggleSkipped(item)}
-          onEdit={() => props.onEditItem(item)}
-          onMoveToBag={props.onRequestMoveItem && (() => props.onRequestMoveItem!(item))}
+          onOpenActions={() => props.onOpenItemActions(item)}
           onToggleSelection={() => props.onToggleItemSelection(item.id)}
           dragActivators={drag.activators}
           isDragging={drag.isDragging}

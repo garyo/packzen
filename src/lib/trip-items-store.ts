@@ -253,6 +253,17 @@ export function createTripItemsStore(tripId: string) {
     });
   }
 
+  /** Quietly set different fields on each item (no toast or Undo); failures roll back. */
+  async function patchEach(patches: Map<string, ItemPatch>) {
+    const known = [...patches].filter(([id]) => find(id));
+    if (known.length === 0) return;
+    const before = known.map(([id, patch]): [string, ItemPatch] => [
+      id,
+      pick(find(id)!, Object.keys(patch) as (keyof TripItem)[]),
+    ]);
+    await writePatches(new Map(known), new Map(before));
+  }
+
   /** POST rows in one batch; the server skips names already on the trip. Null on failure. */
   function addItems(rows: NewItemRow[]): Promise<TripItem[] | null> {
     if (rows.length === 0) return Promise.resolve([]);
@@ -377,6 +388,7 @@ export function createTripItemsStore(tripId: string) {
     /** Reflect writes another component already made on the server. */
     local: { update, upsert, remove },
     patchItems,
+    patchEach,
     deleteItems,
     addItems,
   };

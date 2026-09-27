@@ -307,8 +307,16 @@ async function createItems(
 export const PATCH: APIRoute = createPatchHandler(
   async ({ db, userId, validatedData, params }) => {
     const trip = await requireOwnedTrip(db, userId, params.tripId);
-    const { id, bag_id, container_item_id, is_container, is_packed, is_skipped, ...fields } =
-      validatedData;
+    const {
+      id,
+      bag_id,
+      container_item_id,
+      master_item_id,
+      is_container,
+      is_packed,
+      is_skipped,
+      ...fields
+    } = validatedData;
 
     const item = await db
       .select()
@@ -324,6 +332,15 @@ export const PATCH: APIRoute = createPatchHandler(
         .where(and(eq(bags.id, bag_id), eq(bags.trip_id, trip.id)))
         .get();
       if (!bag) throw new BadRequestError('Bag not found or does not belong to this trip');
+    }
+
+    if (master_item_id) {
+      const owned = await db
+        .select({ id: masterItems.id })
+        .from(masterItems)
+        .where(and(eq(masterItems.id, master_item_id), eq(masterItems.clerk_user_id, userId)))
+        .get();
+      if (!owned) throw new BadRequestError('Master item not found or does not belong to you');
     }
 
     if (container_item_id) {
@@ -383,6 +400,7 @@ export const PATCH: APIRoute = createPatchHandler(
         ...packState,
         bag_id,
         container_item_id,
+        master_item_id,
         is_container,
         updated_at: new Date(),
       })

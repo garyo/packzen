@@ -7,8 +7,17 @@ import yaml from 'js-yaml';
 import builtInDataRaw from '../data/built-in-items.yaml?raw';
 import type { BuiltInItemsData, BuiltInItem } from './types';
 
+export type TripType = BuiltInItemsData['trip_types'][number] & {
+  /** Default name for a trip started from this type. */
+  trip_name: string;
+  /** Words in a trip's name that suggest this type. */
+  keywords: string[];
+};
+
 // Load and parse the YAML data
-export const builtInItems: BuiltInItemsData = yaml.load(builtInDataRaw) as BuiltInItemsData;
+export const builtInItems = yaml.load(builtInDataRaw) as Omit<BuiltInItemsData, 'trip_types'> & {
+  trip_types: TripType[];
+};
 
 // Categories excluded from generic starter lists: situational for a subset of
 // travelers, with no dedicated family trip type. Still browsable in the Built-in browser.
@@ -55,6 +64,26 @@ export function getStarterItems(
       item.essential_modifiers!.some((m) => modifiers.includes(m as StarterModifier));
     return tripOk && modOk;
   });
+}
+
+/** International is offered as a starter option, not a trip type of its own. */
+export const STARTER_TRIP_TYPES = builtInItems.trip_types.filter((t) => t.id !== 'international');
+
+const mentions = (type: TripType | undefined, word: string) =>
+  !!type?.keywords.some((keyword) => word === keyword || word === `${keyword}s`);
+
+/**
+ * What a trip's name suggests for its starter list: the trip type whose
+ * keyword appears first in the name (whole words; a trailing "s" is fine),
+ * and whether it sounds international.
+ */
+export function suggestStarter(tripName: string): { tripTypeId?: string; international: boolean } {
+  const words = tripName.toLowerCase().match(/[a-z]+/g) ?? [];
+  const internationalType = builtInItems.trip_types.find((t) => t.id === 'international');
+  const tripTypeId = words
+    .map((word) => STARTER_TRIP_TYPES.find((type) => mentions(type, word)))
+    .find(Boolean)?.id;
+  return { tripTypeId, international: words.some((word) => mentions(internationalType, word)) };
 }
 
 /** Items suited to any of the given trip types (none given = all items). */

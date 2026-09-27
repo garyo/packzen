@@ -1,12 +1,13 @@
 /**
  * AddModeView Component
  *
- * Two-panel view for adding items to trip bags via drag-and-drop.
- * Left panel: Item sources (My Saved Items, Built-in templates)
- * Right panel: Compact bag cards as drop targets
+ * Add mode: item sources (My Items, Suggestions) beside the trip's bags.
+ * Tapping an item adds it to the current target — the first bag until you
+ * pick another. On desktop items can also be dragged onto a bag. Phones show
+ * one pane at a time: items, or the bags to choose a target from.
  */
 
-import { createSignal, createEffect, createMemo, onCleanup, Show, type Accessor } from 'solid-js';
+import { createEffect, createSignal, createMemo, onCleanup, Show, type Accessor } from 'solid-js';
 import {
   DragDropProvider,
   DragDropSensors,
@@ -14,9 +15,13 @@ import {
   type DragEvent,
 } from '@thisbeyond/solid-dnd';
 import type { TripItem, Bag, MasterItemWithCategory, SelectedBuiltInItem } from '../../lib/types';
+import type { AddOptions } from '../../lib/trip-item-adder';
+import type { StarterModifier } from '../../lib/built-in-items';
 import { NO_BAG_LABEL } from '../../lib/vocabulary';
+import { byName } from '../../lib/item-placement';
 import { AddModeLeftPanel } from './AddModeLeftPanel';
 import { AddModeBagCards } from './AddModeBagCards';
+import { BagSwatch } from './BagFields';
 import {
   liveRectCollision,
   usePanelAutoScroll,
@@ -32,10 +37,17 @@ interface AddModeViewProps {
   onAddItems: (
     items: SelectedBuiltInItem[],
     bagId: string | null,
-    containerId: string | null
+    containerId: string | null,
+    options?: AddOptions
   ) => Promise<void>;
+  onAddStarter: (
+    tripTypeId: string,
+    modifiers: StarterModifier[],
+    bagId: string | null
+  ) => Promise<number>;
   onRemoveFromTrip: (tripItemId: string) => void;
-  onAddNewItem: () => void;
+  /** Open the new-item form aimed at the current target, optionally with a name filled in. */
+  onAddNewItem: (target: SelectedTarget, name?: string) => void;
   onManageBags: () => void;
   onReplaceBag: (bag: Bag) => void;
 }
@@ -52,7 +64,7 @@ export interface AddModeBagDropData {
   containerId?: string;
 }
 
-// Selected target for click-to-add
+/** Where tapped items go: a bag (null = not in a bag) or a container. */
 export interface SelectedTarget {
   bagId: string | null;
   containerId: string | null;
@@ -60,53 +72,45 @@ export interface SelectedTarget {
 
 export function AddModeView(props: AddModeViewProps) {
   const [activeTab, setActiveTab] = createSignal<'my-items' | 'built-in'>('my-items');
-
-  // Auto-select Built-in tab if the user has no saved items
-  let hasSetInitialTab = false;
+  // Start on Suggestions when there are no saved items yet.
+  let initialTabSet = false;
   createEffect(() => {
-    const items = props.masterItems();
-    if (!hasSetInitialTab && items !== undefined) {
-      hasSetInitialTab = true;
-      if (items.length === 0) {
-        setActiveTab('built-in');
-      }
-    }
+    const masterItems = props.masterItems();
+    if (initialTabSet || masterItems === undefined) return;
+    initialTabSet = true;
+    if (masterItems.length === 0) setActiveTab('built-in');
   });
 
   const [draggedItem, setDraggedItem] = createSignal<SourceItemDragData | null>(null);
   const [dragCancelled, setDragCancelled] = createSignal(false);
-  // Selected target for click-to-add (undefined means no selection)
-  const [chosenTarget, setChosenTarget] = createSignal<SelectedTarget | undefined>(undefined);
-  // A target deleted since it was chosen (here or on another device) no longer counts.
-  const selectedTarget = createMemo(() => {
+  const [chosenTarget, setChosenTarget] = createSignal<SelectedTarget>();
+  // The chosen target while it exists (it may be deleted, here or on another
+  // device); otherwise the first bag, as the bags pane lists them.
+  const selectedTarget = createMemo((): SelectedTarget => {
     const target = chosenTarget();
-    if (!target) return undefined;
-    const exists = target.containerId
-      ? props.items()?.some((item) => item.id === target.containerId)
-      : target.bagId === null || props.bags()?.some((bag) => bag.id === target.bagId);
-    return exists ? target : undefined;
+    const exists =
+      target &&
+      (target.containerId
+        ? props.items()?.some((item) => item.id === target.containerId)
+        : target.bagId === null || props.bags()?.some((bag) => bag.id === target.bagId));
+    if (exists) return target;
+    const firstBag = [...(props.bags() ?? [])].sort(byName)[0];
+    return { bagId: firstBag?.id ?? null, containerId: null };
   });
-  // Which pane is visible on mobile (<md). At md+ both panes show side-by-side.
-  const [mobilePane, setMobilePane] = createSignal<'items' | 'bags'>('bags');
+  // Which pane phones show (<md). At md+ both panes show side-by-side.
+  const [mobilePane, setMobilePane] = createSignal<'items' | 'bags'>('items');
   let rightPanelRef: HTMLDivElement | undefined;
 
-  // Choose a target and, on mobile, jump to the Items pane so the user can tap "+".
-  const handleSelectTarget = (target: SelectedTarget | undefined) => {
+  const handleSelectTarget = (target: SelectedTarget) => {
     setChosenTarget(target);
-    if (target) setMobilePane('items');
+    setMobilePane('items');
   };
 
-  // Human-readable name of the current target for the mobile "Adding to:" bar.
-  const selectedTargetName = createMemo(() => {
-    const target = selectedTarget();
-    if (!target) return undefined;
-    if (target.containerId) {
-      const container = props.items()?.find((i) => i.id === target.containerId);
-      return container?.name ?? 'Container';
-    }
-    if (target.bagId === null) return NO_BAG_LABEL;
-    return props.bags()?.find((b) => b.id === target.bagId)?.name ?? 'Bag';
-  });
+  const targetContainer = () => {
+    const id = selectedTarget().containerId;
+    return id ? props.items()?.find((item) => item.id === id) : undefined;
+  };
+  const targetBag = () => props.bags()?.find((bag) => bag.id === selectedTarget().bagId);
 
   const autoScroll = usePanelAutoScroll(() => rightPanelRef);
 
@@ -139,23 +143,16 @@ export function AddModeView(props: AddModeViewProps) {
     stopPointerTracking();
     autoScroll.stop();
 
-    // User pressed ESC to cancel
-    if (wasCancelled) return;
-
-    // No valid drop target - cancel (includes dropping on left panel)
-    if (!droppable) return;
+    if (wasCancelled || !droppable) return;
 
     const dragData = draggable.data as SourceItemDragData;
     const dropData = droppable.data as AddModeBagDropData;
-
-    // Only process source items dropped on bag/container targets
     if (dragData?.type !== 'source-item') return;
     if (dropData?.type !== 'add-mode-bag' && dropData?.type !== 'add-mode-container') return;
 
     const bagId = dropData.type === 'add-mode-bag' ? dropData.bagId : null;
     const containerId =
       dropData.type === 'add-mode-container' ? (dropData.containerId ?? null) : null;
-
     await props.onAddItems([dragData.item], bagId, containerId);
   };
 
@@ -166,11 +163,12 @@ export function AddModeView(props: AddModeViewProps) {
     autoScroll.stop();
   };
 
-  // Add to the selected target; "Add all" works without one (not in a bag).
-  const addToTarget = (items: SelectedBuiltInItem[]) => {
-    const target = selectedTarget();
-    return props.onAddItems(items, target?.bagId ?? null, target?.containerId ?? null);
-  };
+  const addToTarget = (items: SelectedBuiltInItem[], options?: AddOptions) =>
+    props.onAddItems(items, selectedTarget().bagId, selectedTarget().containerId, options);
+
+  // Starter lists go in a bag; a container target means its bag.
+  const addStarterToTarget = (tripTypeId: string, modifiers: StarterModifier[]) =>
+    props.onAddStarter(tripTypeId, modifiers, targetContainer()?.bag_id ?? selectedTarget().bagId);
 
   return (
     <DragDropProvider
@@ -181,48 +179,46 @@ export function AddModeView(props: AddModeViewProps) {
       <DragDropSensors />
       <EscapeCancelHandler onCancel={handleCancel} />
 
-      <div class="flex h-[calc(100vh-8rem)] flex-col">
-        {/* Mobile-only controls: pane toggle + "Adding to:" target bar (hidden at md+) */}
-        <div class="flex flex-col gap-2 px-2 pt-2 md:hidden">
-          <div class="flex rounded-lg bg-gray-100 p-0.5">
-            <button
-              type="button"
-              class="flex-1 rounded-md py-1.5 text-sm font-medium transition-colors"
-              classList={{
-                'bg-white text-blue-600 shadow-sm': mobilePane() === 'items',
-                'text-gray-600': mobilePane() !== 'items',
-              }}
-              onClick={() => setMobilePane('items')}
-            >
-              Items
-            </button>
-            <button
-              type="button"
-              class="flex-1 rounded-md py-1.5 text-sm font-medium transition-colors"
-              classList={{
-                'bg-white text-blue-600 shadow-sm': mobilePane() === 'bags',
-                'text-gray-600': mobilePane() !== 'bags',
-              }}
-              onClick={() => setMobilePane('bags')}
-            >
-              Bags
-            </button>
-          </div>
-          <button
-            type="button"
-            onClick={() => setMobilePane('bags')}
-            class="flex items-center justify-between gap-2 rounded-md border border-gray-200 bg-white px-3 py-2 text-left text-sm shadow-sm"
+      <div class="flex h-full flex-col">
+        {/* Phones: where tapped items go, and the way to change it */}
+        <div class="px-2 pt-2 md:hidden">
+          <Show
+            when={mobilePane() === 'items'}
+            fallback={
+              <div class="flex items-center justify-between gap-2 px-1">
+                <span class="text-sm text-gray-600">Tap a bag to add items to it</span>
+                <button
+                  type="button"
+                  onClick={() => setMobilePane('items')}
+                  class="rounded-md px-3 text-sm font-medium text-blue-600"
+                >
+                  Back to items
+                </button>
+              </div>
+            }
           >
-            <Show
-              when={selectedTargetName()}
-              fallback={<span class="text-gray-500">Tap a bag to choose where items go</span>}
+            <button
+              type="button"
+              onClick={() => setMobilePane('bags')}
+              class="flex w-full items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 text-left text-sm shadow-sm"
             >
-              <span class="min-w-0 flex-1 truncate text-gray-700">
-                Adding to: <span class="font-semibold text-gray-900">{selectedTargetName()}</span>
+              <span class="text-gray-600">Adding to</span>
+              <Show
+                when={targetContainer()}
+                fallback={
+                  <Show when={targetBag()} fallback={<span>👕</span>}>
+                    {(bag) => <BagSwatch color={bag().color} class="h-3 w-3" />}
+                  </Show>
+                }
+              >
+                <span>📦</span>
+              </Show>
+              <span class="min-w-0 flex-1 truncate font-semibold text-gray-900">
+                {targetContainer()?.name ?? targetBag()?.name ?? NO_BAG_LABEL}
               </span>
-            </Show>
-            <span class="flex-shrink-0 text-xs font-medium text-blue-600">Change</span>
-          </button>
+              <span class="flex-shrink-0 font-medium text-blue-600">Change</span>
+            </button>
+          </Show>
         </div>
 
         <div class="flex min-h-0 flex-1 gap-2 p-2 md:gap-4 md:p-4">
@@ -240,22 +236,22 @@ export function AddModeView(props: AddModeViewProps) {
               items={props.items}
               masterItems={props.masterItems}
               onRemoveFromTrip={props.onRemoveFromTrip}
-              onAddNewItem={props.onAddNewItem}
+              onAddNewItem={(name) => props.onAddNewItem(selectedTarget(), name)}
               isDragging={() => draggedItem() !== null}
-              hasTarget={() => selectedTarget() !== undefined}
-              onAdd={(item) => addToTarget([item])}
+              onAdd={(item) => addToTarget([item], { quiet: true })}
               onAddAll={addToTarget}
+              onAddStarter={addStarterToTarget}
             />
           </div>
 
           {/* Right Panel - Bag Cards */}
           <div
-            class="relative w-full md:block md:w-1/2"
+            class="w-full md:block md:w-1/2"
             classList={{ 'hidden md:block': mobilePane() !== 'bags' }}
           >
             <div
               ref={rightPanelRef}
-              class="h-full overflow-y-auto rounded-lg border border-gray-200 bg-white p-1 shadow-sm md:p-4"
+              class="h-full overflow-y-auto rounded-lg border border-gray-200 bg-white p-2 shadow-sm md:p-4"
             >
               <AddModeBagCards
                 items={props.items}
@@ -264,28 +260,14 @@ export function AddModeView(props: AddModeViewProps) {
                 selectedTarget={selectedTarget}
                 onSelectTarget={handleSelectTarget}
               />
-            </div>
-            {/* Manage Bags FAB */}
-            <button
-              type="button"
-              onClick={props.onManageBags}
-              class="absolute right-2 bottom-2 flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg hover:bg-blue-700 md:right-3 md:bottom-3 md:h-12 md:w-12"
-              title="Manage bags"
-            >
-              <svg
-                class="h-5 w-5 md:h-6 md:w-6"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
+              <button
+                type="button"
+                onClick={props.onManageBags}
+                class="mt-3 w-full rounded-lg border border-dashed border-gray-300 text-sm font-medium text-gray-600 hover:border-blue-400 hover:text-blue-700"
               >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M12 4v16m8-8H4"
-                />
-              </svg>
-            </button>
+                Add or edit bags…
+              </button>
+            </div>
           </div>
         </div>
       </div>

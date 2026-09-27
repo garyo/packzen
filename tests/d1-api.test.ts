@@ -1456,3 +1456,43 @@ test('Plan limits consult the billing override only when the session plan falls 
   });
   assert.equal(await planLimit(unreachable, 'maxTrips', free + 1), free);
 });
+
+test('PATCH links a trip item to one of your own My Items only', async () => {
+  const d1 = await createTestDatabase();
+  const db = drizzle(d1);
+  const userId = 'link_master_user';
+
+  const trip = await db
+    .insert(trips)
+    .values({ clerk_user_id: userId, name: 'Link Trip' })
+    .returning()
+    .get();
+  const item = await db
+    .insert(tripItems)
+    .values({ trip_id: trip.id, name: 'Sunglasses' })
+    .returning()
+    .get();
+  const mine = await db
+    .insert(masterItems)
+    .values({ clerk_user_id: userId, name: 'Sunglasses' })
+    .returning()
+    .get();
+  const theirs = await db
+    .insert(masterItems)
+    .values({ clerk_user_id: 'someone_else', name: 'Sunglasses' })
+    .returning()
+    .get();
+
+  const link = (master_item_id: string) =>
+    callApi(tripItemsApi.PATCH, d1, userId, {
+      method: 'PATCH',
+      body: { id: item.id, master_item_id },
+      params: { tripId: trip.id },
+    });
+
+  assert.equal((await link(theirs.id)).status, 400);
+  assert.equal((await link(mine.id)).status, 200);
+
+  const linked = await db.select().from(tripItems).where(eq(tripItems.id, item.id)).get();
+  assert.equal(linked?.master_item_id, mine.id);
+});
