@@ -94,11 +94,12 @@ export const POST: APIRoute = async (context) => {
     let evt: ClerkWebhookEvent;
 
     try {
-      evt = wh.verify(payload, {
+      wh.verify(payload, {
         'svix-id': svixId,
         'svix-timestamp': svixTimestamp,
         'svix-signature': svixSignature,
-      }) as ClerkWebhookEvent;
+      });
+      evt = JSON.parse(payload) as ClerkWebhookEvent;
     } catch (err) {
       console.error('Webhook signature verification failed:', err);
       return new Response('Invalid signature', { status: 400 });
