@@ -1,6 +1,6 @@
 import { createSignal, createResource, For, Show } from 'solid-js';
 import { api, endpoints } from '../../lib/api';
-import type { Bag, BagTemplate, BagType } from '../../lib/types';
+import type { Bag, BagTemplate } from '../../lib/types';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
@@ -64,7 +64,11 @@ export function BagManager(props: BagManagerProps) {
   const handleAddFromTemplate = (template: BagTemplate) =>
     runExclusive(async () => {
       await addBag(
-        { name: template.name, type: template.type as BagType, color: template.color || 'blue' },
+        {
+          name: template.name,
+          type: template.type as Bag['type'],
+          color: template.color || 'blue',
+        },
         `Added ${template.name}`
       );
     });
@@ -107,7 +111,7 @@ export function BagManager(props: BagManagerProps) {
 
   const startEdit = (bag: Bag) => {
     setEditingId(bag.id);
-    setEditData({ name: bag.name, type: bag.type as BagType, color: bag.color || 'blue' });
+    setEditData({ name: bag.name, type: bag.type as Bag['type'], color: bag.color || 'blue' });
   };
 
   const handleUpdate = (e: Event) => {

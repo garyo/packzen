@@ -1,11 +1,11 @@
 import { For, Show, type JSX } from 'solid-js';
-import { BAG_TYPES, type BagType } from '../../lib/types';
+import { BAG_TYPES, type Bag } from '../../lib/types';
 import { BAG_COLORS, getBagColorSwatchClass } from '../../lib/color-utils';
 import { Input } from '../ui/Input';
 
 export interface BagFieldValues {
   name: string;
-  type: BagType;
+  type: Bag['type'];
   color: string;
 }
 
@@ -34,7 +34,7 @@ export function BagFields(props: {
         <label class="mb-1 block text-sm font-medium text-gray-700">Bag Type</label>
         <select
           value={props.value.type}
-          onChange={(e) => update({ type: e.currentTarget.value as BagType })}
+          onChange={(e) => update({ type: e.currentTarget.value as Bag['type'] })}
           class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
         >
           <For each={BAG_TYPES}>{(type) => <option value={type.type}>{type.label}</option>}</For>

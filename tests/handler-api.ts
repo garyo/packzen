@@ -1,6 +1,6 @@
 import type { APIRoute } from 'astro';
 import { createApi, type ApiClient } from '../src/lib/api';
-import type { BillingStatus } from '../src/lib/billing';
+import { createBilling, type Billing } from '../src/lib/billing';
 import * as categories from '../src/pages/api/categories/index';
 import * as category from '../src/pages/api/categories/[id]';
 import * as masterItems from '../src/pages/api/master-items/index';
@@ -28,11 +28,7 @@ const ROUTES: Array<[RegExp, RouteModule]> = [
   [/^\/api\/trips\/(?<tripId>[^/]+)\/items$/, tripItems],
 ];
 
-const STANDARD_PLAN: BillingStatus = {
-  activePlan: 'standard',
-  hasFreeUserPlan: false,
-  hasStandardPlan: true,
-};
+const STANDARD_PLAN = createBilling('standard');
 
 /**
  * Return a rejection message to make the matching request fail with a 400
@@ -47,7 +43,7 @@ export type FailHook = (method: string, endpoint: string, body: any) => string |
 export function makeHandlerApi(
   db: Parameters<typeof buildApiContext>[0]['db'],
   userId: string,
-  options: { failWhen?: FailHook; billingStatus?: BillingStatus } = {}
+  options: { failWhen?: FailHook; billing?: Billing } = {}
 ): ApiClient {
   return createApi({
     getToken: async () => 'test-token',
@@ -65,7 +61,7 @@ export function makeHandlerApi(
             buildApiContext({
               db,
               userId,
-              billingStatus: options.billingStatus ?? STANDARD_PLAN,
+              billing: options.billing ?? STANDARD_PLAN,
               params: match.groups,
               request: new Request(`http://localhost${endpoint}`, init),
             })
