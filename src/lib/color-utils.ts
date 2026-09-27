@@ -20,7 +20,7 @@ export const BAG_COLORS = [
  * Get the Tailwind swatch class for a named bag color, for rendering a color
  * dot next to a bag/template. Falls back to gray for unrecognized values.
  */
-export function getBagColorSwatchClass(value: string | null | undefined): string {
+function getBagColorSwatchClass(value: string | null | undefined): string {
   return BAG_COLORS.find((c) => c.value === value)?.class || 'bg-gray-500';
 }
 
@@ -33,16 +33,17 @@ export function getBagColorClass(color: string | null | undefined): string | und
 }
 
 /**
- * Get inline style object for a bag color (used for hex colors)
+ * Get the inline style for a hex bag color, as a Solid style object (whose
+ * keys are CSS property names, not camelCase).
  */
 export function getBagColorStyle(
   color: string | null | undefined
-): { backgroundColor: string } | undefined {
+): { 'background-color': string } | undefined {
   if (!color) return undefined;
 
   // Only return style for hex colors
   if (color.startsWith('#')) {
-    return { backgroundColor: color };
+    return { 'background-color': color };
   }
 
   return undefined;

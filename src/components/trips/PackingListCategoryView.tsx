@@ -9,7 +9,7 @@ import { For, Show, createMemo } from 'solid-js';
 import type { TripItem } from '../../lib/types';
 import { packingStats } from '../../lib/packing-stats';
 import { byName, categoryOf, placeItems } from '../../lib/item-placement';
-import { BagSwatch } from './BagFields';
+import { BagSwatch } from '../ui/BagFields';
 import {
   AllPackedNote,
   ItemGroup,

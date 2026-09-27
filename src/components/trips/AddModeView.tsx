@@ -21,7 +21,7 @@ import { NO_BAG_LABEL } from '../../lib/vocabulary';
 import { byName } from '../../lib/item-placement';
 import { AddModeLeftPanel } from './AddModeLeftPanel';
 import { AddModeBagCards } from './AddModeBagCards';
-import { BagSwatch } from './BagFields';
+import { BagSwatch } from '../ui/BagFields';
 import {
   liveRectCollision,
   usePanelAutoScroll,

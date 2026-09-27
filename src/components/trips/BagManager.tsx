@@ -7,7 +7,7 @@ import { LoadingSpinner } from '../ui/LoadingSpinner';
 import { showToast } from '../ui/Toast';
 import { confirmDialog } from '../ui/ConfirmDialog';
 import { EditIcon, TrashIcon } from '../ui/Icons';
-import { BagChip, BagFields, DEFAULT_BAG_FIELDS, type BagFieldValues } from './BagFields';
+import { BagChip, BagFields, DEFAULT_BAG_FIELDS, type BagFieldValues } from '../ui/BagFields';
 
 interface BagManagerProps {
   tripId: string;

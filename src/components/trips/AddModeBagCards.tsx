@@ -13,7 +13,7 @@ import { NO_BAG_LABEL } from '../../lib/vocabulary';
 import { packingStats } from '../../lib/packing-stats';
 import { byName, categoryOf, groupSorted, placeItems } from '../../lib/item-placement';
 import { SwitchBagIcon } from '../ui/Icons';
-import { BagChip } from './BagFields';
+import { BagChip } from '../ui/BagFields';
 
 interface AddModeBagCardsProps {
   items: Accessor<TripItem[] | undefined>;

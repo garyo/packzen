@@ -8,7 +8,7 @@ import type { Bag, TripItem } from '../../lib/types';
 import { NO_BAG_LABEL } from '../../lib/vocabulary';
 import { Modal } from '../ui/Modal';
 import { EditIcon, SkipIcon, TrashIcon } from '../ui/Icons';
-import { BagChip } from './BagFields';
+import { BagChip } from '../ui/BagFields';
 
 interface ItemActionSheetProps {
   item: TripItem;

@@ -19,7 +19,7 @@ import type { Bag, TripItem } from '../../lib/types';
 import { NO_BAG_LABEL } from '../../lib/vocabulary';
 import { packingStats } from '../../lib/packing-stats';
 import { byName, categoryOf, groupSorted, placeItems } from '../../lib/item-placement';
-import { BagSwatch } from './BagFields';
+import { BagSwatch } from '../ui/BagFields';
 import { EditIcon, PlusIcon, SwitchBagIcon } from '../ui/Icons';
 import {
   AllPackedNote,

@@ -1,7 +1,7 @@
-import { For, Show, type JSX } from 'solid-js';
+import { createUniqueId, For, Show, type JSX } from 'solid-js';
 import { BAG_TYPES, type Bag } from '../../lib/types';
 import { BAG_COLORS, getBagColorClass, getBagColorStyle } from '../../lib/color-utils';
-import { Input } from '../ui/Input';
+import { Input } from './Input';
 
 export interface BagFieldValues {
   name: string;
@@ -13,12 +13,19 @@ export const DEFAULT_BAG_FIELDS: BagFieldValues = { name: '', type: 'carry_on', 
 
 const bagTypeLabel = (type: string) => BAG_TYPES.find((t) => t.type === type)?.label || type;
 
+const SELECTED_SWATCH = 'ring-2 ring-blue-500 ring-offset-2';
+
 /** Name, type and color inputs for creating or editing a bag. */
 export function BagFields(props: {
   value: BagFieldValues;
   onChange: (value: BagFieldValues) => void;
+  placeholder?: string;
 }) {
   const update = (patch: Partial<BagFieldValues>) => props.onChange({ ...props.value, ...patch });
+  const typeId = createUniqueId();
+  // A color from outside the palette (e.g. an imported #hex) is shown as its own choice.
+  const customColor = () =>
+    BAG_COLORS.some((c) => c.value === props.value.color) ? null : props.value.color;
 
   return (
     <div class="space-y-3">
@@ -27,12 +34,15 @@ export function BagFields(props: {
         type="text"
         value={props.value.name}
         onInput={(e) => update({ name: e.currentTarget.value })}
-        placeholder="e.g., Red Suitcase"
+        placeholder={props.placeholder ?? 'e.g., Red Suitcase'}
       />
 
       <div>
-        <label class="mb-1 block text-sm font-medium text-gray-700">Bag Type</label>
+        <label for={typeId} class="mb-1 block text-sm font-medium text-gray-700">
+          Bag Type
+        </label>
         <select
+          id={typeId}
           value={props.value.type}
           onChange={(e) => update({ type: e.currentTarget.value as Bag['type'] })}
           class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
@@ -41,18 +51,28 @@ export function BagFields(props: {
         </select>
       </div>
 
-      <div>
-        <span class="mb-1 block text-sm font-medium text-gray-700">Color</span>
+      <fieldset>
+        <legend class="mb-1 block text-sm font-medium text-gray-700">Color</legend>
         <div class="flex flex-wrap gap-2">
+          <Show when={customColor()}>
+            {(color) => (
+              <button
+                type="button"
+                class={`btn-compact h-8 w-8 rounded-full border border-gray-300 ${SELECTED_SWATCH}`}
+                style={getBagColorStyle(color())}
+                title="Current color"
+                aria-label="Current color"
+                aria-pressed="true"
+              />
+            )}
+          </Show>
           <For each={BAG_COLORS}>
             {(color) => (
               <button
                 type="button"
                 onClick={() => update({ color: color.value })}
                 class={`btn-compact h-8 w-8 rounded-full border border-gray-300 ${color.class} ${
-                  props.value.color === color.value
-                    ? 'ring-2 ring-blue-500 ring-offset-2'
-                    : 'hover:scale-110'
+                  props.value.color === color.value ? SELECTED_SWATCH : 'hover:scale-110'
                 } transition-transform`}
                 title={color.label}
                 aria-label={color.label}
@@ -61,7 +81,7 @@ export function BagFields(props: {
             )}
           </For>
         </div>
-      </div>
+      </fieldset>
     </div>
   );
 }

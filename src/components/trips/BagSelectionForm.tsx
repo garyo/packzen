@@ -3,7 +3,7 @@ import type { BagTemplate } from '../../lib/types';
 import { Button } from '../ui/Button';
 import { CheckIcon } from '../ui/Icons';
 import { showToast } from '../ui/Toast';
-import { BagChip, BagFields, DEFAULT_BAG_FIELDS, type BagFieldValues } from './BagFields';
+import { BagChip, BagFields, DEFAULT_BAG_FIELDS, type BagFieldValues } from '../ui/BagFields';
 
 export interface CustomBagData extends BagFieldValues {
   saveToMyBags: boolean;

@@ -1,41 +1,29 @@
-import { createSignal, createUniqueId, For, Show } from 'solid-js';
-import { createStore, type SetStoreFunction } from 'solid-js/store';
-import { Input } from '../ui/Input';
+import { createSignal, For, Show } from 'solid-js';
 import { Button } from '../ui/Button';
 import { showToast } from '../ui/Toast';
 import { confirmDialog } from '../ui/ConfirmDialog';
 import { EditIcon, TrashIcon } from '../ui/Icons';
 import { api, endpoints } from '../../lib/api';
 import type { BagTemplate } from '../../lib/types';
-import { BAG_TYPES } from '../../lib/types';
-import { BAG_COLORS, getBagColorSwatchClass } from '../../lib/color-utils';
+import { BagChip, BagFields, DEFAULT_BAG_FIELDS, type BagFieldValues } from '../ui/BagFields';
 
 interface BagTemplateManagerContentProps {
   templates: BagTemplate[];
   onSaved: () => void;
 }
 
-type BagType = (typeof BAG_TYPES)[number]['type'];
-
-interface BagDraft {
-  name: string;
-  type: BagType;
-  color: string;
-}
-
-const emptyDraft = (): BagDraft => ({ name: '', type: 'carry_on', color: 'blue' });
-
 export function BagTemplateManagerContent(props: BagTemplateManagerContentProps) {
-  const [newBag, setNewBag] = createStore(emptyDraft());
+  const [newBag, setNewBag] = createSignal<BagFieldValues>(DEFAULT_BAG_FIELDS);
   const [adding, setAdding] = createSignal(false);
 
   const [editingId, setEditingId] = createSignal<string | null>(null);
-  const [editBag, setEditBag] = createStore(emptyDraft());
+  const [editBag, setEditBag] = createSignal<BagFieldValues>(DEFAULT_BAG_FIELDS);
   const [updating, setUpdating] = createSignal(false);
 
   const handleAdd = async (e: Event) => {
     e.preventDefault();
-    const name = newBag.name.trim();
+    const { type, color } = newBag();
+    const name = newBag().name.trim();
     if (!name) {
       showToast('error', 'Bag name is required');
       return;
@@ -44,15 +32,15 @@ export function BagTemplateManagerContent(props: BagTemplateManagerContentProps)
     setAdding(true);
     const response = await api.post(endpoints.bagTemplates, {
       name,
-      type: newBag.type,
-      color: newBag.color,
+      type,
+      color,
       sort_order: props.templates.length,
     });
     setAdding(false);
 
     if (response.success) {
       showToast('success', 'Bag added');
-      setNewBag(emptyDraft());
+      setNewBag(DEFAULT_BAG_FIELDS);
     } else {
       showToast('error', response.error || 'Failed to add bag');
     }
@@ -84,14 +72,15 @@ export function BagTemplateManagerContent(props: BagTemplateManagerContentProps)
     setEditingId(template.id);
     setEditBag({
       name: template.name,
-      type: template.type as BagType,
-      color: template.color || 'blue',
+      type: template.type as BagFieldValues['type'],
+      color: template.color || DEFAULT_BAG_FIELDS.color,
     });
   };
 
   const handleUpdate = async (e: Event) => {
     e.preventDefault();
-    const name = editBag.name.trim();
+    const { type, color } = editBag();
+    const name = editBag().name.trim();
     if (!name) {
       showToast('error', 'Bag name is required');
       return;
@@ -100,8 +89,8 @@ export function BagTemplateManagerContent(props: BagTemplateManagerContentProps)
     setUpdating(true);
     const response = await api.patch(endpoints.bagTemplate(editingId()!), {
       name,
-      type: editBag.type,
-      color: editBag.color,
+      type,
+      color,
     });
     setUpdating(false);
 
@@ -126,8 +115,8 @@ export function BagTemplateManagerContent(props: BagTemplateManagerContentProps)
           class="space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-3"
         >
           <BagFields
-            draft={newBag}
-            setDraft={setNewBag}
+            value={newBag()}
+            onChange={setNewBag}
             placeholder="e.g., Weekend Carry-on, Red Suitcase"
           />
           <Button type="submit" size="sm" disabled={adding()}>
@@ -153,17 +142,8 @@ export function BagTemplateManagerContent(props: BagTemplateManagerContentProps)
                   when={editingId() === template.id}
                   fallback={
                     <div class="flex items-center justify-between rounded-lg border border-gray-200 p-3 hover:border-gray-300">
-                      <div class="flex min-w-0 items-center gap-3">
-                        <div
-                          class={`h-4 w-4 flex-shrink-0 rounded-full border border-gray-300 ${getBagColorSwatchClass(template.color)}`}
-                        />
-                        <div class="min-w-0">
-                          <p class="truncate font-medium text-gray-900">{template.name}</p>
-                          <p class="text-xs text-gray-500">
-                            {BAG_TYPES.find((t) => t.type === template.type)?.label ||
-                              template.type}
-                          </p>
-                        </div>
+                      <div class="flex min-w-0 flex-1 items-center gap-3">
+                        <BagChip bag={template} />
                       </div>
                       <div class="flex">
                         <button
@@ -193,8 +173,8 @@ export function BagTemplateManagerContent(props: BagTemplateManagerContentProps)
                     class="col-span-full space-y-3 rounded-lg border border-blue-300 bg-blue-50 p-3"
                   >
                     <BagFields
-                      draft={editBag}
-                      setDraft={setEditBag}
+                      value={editBag()}
+                      onChange={setEditBag}
                       placeholder="e.g., Weekend Carry-on"
                     />
                     <div class="flex gap-2">
@@ -218,64 +198,5 @@ export function BagTemplateManagerContent(props: BagTemplateManagerContentProps)
         </Show>
       </div>
     </div>
-  );
-}
-
-function BagFields(props: {
-  draft: BagDraft;
-  setDraft: SetStoreFunction<BagDraft>;
-  placeholder: string;
-}) {
-  const typeId = createUniqueId();
-  return (
-    <>
-      <div>
-        <label for={typeId} class="mb-1 block text-sm font-medium text-gray-700">
-          Bag Type
-        </label>
-        <select
-          id={typeId}
-          value={props.draft.type}
-          onChange={(e) => props.setDraft('type', e.currentTarget.value as BagType)}
-          class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
-        >
-          <For each={BAG_TYPES}>{(type) => <option value={type.type}>{type.label}</option>}</For>
-        </select>
-      </div>
-
-      <Input
-        label="Bag Name"
-        type="text"
-        value={props.draft.name}
-        onInput={(e) => props.setDraft('name', e.currentTarget.value)}
-        placeholder={props.placeholder}
-      />
-
-      <fieldset>
-        <legend class="mb-1 block text-sm font-medium text-gray-700">Color</legend>
-        <div class="flex flex-wrap gap-1">
-          <For each={BAG_COLORS}>
-            {(color) => (
-              <button
-                type="button"
-                onClick={() => props.setDraft('color', color.value)}
-                class="flex items-center justify-center rounded-full"
-                title={color.label}
-                aria-label={color.label}
-                aria-pressed={props.draft.color === color.value}
-              >
-                <span
-                  class={`h-6 w-6 rounded-full border border-gray-300 ${color.class} ${
-                    props.draft.color === color.value
-                      ? 'ring-2 ring-blue-500 ring-offset-2'
-                      : 'transition-transform hover:scale-110'
-                  }`}
-                />
-              </button>
-            )}
-          </For>
-        </div>
-      </fieldset>
-    </>
   );
 }
