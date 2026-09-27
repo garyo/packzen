@@ -181,9 +181,12 @@ Only needed if Workers Builds is unavailable, or to ship without a push:
 # Build the project
 bun run build
 
-# Deploy to Cloudflare Workers (includes static assets)
-npx wrangler deploy
+# Apply pending D1 migrations to production, then deploy the Worker (and its static assets)
+bun run deploy
 ```
+
+Never do this from a checkout whose env files hold the live Clerk secret key:
+the build inlines build-time env into the server bundle (see `DEPLOYMENT.md`).
 
 The first deployment will create a new Worker in your Cloudflare account.
 
@@ -207,7 +210,7 @@ Update `wrangler.jsonc` with your production values:
 }
 ```
 
-Then redeploy: `npx wrangler deploy`
+Then redeploy: `bun run deploy`
 
 ### 4. Apply Database Migrations to Production
 

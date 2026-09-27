@@ -5,8 +5,9 @@ interface Props {
   ogImage?: string;
   ogType?: string;
   /**
-   * Load the featherstat tracker. Only public pages opt in, so a third-party
-   * script never runs on pages that hold a signed-in session.
+   * Load the featherstat tracker. Only public pages opt in, so the third-party
+   * script never runs on the app pages that show a user's data. (A signed-in
+   * visitor to a public page still has their Clerk session there.)
    */
   analytics?: boolean;
   /** This page is a "not found" response — see the featherstat note below. */

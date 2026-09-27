@@ -74,7 +74,6 @@ export function useItemSearch(
     query,
     setQuery,
     results,
-    isSearching,
     noResults,
     hasExactMatch,
     scrollToItem: setScrollTarget,

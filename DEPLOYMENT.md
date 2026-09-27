@@ -71,6 +71,10 @@ npx wrangler secret put PUBLIC_CLERK_PUBLISHABLE_KEY
 # Set Clerk secret key (private - server-side only)
 npx wrangler secret put CLERK_SECRET_KEY
 # When prompted, paste: sk_live_...
+
+# Set the Clerk webhook signing secret (private - server-side only)
+npx wrangler secret put CLERK_WEBHOOK_SECRET
+# When prompted, paste: whsec_...
 ```
 
 ### Important Notes
@@ -79,49 +83,47 @@ npx wrangler secret put CLERK_SECRET_KEY
 - `CLERK_SECRET_KEY` is sensitive - never commit to git or expose publicly
 - Secrets are encrypted and only available at runtime
 - The Worker reads them at runtime (`env` from `cloudflare:workers`)
+- Keep `CLERK_SECRET_KEY` and `CLERK_WEBHOOK_SECRET` as **runtime secrets
+  only**, never as build variables (Workers Builds) or in a local `.env` you
+  build for production from: Astro 6+ inlines build-time env into the server
+  bundle, so a secret present at build time ends up in the deployed code
 
 ## Step 5: Deploy to Cloudflare Workers
 
-### Deploy the Worker
+### Continuous Deployment (Workers Builds)
+
+Pushing to `main` deploys automatically through Cloudflare Workers Builds
+(Workers & Pages → packzen → Settings → Build). Its settings:
+
+- **Node version**: 22.12 or later (Astro 6+ requires it); set the
+  `NODE_VERSION` build variable if the default is older
+- **Build command**: `bun run build`
+- **Deploy command**: `bun run deploy`, which applies pending D1 migrations
+  (`wrangler d1 migrations apply packzen-db --remote`) and then runs
+  `wrangler deploy`
+- **API token**: needs D1 edit permission (for the migrations) as well as
+  Workers deploy permission
+- **Build variables**: no Clerk secrets (see Step 4)
+
+### Deploying by hand
+
+Only when Workers Builds is unavailable:
 
 ```bash
-# Build the application
 bun run build
-
-# Deploy to Cloudflare Workers
-npx wrangler deploy
+bun run deploy
 ```
 
-This will:
+Never deploy a local build made with the live secret key in `.env` (or any
+other env file Astro loads for production builds): it would be inlined into
+the uploaded bundle.
 
-1. Upload your Worker script (`dist/server/`, via the config the build writes to `dist/server/wrangler.json`)
-2. Upload static assets from `dist/client/`
-3. Bind the D1 database
-4. Make your app live at `https://packzen.<your-subdomain>.workers.dev`
+A deploy:
 
-### Continuous Deployment
-
-For automatic deployments, use GitHub Actions:
-
-```yaml
-# .github/workflows/deploy.yml
-name: Deploy to Cloudflare Workers
-on:
-  push:
-    branches: [main]
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v1
-      - run: bun install
-      - run: bun run build
-      - uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-```
+1. Uploads your Worker script (`dist/server/`, via the config the build writes to `dist/server/wrangler.json`)
+2. Uploads static assets from `dist/client/`
+3. Binds the D1 database
+4. Makes your app live at `https://packzen.<your-subdomain>.workers.dev`
 
 ## Step 6: Verify Deployment
 
@@ -173,6 +175,7 @@ After deployment, test the following:
 | ---------------------------- | -------- | ----------- | ------------------------------------- |
 | PUBLIC_CLERK_PUBLISHABLE_KEY | Yes      | pk*live*... | Clerk publishable key (public)        |
 | CLERK_SECRET_KEY             | Yes      | sk*live*... | Clerk secret key (private)            |
+| CLERK_WEBHOOK_SECRET         | Yes      | whsec\_...  | Clerk webhook signing secret          |
 | DB                           | Auto     | -           | D1 database binding (auto-configured) |
 
 ## Maintenance
@@ -185,7 +188,8 @@ Migrations are hand-written SQL (there is no generate step):
    data-preserving only)
 2. Mirror the change in `db/schema.ts`
 3. Test locally: `bun run db:migrate`, then `bun run test`
-4. Apply to production: `bun run db:migrate:prod` — before the code that needs it deploys
+4. Deploy: `bun run deploy` applies it before the new code goes live (or run
+   `bun run db:migrate:prod` ahead of time)
 
 ### Monitoring
 

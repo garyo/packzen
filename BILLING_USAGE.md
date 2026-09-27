@@ -70,19 +70,19 @@ The app uses environment variables to configure fallback redirect URLs after aut
 ```jsonc
 {
   "vars": {
-    "CLERK_SIGN_IN_FALLBACK_REDIRECT_URL": "/dashboard",
-    "CLERK_SIGN_UP_FALLBACK_REDIRECT_URL": "/dashboard",
+    "CLERK_SIGN_IN_FALLBACK_REDIRECT_URL": "/trips",
+    "CLERK_SIGN_UP_FALLBACK_REDIRECT_URL": "/trips",
   },
 }
 ```
 
 **How it works:**
 
-1. **Protected pages with redirect_url**: When an unauthenticated user accesses a protected page (e.g., `/dashboard`), the API returns 401. The client-side error handler in `src/lib/api.ts:90` redirects to `/sign-in?redirect_url=/dashboard`. After authentication, Clerk uses this `redirect_url` to return the user to the original page.
+1. **Protected pages with redirect_url**: When a signed-out visitor opens an app page (e.g., `/trips/<id>/pack`), `mountApp()` (`src/components/nav/mountApp.ts`) redirects to `/sign-in?redirect_url=/trips/<id>/pack`; an API call that gets a 401 does the same (`scheduleSignInRedirect()` in `src/lib/api.ts`). After authentication, Clerk uses this `redirect_url` to return the user to the original page.
 
-2. **Direct sign-in visits**: When a user directly visits `/sign-in` (no `redirect_url` parameter), the fallback environment variable is used, sending them to `/dashboard` after authentication.
+2. **Direct sign-in visits**: When a user directly visits `/sign-in` (no `redirect_url` parameter), the fallback environment variable is used, sending them to `/trips` after authentication.
 
-**Checkout Redirect:** The pricing page uses the `newSubscriptionRedirectUrl` prop in the `mountPricingTable()` call to redirect users to `/dashboard` after successful subscription.
+**Checkout Redirect:** The pricing page passes `newSubscriptionRedirectUrl="/trips"` to `<PricingTable />`, sending users to `/trips` after a successful subscription.
 
 ### Pricing Page
 
