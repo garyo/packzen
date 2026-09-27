@@ -53,8 +53,9 @@ export function AccountMenu(props: AccountMenuProps) {
   const handleRestore = async (event: Event) => {
     const input = event.currentTarget as HTMLInputElement;
     const file = input.files?.[0];
-    input.value = '';
     if (!file) return;
+    const text = await file.text();
+    input.value = ''; // so choosing the same file again still fires onChange
 
     const confirmed = await confirmDialog({
       title: 'Restore backup?',
@@ -67,7 +68,7 @@ export function AccountMenu(props: AccountMenuProps) {
     const progressToast = showToast('info', 'Restoring backup…', { duration: 0 });
     try {
       const { categories, masterItems } = await fetchLibrary();
-      await restoreBackupData(await file.text(), categories, masterItems);
+      await restoreBackupData(text, categories, masterItems);
       showToast('success', 'Backup restored. Reloading…');
       // Every page's data may have changed; a reload is the simplest refresh.
       setTimeout(() => window.location.reload(), 1500);

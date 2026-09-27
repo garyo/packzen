@@ -15,16 +15,16 @@ interface TabNavProps {
 export function TabNav(props: TabNavProps) {
   return (
     <div class="border-b border-gray-200 bg-white">
-      {/* Mobile: horizontal scroll, Desktop: centered */}
+      {/* Mobile: tabs share the width (scrolling if they must), Desktop: centered */}
       <div class="scrollbar-hide overflow-x-auto md:overflow-visible">
-        <div role="tablist" class="flex min-w-max md:min-w-0 md:justify-center">
+        <div role="tablist" class="flex md:justify-center">
           <For each={props.tabs}>
             {(tab) => (
               <button
                 type="button"
                 id={`tab-${tab.id}`}
                 onClick={() => props.onChange(tab.id)}
-                class={`flex items-center gap-2 border-b-2 px-6 py-4 text-sm font-medium whitespace-nowrap transition-colors md:px-4 md:py-3 ${
+                class={`flex flex-1 items-center justify-center gap-1.5 border-b-2 px-3 py-4 text-sm font-medium whitespace-nowrap transition-colors md:flex-none md:gap-2 md:px-4 md:py-3 ${
                   props.activeTab === tab.id
                     ? 'border-blue-500 text-blue-600'
                     : 'border-transparent text-gray-600 hover:border-gray-300 hover:text-gray-900'

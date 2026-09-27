@@ -1,7 +1,7 @@
 import { createSignal, For, Show } from 'solid-js';
-import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
 import { showToast } from '../ui/Toast';
+import { confirmDialog } from '../ui/ConfirmDialog';
 import { api, endpoints } from '../../lib/api';
 import type { Category } from '../../lib/types';
 import { EditIcon, TrashIcon } from '../ui/Icons';
@@ -48,10 +48,16 @@ export function CategoryManagerContent(props: CategoryManagerContentProps) {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Delete this category? Items will become uncategorized.')) return;
+  const handleDelete = async (category: Category) => {
+    const confirmed = await confirmDialog({
+      title: `Delete “${category.name}”?`,
+      message: 'Its items become uncategorized.',
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (!confirmed) return;
 
-    const response = await api.delete(endpoints.category(id));
+    const response = await api.delete(endpoints.category(category.id));
 
     if (response.success) {
       showToast('success', 'Category deleted');
@@ -115,6 +121,7 @@ export function CategoryManagerContent(props: CategoryManagerContentProps) {
             value={newIcon()}
             onInput={(e) => setNewIcon(e.currentTarget.value)}
             placeholder="📦"
+            aria-label="Category icon (emoji)"
             class="w-10 rounded-lg border border-gray-300 px-2 py-2 text-center focus:border-transparent focus:ring-2 focus:ring-blue-500 focus:outline-none"
           />
           <input
@@ -122,7 +129,8 @@ export function CategoryManagerContent(props: CategoryManagerContentProps) {
             value={newName()}
             onInput={(e) => setNewName(e.currentTarget.value)}
             placeholder="Category name"
-            class="w-64 rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            aria-label="Category name"
+            class="min-w-0 flex-1 rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500 focus:outline-none md:w-64 md:flex-none"
           />
           <Button type="submit" disabled={adding()}>
             {adding() ? '...' : 'Add'}
@@ -152,15 +160,17 @@ export function CategoryManagerContent(props: CategoryManagerContentProps) {
                     <div class="flex gap-2">
                       <button
                         onClick={() => startEdit(category)}
-                        class="p-1 text-gray-400 hover:text-blue-600"
-                        title="Edit category"
+                        class="flex items-center justify-center rounded-md text-gray-600 hover:bg-gray-200 hover:text-blue-700"
+                        aria-label={`Edit ${category.name}`}
+                        title="Edit"
                       >
                         <EditIcon class="h-4 w-4" />
                       </button>
                       <button
-                        onClick={() => handleDelete(category.id)}
-                        class="p-1 text-gray-400 hover:text-red-600"
-                        title="Delete category"
+                        onClick={() => handleDelete(category)}
+                        class="flex items-center justify-center rounded-md text-gray-600 hover:bg-gray-200 hover:text-red-700"
+                        aria-label={`Delete ${category.name}`}
+                        title="Delete"
                       >
                         <TrashIcon class="h-4 w-4" />
                       </button>
@@ -175,6 +185,7 @@ export function CategoryManagerContent(props: CategoryManagerContentProps) {
                       value={editIcon()}
                       onInput={(e) => setEditIcon(e.currentTarget.value)}
                       placeholder="📦"
+                      aria-label="Category icon (emoji)"
                       class="w-10 rounded-lg border border-gray-300 px-2 py-2 text-center focus:border-transparent focus:ring-2 focus:ring-blue-500 focus:outline-none"
                     />
                     <input
@@ -182,7 +193,8 @@ export function CategoryManagerContent(props: CategoryManagerContentProps) {
                       value={editName()}
                       onInput={(e) => setEditName(e.currentTarget.value)}
                       placeholder="Category name"
-                      class="flex-1 rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      aria-label="Category name"
+                      class="min-w-0 flex-1 rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500 focus:outline-none"
                     />
                     <Button type="submit" disabled={updating()} size="sm">
                       {updating() ? '...' : 'Save'}
