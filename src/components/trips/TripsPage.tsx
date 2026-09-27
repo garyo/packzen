@@ -358,10 +358,11 @@ function TripCard(props: {
     past: 'bg-gray-100 text-gray-800',
   };
 
+  // An undated trip has no status; the card says "No date set" instead.
   const status = () =>
     props.trip.start_date
       ? getTripStatus(props.trip.start_date, props.trip.end_date || props.trip.start_date)
-      : 'upcoming';
+      : null;
 
   return (
     <div class="rounded-lg bg-white p-5 shadow-md transition-shadow hover:shadow-lg">
@@ -372,9 +373,13 @@ function TripCard(props: {
             {props.trip.destination && <>📍 {props.trip.destination}</>}
           </p>
         </div>
-        <span class={`rounded px-2 py-1 text-xs font-medium ${statusColors[status()]}`}>
-          {status()}
-        </span>
+        <Show when={status()}>
+          {(current) => (
+            <span class={`rounded px-2 py-1 text-xs font-medium ${statusColors[current()]}`}>
+              {current()}
+            </span>
+          )}
+        </Show>
       </div>
 
       <p class="mb-2 text-sm text-gray-600">
