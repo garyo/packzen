@@ -1,6 +1,7 @@
 import {
   createSignal,
   createEffect,
+  createMemo,
   createUniqueId,
   For,
   Show,
@@ -33,6 +34,8 @@ interface ComboboxProps {
   minChars?: number;
   maxResults?: number;
   class?: string;
+  /** Input id, so a <label for> can name the field. */
+  id?: string;
 }
 
 export function Combobox(props: ComboboxProps) {
@@ -47,9 +50,23 @@ export function Combobox(props: ComboboxProps) {
   let containerRef: HTMLDivElement | undefined;
   let inputRef: HTMLInputElement | undefined;
 
-  // Group items by type
-  const masterItems = () => props.items.filter((item) => item.group === 'master');
-  const builtinItems = () => props.items.filter((item) => item.group === 'builtin');
+  // Options are shown grouped (My Items first, then Suggestions); keyboard
+  // navigation follows that same display order.
+  const groups = createMemo(() => [
+    {
+      label: 'From My Items',
+      marker: '✓',
+      markerClass: 'text-blue-600',
+      items: props.items.filter((item) => item.group === 'master'),
+    },
+    {
+      label: 'Suggestions',
+      marker: '○',
+      markerClass: 'text-gray-400',
+      items: props.items.filter((item) => item.group === 'builtin'),
+    },
+  ]);
+  const orderedItems = createMemo(() => groups().flatMap((g) => g.items));
 
   // Show dropdown if we have results (or trip items warning) and input meets minimum length
   const shouldShowDropdown = () => {
@@ -138,39 +155,26 @@ export function Combobox(props: ComboboxProps) {
         }
         break;
 
+      // Enter and Tab accept the highlighted suggestion. With nothing
+      // highlighted they close the list and keep their usual meaning (submit
+      // the form, move focus).
       case 'Enter':
-        if (isOpen() && props.items.length > 0) {
+      case 'Tab': {
+        const highlighted = isOpen() ? orderedItems()[highlightedIndex()] : undefined;
+        if (highlighted) {
           e.preventDefault();
-          const highlighted = highlightedIndex();
-          if (highlighted >= 0 && highlighted < props.items.length) {
-            selectItem(props.items[highlighted]);
-          } else {
-            // No item highlighted - close dropdown
-            setIsOpen(false);
-          }
+          selectItem(highlighted);
+        } else {
+          setIsOpen(false);
         }
-        // If dropdown is closed, let Enter submit the form (don't preventDefault)
         break;
+      }
 
       case 'Escape':
         if (isOpen()) {
           e.preventDefault();
           setIsOpen(false);
           setHighlightedIndex(-1);
-        }
-        break;
-
-      case 'Tab':
-        if (isOpen() && props.items.length > 0) {
-          e.preventDefault();
-          const highlightedTab = highlightedIndex();
-          if (highlightedTab >= 0 && highlightedTab < props.items.length) {
-            // Accept the highlighted suggestion
-            selectItem(props.items[highlightedTab]);
-          } else {
-            // No item highlighted - just close dropdown and let tab continue
-            setIsOpen(false);
-          }
         }
         break;
     }
@@ -199,6 +203,7 @@ export function Combobox(props: ComboboxProps) {
     <div ref={containerRef} class={cn('relative w-full', props.class)}>
       <input
         ref={inputRef}
+        id={props.id}
         type="text"
         value={props.value}
         onInput={handleInput}
@@ -229,98 +234,55 @@ export function Combobox(props: ComboboxProps) {
             </div>
           </Show>
 
-          {/* Master items section */}
-          <Show when={masterItems().length > 0}>
-            <div class="border-b border-gray-100 px-3 py-2 text-xs font-semibold text-gray-500 uppercase">
-              From My Items
-            </div>
-            <For each={masterItems()}>
-              {(item) => {
-                const index = props.items.indexOf(item);
-
-                return (
-                  <div
-                    id={itemId(index)}
-                    role="option"
-                    aria-selected={highlightedIndex() === index}
-                    class={cn(
-                      'flex cursor-pointer items-start gap-2 px-3 py-2',
-                      highlightedIndex() === index ? 'bg-blue-100' : 'hover:bg-blue-50'
-                    )}
-                    onMouseDown={(e) => {
-                      e.preventDefault(); // Prevent blur
-                      selectItem(item);
-                    }}
-                    onMouseEnter={() => setHighlightedIndex(index)}
-                  >
-                    <span class="text-blue-600">✓</span>
-                    <div class="flex-1">
-                      <div class="font-medium text-gray-900">
-                        {item.name}
-                        <Show when={item.existingLocation}>
-                          <span class="ml-2 text-xs text-blue-600">
-                            (
-                            {item.existingLocation === 'No Bag'
-                              ? 'no bag'
-                              : `in ${item.existingLocation}`}
-                            )
-                          </span>
-                        </Show>
+          <For each={groups()}>
+            {(group) => (
+              <Show when={group.items.length > 0}>
+                <div class="border-b border-gray-100 px-3 py-2 text-xs font-semibold text-gray-500 uppercase">
+                  {group.label}
+                </div>
+                <For each={group.items}>
+                  {(item) => {
+                    const index = () => orderedItems().indexOf(item);
+                    return (
+                      <div
+                        id={itemId(index())}
+                        role="option"
+                        aria-selected={highlightedIndex() === index()}
+                        class={cn(
+                          'flex cursor-pointer items-start gap-2 px-3 py-2',
+                          highlightedIndex() === index() ? 'bg-blue-100' : 'hover:bg-blue-50'
+                        )}
+                        onMouseDown={(e) => {
+                          e.preventDefault(); // Prevent blur
+                          selectItem(item);
+                        }}
+                        onMouseEnter={() => setHighlightedIndex(index())}
+                      >
+                        <span class={group.markerClass}>{group.marker}</span>
+                        <div class="flex-1">
+                          <div class="font-medium text-gray-900">
+                            {item.name}
+                            <Show when={item.existingLocation}>
+                              <span class="ml-2 text-xs text-blue-600">
+                                (
+                                {item.existingLocation === 'No Bag'
+                                  ? 'no bag'
+                                  : `in ${item.existingLocation}`}
+                                )
+                              </span>
+                            </Show>
+                          </div>
+                          <Show when={item.description}>
+                            <div class="text-xs text-gray-500">{item.description}</div>
+                          </Show>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                );
-              }}
-            </For>
-          </Show>
-
-          {/* Built-in items section */}
-          <Show when={builtinItems().length > 0}>
-            <div class="border-b border-gray-100 px-3 py-2 text-xs font-semibold text-gray-500 uppercase">
-              Suggestions
-            </div>
-            <For each={builtinItems()}>
-              {(item) => {
-                const index = props.items.indexOf(item);
-
-                return (
-                  <div
-                    id={itemId(index)}
-                    role="option"
-                    aria-selected={highlightedIndex() === index}
-                    class={cn(
-                      'flex cursor-pointer items-start gap-2 px-3 py-2',
-                      highlightedIndex() === index ? 'bg-blue-100' : 'hover:bg-blue-50'
-                    )}
-                    onMouseDown={(e) => {
-                      e.preventDefault(); // Prevent blur
-                      selectItem(item);
-                    }}
-                    onMouseEnter={() => setHighlightedIndex(index)}
-                  >
-                    <span class="text-gray-400">○</span>
-                    <div class="flex-1">
-                      <div class="font-medium text-gray-900">
-                        {item.name}
-                        <Show when={item.existingLocation}>
-                          <span class="ml-2 text-xs text-blue-600">
-                            (
-                            {item.existingLocation === 'No Bag'
-                              ? 'no bag'
-                              : `in ${item.existingLocation}`}
-                            )
-                          </span>
-                        </Show>
-                      </div>
-                      <Show when={item.description}>
-                        <div class="text-xs text-gray-500">{item.description}</div>
-                      </Show>
-                    </div>
-                  </div>
-                );
-              }}
-            </For>
-          </Show>
+                    );
+                  }}
+                </For>
+              </Show>
+            )}
+          </For>
 
           {/* No results message */}
           <Show when={props.value.length >= minChars() && props.items.length === 0}>

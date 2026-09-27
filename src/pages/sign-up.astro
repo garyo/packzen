@@ -4,7 +4,7 @@ import { SignUp, SignedIn, SignedOut } from '@clerk/astro/components';
 import { DEV_FAKE_AUTH } from '../lib/dev-auth';
 ---
 
-<BaseLayout title="Sign Up - PackZen">
+<BaseLayout title="Sign Up - PackZen" analytics>
   <div class="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12">
     <div class="w-full max-w-md">
       <div class="mb-8 text-center">
@@ -20,7 +20,7 @@ import { DEV_FAKE_AUTH } from '../lib/dev-auth';
             for the post-sign-up redirect and preserves it on the sign-in link,
             so `fallbackRedirectUrl` only applies when `redirect_url` is absent.
           -->
-          <SignUp signInUrl="/sign-in" fallbackRedirectUrl="/dashboard" />
+          <SignUp signInUrl="/sign-in" fallbackRedirectUrl="/trips" />
         </SignedOut>
         <SignedIn>
           <p class="text-gray-600">You're already signed in. Redirecting…</p>
@@ -41,12 +41,15 @@ import { DEV_FAKE_AUTH } from '../lib/dev-auth';
 </BaseLayout>
 
 <script>
-  import { isSignedIn } from '../lib/clerk';
+  import { isSignedIn, safeRedirectPath } from '../lib/clerk';
 
-  // Already signed in → go straight to the dashboard.
-  (async () => {
-    if (await isSignedIn()) {
-      window.location.replace('/dashboard');
-    }
-  })();
+  // Already signed in: go where the visitor was headed, or home.
+  isSignedIn()
+    .then((signedIn) => {
+      if (signedIn) {
+        const target = new URLSearchParams(window.location.search).get('redirect_url');
+        window.location.replace(safeRedirectPath(target));
+      }
+    })
+    .catch((error) => console.error('Auth check failed:', error));
 </script>

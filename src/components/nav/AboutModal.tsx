@@ -29,19 +29,19 @@ export function AboutModal(props: AboutModalProps) {
         <div>
           <h3 class="mb-2 font-semibold text-gray-900">What is PackZen?</h3>
           <p class="text-sm leading-relaxed">
-            PackZen is a smart packing list manager that helps you organize your travel essentials.
-            Create reusable item lists, manage bag templates, and efficiently pack for any trip.
+            PackZen is a packing list app that helps you organize your travel essentials. Keep your
+            own reusable items and bags, and pack efficiently for any trip.
           </p>
         </div>
 
         <div>
           <h3 class="mb-2 font-semibold text-gray-900">Features</h3>
           <ul class="list-inside list-disc space-y-1 text-sm">
-            <li>Master item library for reusable packing essentials</li>
-            <li>Customizable bag templates</li>
-            <li>Trip planning with date tracking</li>
-            <li>Category organization</li>
-            <li>Import/export functionality</li>
+            <li>My Items: your reusable packing essentials</li>
+            <li>My Bags: the bags you travel with</li>
+            <li>Suggestions: curated lists for each kind of trip</li>
+            <li>Trip planning with dates, bags and categories</li>
+            <li>Printable packing lists</li>
             <li>Full backup and restore</li>
           </ul>
         </div>

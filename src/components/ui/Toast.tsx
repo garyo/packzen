@@ -87,18 +87,17 @@ export function Toast() {
 
   return (
     <Portal>
-      {/* Wrapper stays mounted (even with no toasts) so each toast's live region
-          is present in the DOM at the moment it's inserted, rather than the
-          whole region appearing and disappearing with the toast list. */}
-      <div class="fixed right-4 bottom-4 z-[60] flex max-w-[calc(100vw-2rem)] flex-col items-stretch md:max-w-sm">
+      {/* The wrapper is the live region and stays mounted even with no
+          toasts: screen readers only announce changes inside a region that
+          already existed. Errors also get role="alert" to interrupt. */}
+      <div
+        role="status"
+        aria-live="polite"
+        class="fixed right-4 bottom-[calc(1rem+var(--app-nav-height,0px))] z-[60] flex max-w-[calc(100vw-2rem)] flex-col items-stretch md:max-w-sm"
+      >
         <For each={toasts().slice(-3)}>
           {(toast) => (
-            <div
-              class={getStyles(toast.type)}
-              role={toast.type === 'error' ? 'alert' : 'status'}
-              aria-live={toast.type === 'error' ? 'assertive' : 'polite'}
-              aria-atomic="true"
-            >
+            <div class={getStyles(toast.type)} role={toast.type === 'error' ? 'alert' : undefined}>
               <span class="flex-1">{toast.message}</span>
               <Show when={toast.action}>
                 <button

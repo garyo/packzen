@@ -11,9 +11,14 @@ import { DEV_FAKE_AUTH, getFakeUser, fakeUserToken, clearFakeUser } from './dev-
  */
 type ClerkClient = NonNullable<ReturnType<typeof $clerkStore.get>>;
 
+// How long to wait for clerk-js before giving up (offline, blocked by an ad
+// blocker, CDN outage), so gated pages can offer a retry instead of hanging.
+const CLERK_LOAD_TIMEOUT_MS = 10_000;
+
 /**
  * Resolve once the @clerk/astro client exists and has finished loading.
- * Returns immediately if Clerk is already loaded.
+ * Returns immediately if Clerk is already loaded; rejects if it hasn't loaded
+ * within CLERK_LOAD_TIMEOUT_MS.
  */
 function waitForClerk(): Promise<ClerkClient> {
   const existing = $clerkStore.get();
@@ -21,15 +26,23 @@ function waitForClerk(): Promise<ClerkClient> {
     return Promise.resolve(existing);
   }
 
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     let unsubClerk = () => {};
     let unsubLoaded = () => {};
+    const stop = () => {
+      clearTimeout(timer);
+      unsubClerk();
+      unsubLoaded();
+    };
+    const timer = setTimeout(() => {
+      stop();
+      reject(new Error('Clerk did not load'));
+    }, CLERK_LOAD_TIMEOUT_MS);
 
     const check = () => {
       const clerk = $clerkStore.get();
       if (clerk && $isLoadedStore.get()) {
-        unsubClerk();
-        unsubLoaded();
+        stop();
         resolve(clerk);
       }
     };
@@ -59,16 +72,29 @@ export async function getSessionToken(): Promise<string | null> {
   }
 }
 
-// Helper to check if user is signed in
+/**
+ * `target` as a same-origin path to redirect to, or `fallback` when it's
+ * missing or points anywhere else ("//host", "/\host", "javascript:", …).
+ */
+export function safeRedirectPath(target: string | null, fallback = '/trips'): string {
+  if (!target) return fallback;
+  try {
+    const url = new URL(target, window.location.origin);
+    if (url.origin === window.location.origin) return url.pathname + url.search + url.hash;
+  } catch {
+    // Unparseable: fall through to the fallback.
+  }
+  return fallback;
+}
+
+/**
+ * Whether a user is signed in. Rejects if Clerk fails to load, so callers can
+ * tell "signed out" apart from "couldn't find out".
+ */
 export async function isSignedIn(): Promise<boolean> {
   if (DEV_FAKE_AUTH && getFakeUser()) return true;
-  try {
-    const clerk = await waitForClerk();
-    return !!clerk.user;
-  } catch (error) {
-    console.error('Error checking sign-in state:', error);
-    return false;
-  }
+  const clerk = await waitForClerk();
+  return !!clerk.user;
 }
 
 // Helper to get current user

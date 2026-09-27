@@ -6,7 +6,6 @@ import type { User } from '../lib/types';
 
 // Auth state
 const [user, setUser] = createSignal<User | null>(null);
-const [isLoading, setIsLoading] = createSignal(true);
 const [isAuthenticated, setIsAuthenticated] = createSignal(false);
 
 // True while our own `signOut()` is in flight, so the session-change listener
@@ -20,8 +19,6 @@ let unsubscribeSessionListener: (() => void) | null = null;
 // Initialize auth state
 async function initAuth() {
   try {
-    setIsLoading(true);
-
     // Dev-only fake auth: when a fake user is selected, reflect it directly and
     // skip Clerk (including the session listener below, which a fake session
     // has no counterpart for). With the gate off or no fake user chosen, this
@@ -73,8 +70,6 @@ async function initAuth() {
     console.error('Failed to initialize auth:', error);
     setUser(null);
     setIsAuthenticated(false);
-  } finally {
-    setIsLoading(false);
   }
 }
 
@@ -95,18 +90,10 @@ async function signOut() {
   }
 }
 
-// Tear down the Clerk session listener, e.g. before a full auth re-init.
-function cleanup() {
-  unsubscribeSessionListener?.();
-  unsubscribeSessionListener = null;
-}
-
 // Export auth store
 export const authStore = {
   user,
-  isLoading,
   isAuthenticated,
   initAuth,
   signOut,
-  cleanup,
 };

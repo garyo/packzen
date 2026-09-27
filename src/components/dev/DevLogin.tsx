@@ -10,6 +10,7 @@ import {
   type FakeUser,
 } from '../../lib/dev-auth';
 import type { BillingPlan } from '../../lib/billing';
+import { safeRedirectPath } from '../../lib/clerk';
 
 function emailFor(id: string): string {
   return `${id.replace(/^devuser_/, '')}@example.test`;
@@ -32,7 +33,7 @@ function buildUser(rawName: string, plan: BillingPlan, fresh: boolean): FakeUser
 
 // Full page reload so the auth store and every island re-initialize as the
 // selected fake user.
-function enter(user: FakeUser, redirect = '/dashboard'): void {
+function enter(user: FakeUser, redirect = '/trips'): void {
   setFakeUser(user);
   window.location.href = redirect;
 }
@@ -56,8 +57,7 @@ export default function DevLogin() {
     if (as) {
       const planParam: BillingPlan = params.get('plan') === 'free_user' ? 'free_user' : 'standard';
       const fresh = params.get('new') === '1';
-      const redirect = params.get('redirect') || '/dashboard';
-      enter(buildUser(as, planParam, fresh), redirect);
+      enter(buildUser(as, planParam, fresh), safeRedirectPath(params.get('redirect')));
       return;
     }
     refresh();
@@ -102,7 +102,7 @@ export default function DevLogin() {
                 {u().id} · {u().plan}
               </p>
               <div class="mt-3 flex gap-2">
-                <a href="/dashboard" class="rounded bg-blue-600 px-3 py-1.5 text-sm text-white">
+                <a href="/trips" class="rounded bg-blue-600 px-3 py-1.5 text-sm text-white">
                   Go to app
                 </a>
                 <button
