@@ -17,6 +17,8 @@ import {
   type TripItem,
 } from '../db/schema';
 import type { FullBackup } from '../src/lib/yaml';
+import { restoreFullBackup } from '../src/lib/backup';
+import { makeHandlerApi } from './handler-api';
 import type { ApiResponse } from '../src/lib/types';
 import type { APIContext } from 'astro';
 
@@ -447,151 +449,23 @@ export function summarizeSnapshot(snapshot: Snapshot) {
   };
 }
 
+/** Restore `backup` for `userId` with the production restore code over the real handlers. */
 export async function importBackupForUser(
   db: ReturnType<typeof drizzle>,
   userId: string,
   backup: FullBackup
 ) {
-  const categoryNameToId = new Map<string, string>();
-
-  for (const category of backup.categories) {
-    const inserted = await db
-      .insert(categories)
-      .values({
-        clerk_user_id: userId,
-        name: category.name,
-        icon: category.icon,
-        sort_order: category.sort_order,
-      })
-      .returning()
-      .get();
-    categoryNameToId.set(category.name.toLowerCase(), inserted.id);
-  }
-
-  for (const item of backup.masterItems) {
-    await db.insert(masterItems).values({
-      clerk_user_id: userId,
-      name: item.name,
-      description: item.description,
-      category_id: item.category_name
-        ? categoryNameToId.get(item.category_name.toLowerCase()) || null
-        : null,
-      default_quantity: item.default_quantity,
-      is_container: item.is_container ?? false,
-    });
-  }
-
-  for (const template of backup.bagTemplates) {
-    await db.insert(bagTemplates).values({
-      clerk_user_id: userId,
-      name: template.name,
-      type: template.type,
-      color: template.color,
-      sort_order: template.sort_order,
-    });
-  }
-
-  for (const tripData of backup.trips) {
-    const newTrip = await db
-      .insert(trips)
-      .values({
-        clerk_user_id: userId,
-        name: tripData.name,
-        destination: tripData.destination || null,
-        start_date: tripData.start_date || null,
-        end_date: tripData.end_date || null,
-        notes: tripData.notes,
-      })
-      .returning()
-      .get();
-
-    const bagSourceMap = new Map<string, string>();
-    const bagNameMap = new Map<string, string>();
-
-    for (const bagData of tripData.bags) {
-      const insertedBag = await db
-        .insert(bags)
-        .values({
-          trip_id: newTrip.id,
-          name: bagData.name,
-          type: bagData.type as Bag['type'],
-          color: bagData.color,
-          sort_order: bagData.sort_order,
-        })
-        .returning()
-        .get();
-
-      bagNameMap.set(bagData.name.toLowerCase(), insertedBag.id);
-      if (bagData.source_id) {
-        bagSourceMap.set(bagData.source_id, insertedBag.id);
-      }
-    }
-
-    const itemKey = (item: (typeof tripData.items)[number]) =>
-      `${item.name.toLowerCase()}|${(item.category_name || '').toLowerCase()}|${
-        item.bag_name ? item.bag_name.toLowerCase() : ''
-      }`;
-
-    const itemSourceMap = new Map<string, string>();
-
-    const createdItems: Array<{ backupItem: (typeof tripData.items)[number]; newId: string }> = [];
-
-    for (const itemData of tripData.items) {
-      const bagId =
-        (itemData.bag_source_id && bagSourceMap.get(itemData.bag_source_id)) ||
-        (itemData.bag_name ? bagNameMap.get(itemData.bag_name.toLowerCase()) || null : null);
-
-      const insertedItem = await db
-        .insert(tripItems)
-        .values({
-          trip_id: newTrip.id,
-          name: itemData.name,
-          category_name: itemData.category_name || null,
-          quantity: itemData.quantity,
-          bag_id: bagId || null,
-          master_item_id: null,
-          is_container: itemData.is_container ?? false,
-          is_packed: itemData.is_packed,
-          is_skipped: itemData.is_skipped ?? false,
-          notes: itemData.notes || null,
-        })
-        .returning()
-        .get();
-
-      createdItems.push({ backupItem: itemData, newId: insertedItem.id });
-
-      if (itemData.source_id) {
-        itemSourceMap.set(itemData.source_id, insertedItem.id);
-      }
-      itemSourceMap.set(itemKey(itemData), insertedItem.id);
-    }
-
-    for (const { backupItem, newId } of createdItems) {
-      let parentId: string | undefined =
-        (backupItem.container_source_id && itemSourceMap.get(backupItem.container_source_id)) ||
-        undefined;
-
-      if (!parentId && backupItem.container_name) {
-        const parentBackupItem = tripData.items.find(
-          (candidate) =>
-            candidate.name.toLowerCase() === backupItem.container_name?.toLowerCase() &&
-            (candidate.is_container ?? false)
-        );
-        if (parentBackupItem) {
-          const key = parentBackupItem.source_id ?? itemKey(parentBackupItem);
-          parentId = key ? itemSourceMap.get(key) : undefined;
-        }
-      }
-
-      if (parentId) {
-        await db
-          .update(tripItems)
-          .set({ container_item_id: parentId })
-          .where(eq(tripItems.id, newId))
-          .run();
-      }
-    }
-  }
+  const api = makeHandlerApi(db.$client as unknown as D1Database, userId);
+  const [categoriesResponse, masterItemsResponse] = await Promise.all([
+    api.get<Category[]>('/api/categories'),
+    api.get<MasterItem[]>('/api/master-items'),
+  ]);
+  await restoreFullBackup(
+    backup,
+    categoriesResponse.data ?? [],
+    masterItemsResponse.data ?? [],
+    api
+  );
 }
 
 // ---------------------------------------------------------------------------

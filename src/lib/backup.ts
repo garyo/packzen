@@ -1,14 +1,18 @@
 import type { Category, MasterItem, BagTemplate, Trip, TripItem, Bag, ApiResponse } from './types';
-import { api as defaultApi, endpoints } from './api';
-import { fullBackupToYAML, yamlToFullBackup } from './yaml';
+import { api as defaultApi, endpoints, type ApiClient } from './api';
+import {
+  fullBackupToYAML,
+  yamlToFullBackup,
+  type BackupBag,
+  type BackupItem,
+  type FullBackup,
+} from './yaml';
+import { chunkArray, mapLimit } from './utils';
 
-interface TripWithData {
-  trip: Trip;
-  bags: Bag[];
-  items: TripItem[];
-}
-
-type ApiClient = typeof defaultApi;
+/** Enough parallelism to be quick without tripping request timeouts on big restores. */
+const MAX_CONCURRENT_REQUESTS = 6;
+/** Items per batch-create request (the endpoint accepts up to 500). */
+const ITEM_BATCH_SIZE = 100;
 
 const normalize = (value?: string | null) => value?.trim().toLowerCase() || '';
 
@@ -28,6 +32,12 @@ function assertData<T>(response: ApiResponse<T>, message: string): T {
   return response.data;
 }
 
+/** Remove and return the first entry of `pool` matching `predicate`, so each row is matched once. */
+function claim<T>(pool: T[], predicate: (item: T) => boolean): T | undefined {
+  const index = pool.findIndex(predicate);
+  return index === -1 ? undefined : pool.splice(index, 1)[0];
+}
+
 export async function exportBackupData(
   categories: Category[],
   masterItems: MasterItem[],
@@ -38,30 +48,231 @@ export async function exportBackupData(
     api.get<Trip[]>(endpoints.trips),
   ]);
   const bagTemplatesList =
-    assertSuccess(bagTemplatesResponse, 'Backup failed: could not fetch bag templates') || [];
+    assertSuccess(bagTemplatesResponse, 'Backup failed: could not fetch My Bags') || [];
   const tripsList = assertSuccess(tripsResponse, 'Backup failed: could not fetch trips') || [];
 
-  const tripsWithData: TripWithData[] = await Promise.all(
-    tripsList.map(async (trip) => {
-      const [bagsResponse, itemsResponse] = await Promise.all([
-        api.get<Bag[]>(endpoints.tripBags(trip.id)),
-        api.get<TripItem[]>(endpoints.tripItems(trip.id)),
-      ]);
-      const bags = assertSuccess(
-        bagsResponse,
-        `Backup failed: could not fetch bags for trip "${trip.name}"`
-      );
-      const items = assertSuccess(
-        itemsResponse,
-        `Backup failed: could not fetch items for trip "${trip.name}"`
-      );
-      return { trip, bags: bags || [], items: items || [] };
-    })
-  );
+  const tripsWithData = await mapLimit(tripsList, MAX_CONCURRENT_REQUESTS, async (trip) => {
+    const [bagsResponse, itemsResponse] = await Promise.all([
+      api.get<Bag[]>(endpoints.tripBags(trip.id)),
+      api.get<TripItem[]>(endpoints.tripItems(trip.id)),
+    ]);
+    const bags = assertSuccess(
+      bagsResponse,
+      `Backup failed: could not fetch bags for trip "${trip.name}"`
+    );
+    const items = assertSuccess(
+      itemsResponse,
+      `Backup failed: could not fetch items for trip "${trip.name}"`
+    );
+    return { trip, bags: bags || [], items: items || [] };
+  });
 
   const yamlContent = fullBackupToYAML(categories, masterItems, bagTemplatesList, tripsWithData);
   const filename = `packzen-backup-${new Date().toISOString().split('T')[0]}.yaml`;
   return { yaml: yamlContent, filename };
+}
+
+export interface TripRestoreResult {
+  created: number;
+  updated: number;
+  /** One message per item that could not be restored (or not nested in its container). */
+  failures: string[];
+}
+
+/**
+ * Restore bags and items (with packed/skipped state, notes and container
+ * nesting) into an existing trip.
+ *
+ * With `merge`, the trip's current bags and items are matched first — by
+ * source id, then by name (bags) or name+bag+category (items) — and updated
+ * in place; everything unmatched is created. Without it the trip is assumed
+ * empty. Bag failures throw, since items depend on the bag ids; item
+ * failures are collected in the result.
+ */
+export async function restoreTripContents(
+  tripId: string,
+  contents: { bags: BackupBag[]; items: BackupItem[] },
+  options: { merge?: boolean; api?: ApiClient } = {}
+): Promise<TripRestoreResult> {
+  const { merge = false, api = defaultApi } = options;
+
+  let existingBags: Bag[] = [];
+  let existingItems: TripItem[] = [];
+  if (merge) {
+    const [bagsResponse, itemsResponse] = await Promise.all([
+      api.get<Bag[]>(endpoints.tripBags(tripId)),
+      api.get<TripItem[]>(endpoints.tripItems(tripId)),
+    ]);
+    existingBags = assertSuccess(bagsResponse, 'Could not fetch existing bags') || [];
+    existingItems = assertSuccess(itemsResponse, 'Could not fetch existing items') || [];
+  }
+
+  // Bags
+  const bagIdBySource = new Map<string, string>();
+  const bagIdByName = new Map<string, string>();
+  const unclaimedBags = [...existingBags];
+  const bagPlan = contents.bags.map((bag) => ({
+    bag,
+    existing:
+      (bag.source_id && claim(unclaimedBags, (b) => b.id === bag.source_id)) ||
+      claim(unclaimedBags, (b) => normalize(b.name) === normalize(bag.name)),
+  }));
+
+  await mapLimit(bagPlan, MAX_CONCURRENT_REQUESTS, async ({ bag, existing }) => {
+    const fields = { name: bag.name, type: bag.type, color: bag.color, sort_order: bag.sort_order };
+    let id: string;
+    if (existing) {
+      const response = await api.patch(endpoints.tripBags(tripId), {
+        bag_id: existing.id,
+        ...fields,
+      });
+      assertSuccess(response, `Could not update bag "${bag.name}"`);
+      id = existing.id;
+    } else {
+      const response = await api.post<Bag>(endpoints.tripBags(tripId), fields);
+      id = assertData(response, `Could not create bag "${bag.name}"`).id;
+    }
+    if (bag.source_id) bagIdBySource.set(bag.source_id, id);
+    if (!bagIdByName.has(normalize(bag.name))) bagIdByName.set(normalize(bag.name), id);
+  });
+
+  // Items
+  const failures: string[] = [];
+  const fail = (item: BackupItem, reason?: string) =>
+    failures.push(`Item "${item.name}": ${reason || 'unknown error'}`);
+  const hasContainer = (item: BackupItem) => !!(item.container_source_id || item.container_name);
+
+  const unclaimedItems = [...existingItems];
+  const itemPlan = contents.items.map((item) => {
+    const bagId =
+      (item.bag_source_id && bagIdBySource.get(item.bag_source_id)) ||
+      (item.bag_name && bagIdByName.get(normalize(item.bag_name))) ||
+      null;
+    const existing =
+      (item.source_id && claim(unclaimedItems, (i) => i.id === item.source_id)) ||
+      claim(
+        unclaimedItems,
+        (i) =>
+          normalize(i.name) === normalize(item.name) &&
+          (i.bag_id || null) === bagId &&
+          normalize(i.category_name) === normalize(item.category_name)
+      );
+    const fields = {
+      name: item.name,
+      category_name: item.category_name ?? null,
+      quantity: item.quantity,
+      bag_id: bagId,
+      is_packed: item.is_packed,
+      is_skipped: item.is_skipped,
+      is_container: item.is_container,
+      notes: item.notes ?? null,
+    };
+    return { item, existing, fields };
+  });
+
+  const restoredIds = new Map<BackupItem, string>();
+  let updated = 0;
+
+  const updates = itemPlan.filter((p) => p.existing);
+  await mapLimit(updates, MAX_CONCURRENT_REQUESTS, async ({ item, existing, fields }) => {
+    const response = await api.patch(endpoints.tripItems(tripId), {
+      id: existing!.id,
+      ...fields,
+      // Items with no container in the file come out of any old one; nested
+      // items are linked below.
+      ...(!hasContainer(item) && { container_item_id: null }),
+    });
+    if (!response.success) return fail(item, response.error);
+    restoredIds.set(item, existing!.id);
+    updated++;
+  });
+
+  // The batch endpoint skips names that already exist in the trip or repeat
+  // within the batch, so only unambiguous names go through it; the rest are
+  // created one by one with merging turned off.
+  const creates = itemPlan.filter((p) => !p.existing);
+  const takenNames = new Set(
+    [...existingItems, ...updates.map((p) => p.item)].map((i) => normalize(i.name))
+  );
+  const createCounts = new Map<string, number>();
+  for (const { item } of creates) {
+    createCounts.set(normalize(item.name), (createCounts.get(normalize(item.name)) || 0) + 1);
+  }
+  const batchable = (item: BackupItem) =>
+    !takenNames.has(normalize(item.name)) && createCounts.get(normalize(item.name)) === 1;
+  let created = 0;
+
+  for (const batch of chunkArray(
+    creates.filter((p) => batchable(p.item)),
+    ITEM_BATCH_SIZE
+  )) {
+    const response = await api.post<TripItem[]>(endpoints.tripItems(tripId), {
+      items: batch.map((p) => p.fields),
+    });
+    const insertedByName = new Map((response.data || []).map((row) => [normalize(row.name), row]));
+    for (const { item } of batch) {
+      const row = insertedByName.get(normalize(item.name));
+      if (!row) {
+        fail(item, response.success ? 'trip item limit reached' : response.error);
+        continue;
+      }
+      restoredIds.set(item, row.id);
+      created++;
+    }
+  }
+
+  const singles = creates.filter((p) => !batchable(p.item));
+  await mapLimit(singles, MAX_CONCURRENT_REQUESTS, async ({ item, fields }) => {
+    const response = await api.post<TripItem>(endpoints.tripItems(tripId), {
+      ...fields,
+      merge_duplicates: false,
+    });
+    if (!response.success || !response.data) return fail(item, response.error);
+    restoredIds.set(item, response.data.id);
+    created++;
+  });
+
+  // Container nesting, now that every restorable item has an id.
+  const findParent = (child: BackupItem) =>
+    (child.container_source_id &&
+      contents.items.find((i) => i.source_id === child.container_source_id)) ||
+    (child.container_name &&
+      (contents.items.find(
+        (i) => i.is_container && normalize(i.name) === normalize(child.container_name)
+      ) ||
+        contents.items.find((i) => normalize(i.name) === normalize(child.container_name)))) ||
+    undefined;
+
+  const nested = contents.items.filter((item) => hasContainer(item) && restoredIds.has(item));
+  await mapLimit(nested, MAX_CONCURRENT_REQUESTS, async (item) => {
+    const parent = findParent(item);
+    const parentId = parent && restoredIds.get(parent);
+    if (!parentId) {
+      return fail(
+        item,
+        `could not find container "${item.container_name || item.container_source_id}"`
+      );
+    }
+    const response = await api.patch(endpoints.tripItems(tripId), {
+      id: restoredIds.get(item),
+      container_item_id: parentId,
+    });
+    if (!response.success) fail(item, `could not put it in its container (${response.error})`);
+  });
+
+  return { created, updated, failures };
+}
+
+/** One-line summary of a trip import for a toast, naming the first few failures. */
+export function describeTripRestore({ created, updated, failures }: TripRestoreResult): string {
+  const restored = created + updated;
+  const counts = updated > 0 ? `${created} new, ${updated} updated` : `${created} new`;
+  if (failures.length === 0) {
+    return `Imported ${restored} item${restored === 1 ? '' : 's'} (${counts})`;
+  }
+  const shown = failures.slice(0, 3).join('; ');
+  const more = failures.length > 3 ? `; and ${failures.length - 3} more` : '';
+  return `Imported ${restored} of ${restored + failures.length} items; ${failures.length} failed. ${shown}${more}`;
 }
 
 export async function restoreBackupData(
@@ -70,353 +281,131 @@ export async function restoreBackupData(
   currentMasterItems: MasterItem[],
   api: ApiClient = defaultApi
 ): Promise<void> {
-  const backup = yamlToFullBackup(yamlText);
+  await restoreFullBackup(yamlToFullBackup(yamlText), currentCategories, currentMasterItems, api);
+}
+
+export async function restoreFullBackup(
+  backup: FullBackup,
+  currentCategories: Category[],
+  currentMasterItems: MasterItem[],
+  api: ApiClient = defaultApi
+): Promise<void> {
   const categoryNameToId = new Map<string, string>();
 
   // Failures that don't corrupt dependent data are collected and reported at
   // the end, rather than aborting the whole restore.
   const masterItemFailures: string[] = [];
   const itemFailures: string[] = [];
-  const containerLinkFailures: string[] = [];
 
-  // Phase 1: Categories (must complete before master items, since items reference category IDs)
-  // Category failures are structural (master items depend on the resulting
-  // IDs), so any failure aborts the restore immediately.
-  await Promise.all(
-    backup.categories.map(async (category) => {
-      const existing = currentCategories.find(
-        (c) => normalize(c.name) === normalize(category.name)
+  // Phase 1: Categories (must complete before My Items, which reference
+  // category IDs). Any failure aborts the restore.
+  await mapLimit(backup.categories, MAX_CONCURRENT_REQUESTS, async (category) => {
+    const fields = { name: category.name, icon: category.icon, sort_order: category.sort_order };
+    const existing = currentCategories.find((c) => normalize(c.name) === normalize(category.name));
+    if (existing) {
+      const response = await api.patch(endpoints.category(existing.id), fields);
+      assertSuccess(response, `Restore failed: could not update category "${category.name}"`);
+      categoryNameToId.set(normalize(category.name), existing.id);
+    } else {
+      const response = await api.post<Category>(endpoints.categories, fields);
+      const data = assertData(
+        response,
+        `Restore failed: could not create category "${category.name}"`
       );
-      if (existing) {
-        const response = await api.patch(endpoints.category(existing.id), {
-          name: category.name,
-          icon: category.icon,
-          sort_order: category.sort_order,
-        });
-        if (!response.success) {
-          throw new Error(
-            `Restore failed: could not update category "${category.name}" (${response.error})`
-          );
-        }
-        categoryNameToId.set(normalize(category.name), existing.id);
-      } else {
-        const response = await api.post<Category>(endpoints.categories, {
-          name: category.name,
-          icon: category.icon,
-          sort_order: category.sort_order,
-        });
-        const data = assertData(
-          response,
-          `Restore failed: could not create category "${category.name}"`
-        );
-        categoryNameToId.set(normalize(category.name), data.id);
-      }
-    })
-  );
+      categoryNameToId.set(normalize(category.name), data.id);
+    }
+  });
 
-  // Phase 2: Master items + bag templates (independent, run in parallel)
+  // Phase 2: My Items + My Bags (independent, run in parallel)
   await Promise.all([
-    // Master items (depend on categoryNameToId from phase 1). A failed master
-    // item doesn't corrupt anything else, so failures are collected instead
-    // of aborting the restore.
-    Promise.all(
-      backup.masterItems.map(async (item) => {
-        const categoryId = item.category_name
-          ? categoryNameToId.get(normalize(item.category_name)) || null
-          : null;
-        const existing = currentMasterItems.find((i) => normalize(i.name) === normalize(item.name));
-
-        const payload = {
-          name: item.name,
-          description: item.description,
-          category_id: categoryId,
-          default_quantity: item.default_quantity,
-          is_container: item.is_container,
-        };
-
-        const response = existing
-          ? await api.patch(endpoints.masterItem(existing.id), payload)
-          : await api.post(endpoints.masterItems, payload);
-
-        if (!response.success) {
-          masterItemFailures.push(`Master item "${item.name}": ${response.error}`);
-        }
-      })
-    ),
-    // Bag templates (fully independent). Structural: dependents (none today,
-    // but treated consistently with categories/trips/bags) abort on failure.
+    // A failed My Item doesn't corrupt anything else, so failures are
+    // collected instead of aborting the restore.
+    mapLimit(backup.masterItems, MAX_CONCURRENT_REQUESTS, async (item) => {
+      const payload = {
+        name: item.name,
+        description: item.description,
+        category_id:
+          (item.category_name && categoryNameToId.get(normalize(item.category_name))) || null,
+        default_quantity: item.default_quantity,
+        is_container: item.is_container,
+      };
+      const existing = currentMasterItems.find((i) => normalize(i.name) === normalize(item.name));
+      const response = existing
+        ? await api.patch(endpoints.masterItem(existing.id), payload)
+        : await api.post(endpoints.masterItems, payload);
+      if (!response.success) {
+        masterItemFailures.push(`My Item "${item.name}": ${response.error}`);
+      }
+    }),
     (async () => {
-      const bagTemplatesResponse = await api.get<BagTemplate[]>(endpoints.bagTemplates);
-      const existingBagTemplates =
+      const existingTemplates =
         assertSuccess(
-          bagTemplatesResponse,
-          'Restore failed: could not fetch existing bag templates'
+          await api.get<BagTemplate[]>(endpoints.bagTemplates),
+          'Restore failed: could not fetch existing My Bags'
         ) || [];
 
-      await Promise.all(
-        backup.bagTemplates.map(async (template) => {
-          const existingTemplate = existingBagTemplates.find(
-            (t) => normalize(t.name) === normalize(template.name)
-          );
-
-          if (existingTemplate) {
-            const response = await api.patch(endpoints.bagTemplate(existingTemplate.id), {
-              name: template.name,
-              type: template.type,
-              color: template.color,
-              sort_order: template.sort_order,
-            });
-            if (!response.success) {
-              throw new Error(
-                `Restore failed: could not update bag template "${template.name}" (${response.error})`
-              );
-            }
-          } else {
-            const response = await api.post(endpoints.bagTemplates, {
-              name: template.name,
-              type: template.type,
-              color: template.color,
-              sort_order: template.sort_order,
-            });
-            if (!response.success) {
-              throw new Error(
-                `Restore failed: could not create bag template "${template.name}" (${response.error})`
-              );
-            }
-          }
-        })
-      );
+      await mapLimit(backup.bagTemplates, MAX_CONCURRENT_REQUESTS, async (template) => {
+        const fields = {
+          name: template.name,
+          type: template.type,
+          color: template.color,
+          sort_order: template.sort_order,
+        };
+        const existing = existingTemplates.find(
+          (t) => normalize(t.name) === normalize(template.name)
+        );
+        const response = existing
+          ? await api.patch(endpoints.bagTemplate(existing.id), fields)
+          : await api.post(endpoints.bagTemplates, fields);
+        assertSuccess(response, `Restore failed: could not save My Bag "${template.name}"`);
+      });
     })(),
   ]);
 
-  // Phase 3: Trips (each trip is sequential internally, but trips are independent)
-  const tripsResponse = await api.get<Trip[]>(endpoints.trips);
+  // Phase 3: Trips, one at a time (each fans out internally).
   const existingTrips =
-    assertSuccess(tripsResponse, 'Restore failed: could not fetch existing trips') || [];
+    assertSuccess(
+      await api.get<Trip[]>(endpoints.trips),
+      'Restore failed: could not fetch existing trips'
+    ) || [];
 
-  await Promise.all(
-    backup.trips.map(async (tripData) => {
-      const existingTrip =
-        existingTrips.find((t) => t.id === tripData.source_id) ||
-        existingTrips.find((t) => normalize(t.name) === normalize(tripData.name));
+  for (const { bags, items, ...tripData } of backup.trips) {
+    const fields = {
+      name: tripData.name,
+      destination: tripData.destination,
+      start_date: tripData.start_date,
+      end_date: tripData.end_date,
+      notes: tripData.notes,
+    };
+    const existingTrip =
+      existingTrips.find((t) => t.id === tripData.source_id) ||
+      existingTrips.find((t) => normalize(t.name) === normalize(tripData.name));
 
-      let tripId: string;
+    let tripId: string;
+    if (existingTrip) {
+      const response = await api.patch(endpoints.trip(existingTrip.id), fields);
+      assertSuccess(response, `Restore failed: could not update trip "${tripData.name}"`);
+      tripId = existingTrip.id;
+    } else {
+      const response = await api.post<Trip>(endpoints.trips, fields);
+      tripId = assertData(response, `Restore failed: could not create trip "${tripData.name}"`).id;
+    }
 
-      if (existingTrip) {
-        const response = await api.patch(endpoints.trip(existingTrip.id), {
-          name: tripData.name,
-          destination: tripData.destination,
-          start_date: tripData.start_date,
-          end_date: tripData.end_date,
-          notes: tripData.notes,
-        });
-        if (!response.success) {
-          throw new Error(
-            `Restore failed: could not update trip "${tripData.name}" (${response.error})`
-          );
-        }
-        tripId = existingTrip.id;
-      } else {
-        const tripResponse = await api.post<Trip>(endpoints.trips, {
-          name: tripData.name,
-          destination: tripData.destination,
-          start_date: tripData.start_date,
-          end_date: tripData.end_date,
-          notes: tripData.notes,
-        });
-        tripId = assertData(
-          tripResponse,
-          `Restore failed: could not create trip "${tripData.name}"`
-        ).id;
-      }
-
-      // Fetch existing bags/items in parallel
-      const [bagsResponse, itemsResponse] = await Promise.all([
-        api.get<Bag[]>(endpoints.tripBags(tripId)),
-        api.get<TripItem[]>(endpoints.tripItems(tripId)),
-      ]);
-      const existingBags =
-        assertSuccess(
-          bagsResponse,
-          `Restore failed: could not fetch bags for trip "${tripData.name}"`
-        ) || [];
-      const bagNameToId = new Map<string, string>();
-      const bagSourceMap = new Map<string, string>();
-
-      const rememberBag = (bagData: (typeof tripData.bags)[number], id: string) => {
-        bagNameToId.set(normalize(bagData.name), id);
-        if (bagData.source_id) {
-          bagSourceMap.set(bagData.source_id, id);
-        }
-      };
-
-      // Restore bags in parallel. Bags are structural: items depend on the
-      // resulting IDs, so a failure here aborts the restore.
-      await Promise.all(
-        tripData.bags.map(async (bagData) => {
-          const existingBag =
-            (bagData.source_id && existingBags.find((b) => b.id === bagData.source_id)) ||
-            existingBags.find((b) => normalize(b.name) === normalize(bagData.name));
-
-          if (existingBag) {
-            const response = await api.patch(endpoints.tripBags(tripId), {
-              bag_id: existingBag.id,
-              name: bagData.name,
-              type: bagData.type,
-              color: bagData.color,
-              sort_order: bagData.sort_order,
-            });
-            if (!response.success) {
-              throw new Error(
-                `Restore failed: could not update bag "${bagData.name}" in trip "${tripData.name}" (${response.error})`
-              );
-            }
-            rememberBag(bagData, existingBag.id);
-          } else {
-            const bagResponse = await api.post<Bag>(endpoints.tripBags(tripId), {
-              name: bagData.name,
-              type: bagData.type,
-              color: bagData.color,
-              sort_order: bagData.sort_order,
-            });
-            const data = assertData(
-              bagResponse,
-              `Restore failed: could not create bag "${bagData.name}" in trip "${tripData.name}"`
-            );
-            rememberBag(bagData, data.id);
-          }
-        })
+    try {
+      const result = await restoreTripContents(
+        tripId,
+        { bags, items },
+        { merge: !!existingTrip, api }
       );
-
-      // Restore items in parallel (bags are done, so bag IDs are available).
-      // Item failures don't corrupt other items, so they're collected and
-      // reported at the end rather than aborting the restore.
-      const existingItems =
-        assertSuccess(
-          itemsResponse,
-          `Restore failed: could not fetch items for trip "${tripData.name}"`
-        ) || [];
-      const itemSourceMap = new Map<string, string>();
-      const restoredItems: Array<{
-        backupItem: (typeof tripData.items)[number];
-        itemId: string;
-      }> = [];
-
-      const getItemKey = (item: (typeof tripData.items)[number]) =>
-        `${normalize(item.name)}|${normalize(item.category_name)}|${normalize(item.bag_name)}`;
-      const getSourceMapKey = (item: (typeof tripData.items)[number]) =>
-        item.source_id || getItemKey(item);
-
-      await Promise.all(
-        tripData.items.map(async (itemData) => {
-          const bagId =
-            (itemData.bag_source_id && bagSourceMap.get(itemData.bag_source_id)) ||
-            (itemData.bag_name ? bagNameToId.get(normalize(itemData.bag_name)) || null : null);
-
-          const existingItem =
-            (itemData.source_id && existingItems.find((i) => i.id === itemData.source_id)) ||
-            existingItems.find(
-              (i) =>
-                normalize(i.name) === normalize(itemData.name) &&
-                (i.bag_id || null) === (bagId || null) &&
-                normalize(i.category_name) === normalize(itemData.category_name)
-            );
-
-          if (existingItem) {
-            const response = await api.patch(endpoints.tripItems(tripId), {
-              id: existingItem.id,
-              name: itemData.name,
-              category_name: itemData.category_name,
-              quantity: itemData.quantity,
-              bag_id: bagId,
-              is_packed: itemData.is_packed,
-              is_skipped: itemData.is_skipped ?? false,
-              is_container: itemData.is_container,
-              notes: itemData.notes,
-            });
-            if (!response.success) {
-              itemFailures.push(
-                `Item "${itemData.name}" in trip "${tripData.name}": ${response.error}`
-              );
-              return;
-            }
-            itemSourceMap.set(getSourceMapKey(itemData), existingItem.id);
-            restoredItems.push({ backupItem: itemData, itemId: existingItem.id });
-            return;
-          }
-
-          const createResponse = await api.post<TripItem>(endpoints.tripItems(tripId), {
-            name: itemData.name,
-            category_name: itemData.category_name,
-            quantity: itemData.quantity,
-            bag_id: bagId,
-            master_item_id: null,
-            container_item_id: null,
-            is_container: itemData.is_container || false,
-            is_packed: itemData.is_packed,
-            is_skipped: itemData.is_skipped ?? false,
-            notes: itemData.notes,
-            merge_duplicates: false,
-          });
-
-          if (!createResponse.success || !createResponse.data) {
-            itemFailures.push(
-              `Item "${itemData.name}" in trip "${tripData.name}": ${createResponse.error || 'no data returned'}`
-            );
-            return;
-          }
-
-          itemSourceMap.set(getSourceMapKey(itemData), createResponse.data.id);
-          restoredItems.push({ backupItem: itemData, itemId: createResponse.data.id });
-        })
+      itemFailures.push(...result.failures.map((f) => `Trip "${tripData.name}": ${f}`));
+    } catch (error) {
+      throw new Error(
+        `Restore failed: trip "${tripData.name}": ${error instanceof Error ? error.message : error}`
       );
+    }
+  }
 
-      // Link containers in parallel (all items that could be restored exist
-      // now). This covers items matched to existing rows as well as newly
-      // created ones, so restoring over existing data doesn't drop nesting.
-      await Promise.all(
-        restoredItems
-          .filter(({ backupItem }) => backupItem.container_source_id || backupItem.container_name)
-          .map(async ({ backupItem, itemId }) => {
-            const parentBackupItem = backupItem.container_name
-              ? tripData.items.find(
-                  (i) => normalize(i.name) === normalize(backupItem.container_name)
-                )
-              : undefined;
-
-            const parentId =
-              (backupItem.container_source_id &&
-                itemSourceMap.get(backupItem.container_source_id)) ||
-              (parentBackupItem ? itemSourceMap.get(getSourceMapKey(parentBackupItem)) : undefined);
-
-            if (!parentId) {
-              containerLinkFailures.push(
-                `Item "${backupItem.name}" in trip "${tripData.name}": could not resolve container "${
-                  backupItem.container_name || backupItem.container_source_id
-                }"`
-              );
-              return;
-            }
-
-            const response = await api.patch(endpoints.tripItems(tripId), {
-              id: itemId,
-              container_item_id: parentId,
-            });
-            if (!response.success) {
-              containerLinkFailures.push(
-                `Item "${backupItem.name}" in trip "${tripData.name}": failed to link container (${response.error})`
-              );
-            }
-          })
-      );
-    })
-  );
-
-  if (
-    masterItemFailures.length > 0 ||
-    itemFailures.length > 0 ||
-    containerLinkFailures.length > 0
-  ) {
+  if (masterItemFailures.length > 0 || itemFailures.length > 0) {
     const totalItems = backup.trips.reduce((sum, t) => sum + t.items.length, 0);
     const summaryParts: string[] = [];
     if (itemFailures.length > 0) {
@@ -424,13 +413,10 @@ export async function restoreBackupData(
     }
     if (masterItemFailures.length > 0) {
       summaryParts.push(
-        `${masterItemFailures.length} of ${backup.masterItems.length} master items failed`
+        `${masterItemFailures.length} of ${backup.masterItems.length} My Items failed`
       );
     }
-    if (containerLinkFailures.length > 0) {
-      summaryParts.push(`${containerLinkFailures.length} container link(s) failed`);
-    }
-    const details = [...masterItemFailures, ...itemFailures, ...containerLinkFailures].join(' | ');
+    const details = [...masterItemFailures, ...itemFailures].join(' | ');
     throw new Error(`Restore incomplete: ${summaryParts.join('; ')}. Failures: ${details}`);
   }
 }
