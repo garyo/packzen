@@ -5,7 +5,7 @@
   "license": "MIT",
   "scripts": {
     "dev": "bun run version:generate:dev && astro dev",
-    "build": "bun run validate:data && bun run version:generate && astro build && bun run sw:generate",
+    "build": "node scripts/check-build-env.js && bun run validate:data && bun run version:generate && astro build && bun run sw:generate",
     "preview": "astro preview",
     "test": "node --import tsx --import ./tests/loader-hooks.mjs --test 'tests/*.test.ts'",
     "typecheck": "tsc --noEmit && astro check",

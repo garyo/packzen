@@ -63,11 +63,11 @@ Set production secrets for your Worker using Wrangler CLI:
 
 ### Set Secrets via Wrangler
 
-```bash
-# Set Clerk publishable key (public - will be in client bundle)
-npx wrangler secret put PUBLIC_CLERK_PUBLISHABLE_KEY
-# When prompted, paste: pk_live_...
+The Clerk publishable key is not a secret and is needed at **build** time
+(static pages bake it in), so it lives in the committed `.env.production`. The
+build fails if it's missing (`scripts/check-build-env.js`).
 
+```bash
 # Set Clerk secret key (private - server-side only)
 npx wrangler secret put CLERK_SECRET_KEY
 # When prompted, paste: sk_live_...
@@ -173,7 +173,7 @@ After deployment, test the following:
 
 | Variable                     | Required | Example     | Description                           |
 | ---------------------------- | -------- | ----------- | ------------------------------------- |
-| PUBLIC_CLERK_PUBLISHABLE_KEY | Yes      | pk*live*... | Clerk publishable key (public)        |
+| PUBLIC_CLERK_PUBLISHABLE_KEY | Yes      | pk*live*... | Build-time, in `.env.production`      |
 | CLERK_SECRET_KEY             | Yes      | sk*live*... | Clerk secret key (private)            |
 | CLERK_WEBHOOK_SECRET         | Yes      | whsec\_...  | Clerk webhook signing secret          |
 | DB                           | Auto     | -           | D1 database binding (auto-configured) |

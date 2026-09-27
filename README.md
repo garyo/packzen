@@ -198,19 +198,11 @@ npx wrangler secret put CLERK_SECRET_KEY
 # Paste your Clerk secret key when prompted
 ```
 
-### 3. Set Environment Variables
+### 3. Set the Publishable Key
 
-Update `wrangler.jsonc` with your production values:
-
-```jsonc
-{
-  "vars": {
-    "PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_live_your_production_key",
-  },
-}
-```
-
-Then redeploy: `bun run deploy`
+The Clerk publishable key is public and baked in at build time, so it lives in
+the committed `.env.production` (the build fails without it). Only secrets go
+through `wrangler secret put`.
 
 ### 4. Apply Database Migrations to Production
 
