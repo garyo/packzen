@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { drizzle } from 'drizzle-orm/d1';
 import { SyncManager } from '../src/lib/sync-manager';
+import { GET } from '../src/pages/api/sync/events';
+import { changeLog } from '../db/schema';
+import { createTestDatabase, buildApiContext } from './test-helpers';
 
 // sync-manager.ts references `window` / `document` only inside methods (not
 // at module load time), so we can stub them as plain globals before calling
@@ -348,5 +352,153 @@ test('sync-manager: online event while a poll is in flight does not spawn a dupl
     'superseded in-flight poll did not spawn a duplicate scheduled loop'
   );
 
+  manager.disconnect();
+});
+
+function stubDom(visibilityState: 'visible' | 'hidden' = 'visible') {
+  const fakeDocument = { ...makeFakeEventTarget(), visibilityState };
+  (globalThis as any).window = makeFakeEventTarget();
+  (globalThis as any).document = fakeDocument;
+  return fakeDocument;
+}
+
+async function settle() {
+  for (let i = 0; i < 5; i++) await Promise.resolve();
+}
+
+test('sync-manager: ready() resolves after the first poll, even a failed one', async () => {
+  stubDom();
+  const clock = makeFakeClock();
+  const manager = new SyncManager({
+    fetch: async () => errResponse(),
+    getToken: async () => null,
+    setTimeout: clock.setTimeout,
+    clearTimeout: clock.clearTimeout,
+  });
+
+  let ready = false;
+  void manager.ready().then(() => (ready = true));
+  await settle();
+  assert.equal(ready, false, 'not ready before connecting');
+
+  manager.connect();
+  await settle();
+  assert.equal(ready, true);
+  manager.disconnect();
+});
+
+test('sync-manager: sends Last-Event-ID 0 after a checkpoint of id 0', async () => {
+  stubDom();
+  const clock = makeFakeClock();
+  const sentIds: Array<string | undefined> = [];
+  const manager = new SyncManager({
+    fetch: async (_url, init) => {
+      sentIds.push((init?.headers as Record<string, string>)['Last-Event-ID']);
+      return okResponse('retry: 3000\n\nid: 0\n\n');
+    },
+    getToken: async () => null,
+    setTimeout: clock.setTimeout,
+    clearTimeout: clock.clearTimeout,
+  });
+
+  manager.connect();
+  await settle();
+  await clock.tick(3000);
+  await settle();
+  assert.deepEqual(sentIds, [undefined, '0']);
+  manager.disconnect();
+});
+
+test('sync-manager: a hidden tab stops polling and resumes at once when visible', async () => {
+  const fakeDocument = stubDom();
+  const clock = makeFakeClock();
+  let fetchCalls = 0;
+  const manager = new SyncManager({
+    fetch: async () => {
+      fetchCalls++;
+      return okResponse();
+    },
+    getToken: async () => null,
+    setTimeout: clock.setTimeout,
+    clearTimeout: clock.clearTimeout,
+  });
+
+  manager.connect();
+  await settle();
+  assert.equal(clock.pendingCount(), 1);
+
+  fakeDocument.visibilityState = 'hidden';
+  fakeDocument.dispatch('visibilitychange');
+  assert.equal(clock.pendingCount(), 0, 'hiding cancels the next poll');
+
+  fakeDocument.visibilityState = 'visible';
+  fakeDocument.dispatch('visibilitychange');
+  await settle();
+  assert.equal(fetchCalls, 2, 'becoming visible polls right away');
+  assert.equal(clock.pendingCount(), 1);
+  manager.disconnect();
+});
+
+test('sync-manager: a full page of rows re-polls immediately', async () => {
+  stubDom();
+  const clock = makeFakeClock();
+  const fullPage = Array.from({ length: 50 }, (_, i) => `id: ${i + 1}\n\n`).join('');
+  const manager = new SyncManager({
+    fetch: async () => okResponse(fullPage),
+    getToken: async () => null,
+    setTimeout: clock.setTimeout,
+    clearTimeout: clock.clearTimeout,
+  });
+
+  manager.connect();
+  await settle();
+  assert.deepEqual(clock.pendingDelays(), [0]);
+  manager.disconnect();
+});
+
+test('sync-manager: delivers the first event written to an empty change log (real handler)', async () => {
+  stubDom();
+  const d1 = await createTestDatabase();
+  const db = drizzle(d1);
+  const userId = 'user_empty_log';
+  const clock = makeFakeClock();
+
+  const manager = new SyncManager({
+    fetch: async (url, init) =>
+      GET!(
+        buildApiContext({
+          db: d1,
+          userId,
+          request: new Request(`http://localhost${url}`, { headers: init?.headers }),
+        })
+      ),
+    getToken: async () => 'token',
+    setTimeout: clock.setTimeout,
+    clearTimeout: clock.clearTimeout,
+  });
+
+  const received: string[] = [];
+  manager.on('trip', (change) => received.push(change.entityId));
+
+  manager.connect();
+  await manager.ready();
+
+  await db.insert(changeLog).values({
+    clerk_user_id: userId,
+    entity_type: 'trip',
+    entity_id: 'trip-1',
+    parent_id: null,
+    action: 'create',
+    data: JSON.stringify({ name: 'First Trip' }),
+    source_id: null,
+    created_at: Math.floor(Date.now() / 1000),
+  });
+
+  await clock.tick(3000);
+  // The handler runs real (async) D1 queries; wait for that poll to finish.
+  for (let i = 0; i < 50 && received.length === 0; i++) {
+    await new Promise((r) => setImmediate(r));
+  }
+  assert.deepEqual(received, ['trip-1']);
   manager.disconnect();
 });

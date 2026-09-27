@@ -13,6 +13,8 @@ export type SyncHandler = (change: SyncChange) => void;
 
 const BASE_POLL_INTERVAL = 3000;
 const MAX_POLL_INTERVAL = 30000;
+/** Rows per poll; must match the LIMIT in src/pages/api/sync/events.ts. */
+const SYNC_PAGE_SIZE = 50;
 
 /**
  * External calls the manager needs, factored out so tests can inject fakes
@@ -37,16 +39,30 @@ export class SyncManager {
   private deps: SyncManagerDeps;
   private timerId: ReturnType<typeof setTimeout> | null = null;
   private handlers = new Map<string, Set<SyncHandler>>();
-  private lastEventId = 0;
+  /** Last id the server sent (0 = empty log); null until the first checkpoint arrives. */
+  private lastEventId: number | null = null;
   private consecutiveErrors = 0;
   private active = false;
   /** Bumped on every connect(); poll loops capture it and refuse to outlive a reconnect. */
   private generation = 0;
   private onOnline: (() => void) | null = null;
   private onVisibilityChange: (() => void) | null = null;
+  private resolveReady!: () => void;
+  private readonly readyPromise = new Promise<void>((resolve) => {
+    this.resolveReady = resolve;
+  });
 
   constructor(deps: Partial<SyncManagerDeps> = {}) {
     this.deps = { ...defaultDeps, ...deps };
+  }
+
+  /**
+   * Resolves once the first poll has completed (successfully or not), i.e.
+   * once the sync checkpoint is established. Await it before fetching a
+   * snapshot so no change can fall between the snapshot and the checkpoint.
+   */
+  ready(): Promise<void> {
+    return this.readyPromise;
   }
 
   connect() {
@@ -60,17 +76,15 @@ export class SyncManager {
 
   disconnect() {
     this.active = false;
-    if (this.timerId) {
-      this.deps.clearTimeout(this.timerId);
-      this.timerId = null;
-    }
+    this.clearTimer();
     this.removeLifecycleListeners();
   }
 
   private addLifecycleListeners() {
     this.onOnline = () => this.resume();
     this.onVisibilityChange = () => {
-      if (document.visibilityState === 'visible') this.resume();
+      if (isHidden()) this.clearTimer();
+      else this.resume();
     };
     window.addEventListener('online', this.onOnline);
     document.addEventListener('visibilitychange', this.onVisibilityChange);
@@ -87,13 +101,17 @@ export class SyncManager {
     }
   }
 
-  /** Poll right away instead of waiting out the current backoff timer. */
-  private resume() {
-    if (!this.active) return;
+  private clearTimer() {
     if (this.timerId) {
       this.deps.clearTimeout(this.timerId);
       this.timerId = null;
     }
+  }
+
+  /** Poll right away instead of waiting out the current backoff timer. */
+  private resume() {
+    if (!this.active) return;
+    this.clearTimer();
     // Bump the generation so any poll already in flight (which cannot see
     // timerId to cancel) bails at the pre-reschedule guard instead of
     // surviving alongside this new poll loop.
@@ -104,13 +122,14 @@ export class SyncManager {
   private async poll(generation: number) {
     if (!this.active || generation !== this.generation) return;
 
+    let rowCount = 0;
     try {
       const token = await this.deps.getToken();
       const url = `/api/sync/events?sourceId=${sourceId}`;
 
       const headers: Record<string, string> = {};
       if (token) headers['Authorization'] = `Bearer ${token}`;
-      if (this.lastEventId) headers['Last-Event-ID'] = String(this.lastEventId);
+      if (this.lastEventId !== null) headers['Last-Event-ID'] = String(this.lastEventId);
 
       const res = await this.deps.fetch(url, { headers, credentials: 'same-origin' });
 
@@ -120,24 +139,32 @@ export class SyncManager {
 
       this.consecutiveErrors = 0;
       const text = await res.text();
-      this.processEvents(text);
+      rowCount = this.processEvents(text);
+      // A checkpoint reply with no id means the change log is empty.
+      this.lastEventId ??= 0;
     } catch {
       this.consecutiveErrors++;
     }
+    this.resolveReady();
 
     // A disconnect (or disconnect+reconnect) that happened while the request
     // was in flight must not resurrect this loop or run alongside a newer one.
-    if (!this.active || generation !== this.generation) return;
+    // Hidden tabs stop polling until they become visible again.
+    if (!this.active || generation !== this.generation || isHidden()) return;
 
     const interval =
       this.consecutiveErrors > 0
         ? Math.min(BASE_POLL_INTERVAL * 2 ** this.consecutiveErrors, MAX_POLL_INTERVAL)
-        : BASE_POLL_INTERVAL;
+        : rowCount >= SYNC_PAGE_SIZE
+          ? 0 // A full page means more rows are waiting.
+          : BASE_POLL_INTERVAL;
 
     this.timerId = this.deps.setTimeout(() => this.poll(generation), interval);
   }
 
-  private processEvents(text: string) {
+  /** Apply an SSE body; returns how many change-log rows (ids) it carried. */
+  private processEvents(text: string): number {
+    let rowCount = 0;
     // Parse SSE format: blocks separated by double newlines
     const blocks = text.split('\n\n');
     for (const block of blocks) {
@@ -151,8 +178,9 @@ export class SyncManager {
         else if (line.startsWith('event: ')) event = line.slice(7);
       }
 
-      if (id) {
+      if (id !== undefined) {
         this.lastEventId = parseInt(id, 10);
+        rowCount++;
       }
 
       if (event === 'sync' && data) {
@@ -165,6 +193,7 @@ export class SyncManager {
         }
       }
     }
+    return rowCount;
   }
 
   /**
@@ -186,6 +215,10 @@ export class SyncManager {
       }
     };
   }
+}
+
+function isHidden(): boolean {
+  return document.visibilityState === 'hidden';
 }
 
 export const syncManager = new SyncManager();
