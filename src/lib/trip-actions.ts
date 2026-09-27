@@ -4,6 +4,7 @@
 
 import { api, endpoints } from './api';
 import { showToast } from '../components/ui/Toast';
+import { confirmDialog } from '../components/ui/ConfirmDialog';
 
 /**
  * Delete a trip with confirmation dialog
@@ -17,9 +18,13 @@ export async function deleteTripWithConfirm(
   tripName: string,
   onSuccess: () => void
 ): Promise<boolean> {
-  if (!confirm(`Permanently delete trip "${tripName}"?`)) {
-    return false;
-  }
+  const confirmed = await confirmDialog({
+    title: `Delete "${tripName}"?`,
+    message: 'This permanently deletes the trip and its packing list.',
+    confirmLabel: 'Delete',
+    destructive: true,
+  });
+  if (!confirmed) return false;
 
   const response = await api.delete(endpoints.trip(tripId));
 

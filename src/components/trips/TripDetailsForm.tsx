@@ -1,4 +1,4 @@
-import { createSignal } from 'solid-js';
+import { createEffect, createSignal } from 'solid-js';
 import { Input } from '../ui/Input';
 import { DateInput } from '../ui/DateInput';
 import { Button } from '../ui/Button';
@@ -18,14 +18,34 @@ interface TripDetailsFormProps {
   onSubmit: (data: TripDetailsData) => void;
   onCancel?: () => void;
   submitLabel?: string;
+  submitting?: boolean;
+  /** Reports whether any field differs from `initialData`. */
+  onDirtyChange?: (dirty: boolean) => void;
 }
 
 export function TripDetailsForm(props: TripDetailsFormProps) {
-  const [name, setName] = createSignal(props.initialData?.name || '');
-  const [destination, setDestination] = createSignal(props.initialData?.destination || '');
-  const [startDate, setStartDate] = createSignal(props.initialData?.start_date || '');
-  const [endDate, setEndDate] = createSignal(props.initialData?.end_date || '');
-  const [notes, setNotes] = createSignal(props.initialData?.notes || '');
+  const initial = {
+    name: props.initialData?.name || '',
+    destination: props.initialData?.destination || '',
+    startDate: props.initialData?.start_date || '',
+    endDate: props.initialData?.end_date || '',
+    notes: props.initialData?.notes || '',
+  };
+  const [name, setName] = createSignal(initial.name);
+  const [destination, setDestination] = createSignal(initial.destination);
+  const [startDate, setStartDate] = createSignal(initial.startDate);
+  const [endDate, setEndDate] = createSignal(initial.endDate);
+  const [notes, setNotes] = createSignal(initial.notes);
+
+  createEffect(() => {
+    props.onDirtyChange?.(
+      name() !== initial.name ||
+        destination() !== initial.destination ||
+        startDate() !== initial.startDate ||
+        endDate() !== initial.endDate ||
+        notes() !== initial.notes
+    );
+  });
 
   const handleSubmit = (e: Event) => {
     e.preventDefault();
@@ -37,15 +57,13 @@ export function TripDetailsForm(props: TripDetailsFormProps) {
 
     const normalizedDates = normalizeTripDates(startDate() || null, endDate() || null);
 
-    const data: TripDetailsData = {
+    props.onSubmit({
       name: name().trim(),
       destination: destination().trim() || null,
       start_date: normalizedDates.startDate,
       end_date: normalizedDates.endDate,
       notes: notes().trim() || null,
-    };
-
-    props.onSubmit(data);
+    });
   };
 
   return (
@@ -55,7 +73,7 @@ export function TripDetailsForm(props: TripDetailsFormProps) {
         type="text"
         value={name()}
         onInput={(e) => setName(e.currentTarget.value)}
-        placeholder="e.g., Summer Vacation 2025"
+        placeholder="e.g., Beach Weekend"
         required
       />
 
@@ -89,7 +107,9 @@ export function TripDetailsForm(props: TripDetailsFormProps) {
             Cancel
           </Button>
         )}
-        <Button type="submit">{props.submitLabel || 'Continue'}</Button>
+        <Button type="submit" disabled={props.submitting}>
+          {props.submitLabel || 'Continue'}
+        </Button>
       </div>
     </form>
   );

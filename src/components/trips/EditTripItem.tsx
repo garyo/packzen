@@ -1,4 +1,4 @@
-import { createSignal, createResource, For, Show, createEffect, createMemo } from 'solid-js';
+import { createSignal, For, Show } from 'solid-js';
 import { api, endpoints } from '../../lib/api';
 import type { TripItem, Bag, Category } from '../../lib/types';
 import { Modal } from '../ui/Modal';
@@ -6,71 +6,59 @@ import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { showToast } from '../ui/Toast';
 import { TrashIcon } from '../ui/Icons';
-import { getOrCreateCategory } from '../../lib/item-helpers';
+import { NO_BAG_LABEL } from '../../lib/vocabulary';
+import {
+  CategoryPicker,
+  categoryChoiceForName,
+  choiceMayCreateCategory,
+  resolveCategoryChoice,
+  type CategoryChoice,
+} from './CategoryPicker';
 
 interface EditTripItemProps {
   tripId: string;
   item: TripItem;
-  allItems?: TripItem[]; // All trip items for container selection
-  bags?: Bag[]; // Pre-loaded bags (avoids async fetch)
-  categories?: Category[]; // Pre-loaded categories (avoids async fetch)
+  allItems: TripItem[] | undefined; // All trip items for container selection
+  bags: Bag[] | undefined;
+  categories: Category[] | undefined;
   /** Called after this form creates a category, so the parent can refresh its own copy. */
-  onDataChanged?: () => void;
+  onDataChanged: () => void;
   onClose: () => void;
+  /** Called with the updated item, or with nothing when the parent should refetch. */
   onSaved: (updatedItem?: TripItem) => void;
-  onDeleted?: (deletedItemId: string, movedItemIds?: string[]) => void;
+  onDeleted: (deletedItemId: string, movedItemIds?: string[]) => void;
 }
+
+const locationOf = (item: TripItem) =>
+  item.container_item_id
+    ? `container:${item.container_item_id}`
+    : item.bag_id
+      ? `bag:${item.bag_id}`
+      : '';
 
 export function EditTripItem(props: EditTripItemProps) {
   const [name, setName] = createSignal(props.item.name);
   const [quantity, setQuantity] = createSignal(props.item.quantity);
   const [notes, setNotes] = createSignal(props.item.notes || '');
-  const [categoryId, setCategoryId] = createSignal<string | null>(null);
-  const [isNewCategory, setIsNewCategory] = createSignal(false);
-  const [newCategoryName, setNewCategoryName] = createSignal('');
+  // Undefined until the user changes the category, so saving never touches a
+  // category it didn't change (e.g. a starter item whose category has no record).
+  const [categoryEdit, setCategoryEdit] = createSignal<CategoryChoice>();
   const [isContainer, setIsContainer] = createSignal(props.item.is_container || false);
   // Combined location - stores either "bag:id" or "container:id"
-  const [location, setLocation] = createSignal<string>(
-    props.item.container_item_id
-      ? `container:${props.item.container_item_id}`
-      : props.item.bag_id
-        ? `bag:${props.item.bag_id}`
-        : ''
-  );
-  const [showDeleteConfirm, setShowDeleteConfirm] = createSignal(false);
-  const [containedItemsCount, setContainedItemsCount] = createSignal(0);
-  const [categoryInitialized, setCategoryInitialized] = createSignal(false);
+  const [location, setLocation] = createSignal<string>(locationOf(props.item));
   const [saving, setSaving] = createSignal(false);
 
-  // Use pre-loaded bags if available, otherwise fetch
   const bags = () => props.bags || [];
+  const categoryChoice = () =>
+    categoryEdit() ?? categoryChoiceForName(props.item.category_name, props.categories);
 
-  // Use pre-loaded categories from the parent when available; only fetch when missing.
-  const [fetchedCategories, { refetch: refetchFetchedCategories }] = createResource<
-    Category[],
-    string
-  >(
-    () => (props.categories ? null : 'categories'), // Only fetch if categories not provided
-    async () => {
-      const response = await api.get<Category[]>(endpoints.categories);
-      if (response.success && response.data) {
-        return response.data;
-      }
-      return [];
-    }
-  );
-  // Preserve undefined (loading) vs. [] (loaded but empty) so the
-  // categoryInitialized effect below correctly waits for real data.
-  const categories = () => props.categories ?? fetchedCategories();
-  // After creating a category, ask the parent to refresh (so the new one flows
-  // back down as a prop), or refetch locally if no parent data was provided.
-  const refreshCategories = async () => {
-    if (props.categories) {
-      props.onDataChanged?.();
-    } else {
-      await refetchFetchedCategories();
-    }
-  };
+  const isDirty = () =>
+    name() !== props.item.name ||
+    quantity() !== props.item.quantity ||
+    notes() !== (props.item.notes || '') ||
+    categoryEdit() !== undefined ||
+    isContainer() !== (props.item.is_container || false) ||
+    location() !== locationOf(props.item);
 
   // Get available containers (containers that are not this item, and not inside this item if this is a container)
   const availableContainers = () => {
@@ -83,72 +71,9 @@ export function EditTripItem(props: EditTripItemProps) {
     );
   };
 
-  // Sort categories alphabetically
-  const sortedCategories = createMemo(() => {
-    const cats = categories() || [];
-    return [...cats].sort((a, b) => a.name.localeCompare(b.name));
-  });
-
-  // Initialize category after resources load
-  createEffect(() => {
-    // Only initialize category once when categories load
-    if (categories() && props.item.category_name && !categoryInitialized()) {
-      const cat = categories()!.find((c) => c.name === props.item.category_name);
-      if (cat) {
-        setCategoryId(cat.id);
-      }
-      setCategoryInitialized(true);
-    }
-  });
-
   const handleSave = async () => {
     if (saving()) return;
     setSaving(true);
-
-    // Create new category if needed
-    let finalCategoryId = categoryId();
-    let finalCategoryName = '';
-
-    if (isNewCategory()) {
-      const newCatName = newCategoryName().trim();
-      if (!newCatName) {
-        showToast('error', 'Category name is required');
-        setSaving(false);
-        return;
-      }
-      const categoriesCache = categories() ? [...categories()!] : [];
-      // Dedup case-insensitively like the other get-or-create call sites,
-      // instead of always creating — retyping (or re-selecting a built-in
-      // name) used to silently create a duplicate category.
-      const alreadyExists = categoriesCache.some(
-        (c) => c.name.toLowerCase() === newCatName.toLowerCase()
-      );
-      const category = await getOrCreateCategory(newCatName, categoriesCache);
-      if (category) {
-        finalCategoryId = category.id;
-        finalCategoryName = category.name;
-        setCategoryId(finalCategoryId);
-        await refreshCategories();
-        showToast(
-          'success',
-          alreadyExists
-            ? `Using existing category "${category.name}"`
-            : `Created category "${newCatName}"`
-        );
-      } else {
-        showToast('error', 'Failed to create category');
-        setSaving(false);
-        return;
-      }
-    } else if (finalCategoryId) {
-      // Look up category name from ID
-      const cat = categories()?.find((c) => c.id === finalCategoryId);
-      finalCategoryName = cat?.name || '';
-    } else if (!categoryInitialized()) {
-      // Categories haven't resolved yet: keep the item's current category instead
-      // of wiping it with categoryId()'s not-yet-initialized null.
-      finalCategoryName = props.item.category_name || '';
-    }
 
     // Parse location to determine bag_id and container_item_id
     const loc = location();
@@ -168,13 +93,26 @@ export function EditTripItem(props: EditTripItemProps) {
       return;
     }
 
+    let categoryName: string | null | undefined;
+    const edit = categoryEdit();
+    if (edit !== undefined) {
+      const resolved = await resolveCategoryChoice(edit, [...(props.categories ?? [])]);
+      if ('error' in resolved) {
+        showToast('error', resolved.error);
+        setSaving(false);
+        return;
+      }
+      categoryName = resolved.category?.name ?? null;
+      if (choiceMayCreateCategory(edit)) props.onDataChanged();
+    }
+
     const patchData = {
       id: props.item.id,
       name: name().trim(),
       quantity: quantity(),
       notes: notes().trim() || null,
       bag_id: containerItemId ? null : bagId, // If inside a container, clear bag_id
-      category_name: finalCategoryName || null,
+      ...(categoryName !== undefined && { category_name: categoryName }),
       is_container: isContainer(),
       container_item_id: isContainer() ? null : containerItemId, // Containers can't be in containers
     };
@@ -196,51 +134,55 @@ export function EditTripItem(props: EditTripItemProps) {
     }
   };
 
-  const handleDelete = async () => {
-    // If this is a container, check for contained items
-    if (props.item.is_container && props.allItems) {
-      const contained = props.allItems.filter((item) => item.container_item_id === props.item.id);
+  const containedItems = () =>
+    (props.allItems ?? []).filter((item) => item.container_item_id === props.item.id);
+  const [choosingContainerDelete, setChoosingContainerDelete] = createSignal(false);
 
-      if (contained.length > 0) {
-        // Show custom confirmation dialog
-        setContainedItemsCount(contained.length);
-        setShowDeleteConfirm(true);
-        return;
-      }
+  const handleDelete = () => {
+    if (containedItems().length > 0) {
+      setChoosingContainerDelete(true);
+    } else {
+      void deleteWithUndo();
     }
-
-    // Simple delete for non-containers or empty containers
-    if (!confirm('Delete this item?')) return;
-    await performDelete(false);
   };
 
-  const getContainerDestination = () => {
-    const loc = location();
-    if (loc.startsWith('bag:')) {
-      const bagId = loc.substring(4);
-      const bag = bags()?.find((b) => b.id === bagId);
-      return bag ? `to ${bag.name}` : 'to trip';
+  // A plain delete needs no confirmation: the toast offers Undo instead.
+  const deleteWithUndo = async () => {
+    if (saving()) return;
+    setSaving(true);
+    const item = props.item;
+    const response = await api.delete(endpoints.tripItems(props.tripId), {
+      body: JSON.stringify({ id: item.id }),
+    });
+    if (!response.success) {
+      showToast('error', response.error || 'Failed to delete item');
+      setSaving(false);
+      return;
     }
-    return 'to trip';
+    props.onDeleted(item.id);
+    props.onClose();
+    const { tripId, onSaved } = props;
+    showToast('success', `Deleted "${item.name}"`, {
+      action: { label: 'Undo', onClick: () => void restoreItem(tripId, item, onSaved) },
+    });
   };
 
-  const performDelete = async (keepItems: boolean) => {
+  // The contents keep the container's own location, not any unsaved edit.
+  const containerDestination = () =>
+    bags().find((b) => b.id === props.item.bag_id)?.name ?? NO_BAG_LABEL;
+
+  const deleteContainer = async (keepContents: boolean) => {
     if (saving()) return;
     setSaving(true);
     const movedItemIds: string[] = [];
 
-    if (keepItems) {
-      // First, move all contained items - they inherit the container's bag
-      const contained =
-        props.allItems?.filter((item) => item.container_item_id === props.item.id) || [];
-
-      for (const item of contained) {
+    if (keepContents) {
+      for (const item of containedItems()) {
         const moveResponse = await api.patch(endpoints.tripItems(props.tripId), {
           id: item.id,
           container_item_id: null,
-          bag_id: props.item.bag_id || null, // Inherit bag from container
+          bag_id: props.item.bag_id || null,
         });
-
         if (!moveResponse.success) {
           // Abort before deleting the container - otherwise the server-side cascade
           // would delete the children the user asked to keep. Some items may already
@@ -254,26 +196,17 @@ export function EditTripItem(props: EditTripItemProps) {
       }
     }
 
-    // Then delete the container
     const response = await api.delete(endpoints.tripItems(props.tripId), {
       body: JSON.stringify({ id: props.item.id }),
     });
-
     if (response.success) {
-      const destination = getContainerDestination();
       showToast(
         'success',
-        keepItems
-          ? `Container deleted. ${containedItemsCount()} items moved ${destination}.`
-          : 'Item deleted'
+        keepContents
+          ? `Container deleted. ${movedItemIds.length} items moved to ${containerDestination()}.`
+          : `Deleted "${props.item.name}" and its contents`
       );
-      setShowDeleteConfirm(false);
-      // Call onDeleted if provided, otherwise fall back to onSaved for compatibility
-      if (props.onDeleted) {
-        props.onDeleted(props.item.id, keepItems ? movedItemIds : undefined);
-      } else {
-        props.onSaved();
-      }
+      props.onDeleted(props.item.id, keepContents ? movedItemIds : undefined);
       props.onClose();
     } else {
       showToast('error', response.error || 'Failed to delete item');
@@ -282,7 +215,7 @@ export function EditTripItem(props: EditTripItemProps) {
   };
 
   return (
-    <Modal title="Edit Item" onClose={props.onClose}>
+    <Modal title="Edit Item" onClose={props.onClose} isDirty={isDirty}>
       <div class="space-y-4">
         <div>
           <label class="mb-1 block text-sm font-medium text-gray-700">Name</label>
@@ -326,50 +259,11 @@ export function EditTripItem(props: EditTripItemProps) {
 
         <div>
           <label class="mb-1 block text-sm font-medium text-gray-700">Category</label>
-          <Show
-            when={!isNewCategory()}
-            fallback={
-              <div class="flex gap-2">
-                <Input
-                  type="text"
-                  value={newCategoryName()}
-                  onInput={(e) => setNewCategoryName(e.currentTarget.value)}
-                  placeholder="Enter category name"
-                  class="flex-1"
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsNewCategory(false);
-                    setNewCategoryName('');
-                  }}
-                  class="px-3 py-2 text-sm text-gray-600 hover:text-gray-900"
-                >
-                  Cancel
-                </button>
-              </div>
-            }
-          >
-            <select
-              value={categoryId() || ''}
-              onChange={(e) => {
-                const value = e.target.value;
-                if (value === '__new__') {
-                  setIsNewCategory(true);
-                  setCategoryId(null);
-                } else {
-                  setCategoryId(value || null);
-                }
-              }}
-              class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">No category</option>
-              <For each={sortedCategories()}>
-                {(category) => <option value={category.id}>{category.name}</option>}
-              </For>
-              <option value="__new__">+ New category...</option>
-            </select>
-          </Show>
+          <CategoryPicker
+            categories={props.categories}
+            value={categoryChoice()}
+            onChange={setCategoryEdit}
+          />
         </div>
 
         {/* Container toggle */}
@@ -401,7 +295,7 @@ export function EditTripItem(props: EditTripItemProps) {
             onChange={(e) => setLocation(e.target.value)}
             class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
           >
-            <option value="">No bag</option>
+            <option value="">{NO_BAG_LABEL}</option>
             <For each={bags()}>{(bag) => <option value={`bag:${bag.id}`}>{bag.name}</option>}</For>
             <Show when={!isContainer() && availableContainers().length > 0}>
               <For each={availableContainers()}>
@@ -440,44 +334,56 @@ export function EditTripItem(props: EditTripItemProps) {
         </div>
       </div>
 
-      {/* Delete confirmation dialog for containers with items */}
-      <Show when={showDeleteConfirm()}>
-        <div class="bg-opacity-50 fixed inset-0 z-50 flex items-center justify-center bg-black p-4">
-          <div class="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
-            <h3 class="mb-4 text-lg font-semibold text-gray-900">Delete Container?</h3>
-            <p class="mb-6 text-sm text-gray-600">
-              This container has {containedItemsCount()} item
-              {containedItemsCount() !== 1 ? 's' : ''} inside. What would you like to do?
-            </p>
-            <div class="flex flex-col gap-3">
-              <Button
-                onClick={() => performDelete(true)}
-                variant="primary"
-                class="w-full justify-center"
-                disabled={saving()}
-              >
-                Keep Items (move {getContainerDestination()})
-              </Button>
-              <Button
-                onClick={() => performDelete(false)}
-                variant="secondary"
-                class="w-full justify-center bg-red-50 text-red-600 hover:bg-red-100"
-                disabled={saving()}
-              >
-                Delete All ({containedItemsCount() + 1} items)
-              </Button>
-              <Button
-                onClick={() => setShowDeleteConfirm(false)}
-                variant="secondary"
-                class="w-full justify-center"
-                disabled={saving()}
-              >
-                Cancel
-              </Button>
-            </div>
+      <Show when={choosingContainerDelete()}>
+        <Modal
+          title="Delete container?"
+          size="small"
+          onClose={() => setChoosingContainerDelete(false)}
+        >
+          <p class="mb-6 text-sm text-gray-600">
+            "{props.item.name}" has {containedItems().length} item
+            {containedItems().length !== 1 ? 's' : ''} inside. What would you like to do?
+          </p>
+          <div class="flex flex-col gap-3">
+            <Button onClick={() => deleteContainer(true)} disabled={saving()}>
+              Keep items (move to {containerDestination()})
+            </Button>
+            <Button variant="danger" onClick={() => deleteContainer(false)} disabled={saving()}>
+              Delete all ({containedItems().length + 1} items)
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => setChoosingContainerDelete(false)}
+              disabled={saving()}
+            >
+              Cancel
+            </Button>
           </div>
-        </div>
+        </Modal>
       </Show>
     </Modal>
   );
+}
+
+/** Re-create a deleted item with the same fields (it gets a new id), then have the parent refetch. */
+async function restoreItem(tripId: string, item: TripItem, onSaved: () => void) {
+  const response = await api.post(endpoints.tripItems(tripId), {
+    name: item.name,
+    category_name: item.category_name,
+    quantity: item.quantity,
+    bag_id: item.bag_id,
+    container_item_id: item.container_item_id,
+    master_item_id: item.master_item_id,
+    notes: item.notes,
+    is_container: item.is_container,
+    is_packed: item.is_packed,
+    is_skipped: item.is_skipped,
+    merge_duplicates: false,
+  });
+  if (response.success) {
+    showToast('success', `Restored "${item.name}"`);
+    onSaved();
+  } else {
+    showToast('error', response.error || 'Failed to restore item');
+  }
 }

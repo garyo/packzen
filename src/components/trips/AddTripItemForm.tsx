@@ -1,4 +1,4 @@
-import { createSignal, createResource, createEffect, createMemo, For, Show } from 'solid-js';
+import { createSignal, createEffect, createMemo, For, Show } from 'solid-js';
 import { api, endpoints } from '../../lib/api';
 import type { Bag, Category, MasterItemWithCategory, TripItem } from '../../lib/types';
 import { Modal } from '../ui/Modal';
@@ -8,18 +8,27 @@ import { Combobox, type ComboboxItem } from '../ui/Combobox';
 import { showToast } from '../ui/Toast';
 import { searchItems } from '../../lib/search';
 import { builtInItems } from '../../lib/built-in-items';
-import { getOrCreateCategory, getOrCreateMasterItem } from '../../lib/item-helpers';
+import { getOrCreateMasterItem } from '../../lib/item-helpers';
+import { NO_BAG_LABEL } from '../../lib/vocabulary';
+import {
+  CategoryPicker,
+  categoryChoiceForName,
+  choiceMayCreateCategory,
+  resolveCategoryChoice,
+  type CategoryChoice,
+} from './CategoryPicker';
 
 interface AddTripItemFormProps {
   tripId: string;
   preSelectedBagId?: string | null;
   preSelectedContainerId?: string | null;
-  bags?: Bag[]; // Pre-loaded bags (avoids async fetch)
-  categories?: Category[]; // Pre-loaded categories (avoids async fetch)
-  tripItems?: TripItem[]; // Pre-loaded trip items (avoids async fetch)
-  masterItems?: MasterItemWithCategory[]; // Pre-loaded master items (avoids async fetch)
+  // The parent's data; undefined while it is still loading.
+  bags: Bag[] | undefined;
+  categories: Category[] | undefined;
+  tripItems: TripItem[] | undefined;
+  masterItems: MasterItemWithCategory[] | undefined;
   /** Called after this form creates a category or master item, so the parent can refresh its own copies. */
-  onDataChanged?: () => void;
+  onDataChanged: () => void;
   onClose: () => void;
   onSaved: (createdItem?: TripItem) => void;
 }
@@ -27,85 +36,17 @@ interface AddTripItemFormProps {
 export function AddTripItemForm(props: AddTripItemFormProps) {
   const [name, setName] = createSignal('');
   const [quantity, setQuantity] = createSignal(1);
-  const [categoryId, setCategoryId] = createSignal<string | null>(null);
+  const [category, setCategory] = createSignal<CategoryChoice>('');
   const [location, setLocation] = createSignal<string>('');
-  const [isNewCategory, setIsNewCategory] = createSignal(false);
-  const [newCategoryName, setNewCategoryName] = createSignal('');
   const [isContainer, setIsContainer] = createSignal(false);
   const [skipMasterAddition, setSkipMasterAddition] = createSignal(false);
   const [saving, setSaving] = createSignal(false);
   let formRef: HTMLFormElement | undefined;
 
-  // Use pre-loaded data from the parent when available; only fetch what's missing.
-  const [bags] = createResource<Bag[], string>(
-    () => (props.bags ? null : props.tripId), // Only fetch if bags not provided
-    async (tripId) => {
-      const response = await api.get<Bag[]>(endpoints.tripBags(tripId));
-      if (response.success && response.data) {
-        return response.data;
-      }
-      return [];
-    },
-    { initialValue: props.bags || [] } // Use provided bags as initial value
-  );
-
-  const [fetchedCategories, { refetch: refetchFetchedCategories }] = createResource<
-    Category[],
-    string
-  >(
-    () => (props.categories ? null : 'categories'), // Only fetch if categories not provided
-    async () => {
-      const response = await api.get<Category[]>(endpoints.categories);
-      if (response.success && response.data) {
-        return response.data;
-      }
-      return [];
-    }
-  );
-  // Preserve undefined (loading) vs. [] (loaded but empty) so downstream
-  // effects that gate on "has data arrived yet?" keep working correctly.
-  const categories = () => props.categories ?? fetchedCategories();
-  // After creating a category, ask the parent to refresh (so the new one flows
-  // back down as a prop), or refetch locally if no parent data was provided.
-  const refreshCategories = async () => {
-    if (props.categories) {
-      props.onDataChanged?.();
-    } else {
-      await refetchFetchedCategories();
-    }
-  };
-
-  const [fetchedTripItems, { refetch: refetchFetchedTripItems }] = createResource<
-    TripItem[],
-    string
-  >(
-    () => (props.tripItems ? null : props.tripId), // Only fetch if tripItems not provided
-    async (tripId) => {
-      const response = await api.get<TripItem[]>(endpoints.tripItems(tripId));
-      if (response.success && response.data) {
-        return response.data;
-      }
-      return [];
-    }
-  );
-  const tripItems = () => props.tripItems ?? fetchedTripItems();
-  // The parent keeps its trip-items store current via `onSaved`, which flows
-  // back down through the `tripItems` prop; only refetch locally when this
-  // form is fetching its own copy (no parent data provided).
-  const refreshTripItemsIfLocal = async () => {
-    if (!props.tripItems) {
-      await refetchFetchedTripItems();
-    }
-  };
-
-  const [fetchedMasterItems] = createResource<MasterItemWithCategory[], string>(
-    () => (props.masterItems ? null : 'master-items'), // Only fetch if masterItems not provided
-    async () => {
-      const response = await api.get<MasterItemWithCategory[]>(endpoints.masterItems);
-      return response.success && response.data ? response.data : [];
-    }
-  );
-  const masterItems = () => props.masterItems ?? fetchedMasterItems();
+  const bags = () => props.bags;
+  const categories = () => props.categories;
+  const tripItems = () => props.tripItems;
+  const masterItems = () => props.masterItems;
 
   // Apply the initial pre-selected bag/container exactly once, as soon as bag
   // and trip-item data is available. Guarded by `initialLocationSet` so this
@@ -145,7 +86,7 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
     const resolveLocation = (item: TripItem, visited = new Set<string>()): string => {
       // Cycle detection: if we've seen this item before, stop recursion
       if (visited.has(item.id)) {
-        return 'No Bag';
+        return NO_BAG_LABEL;
       }
       visited.add(item.id);
 
@@ -162,7 +103,7 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
         return bagLookup.get(item.bag_id)!;
       }
 
-      return 'No Bag';
+      return NO_BAG_LABEL;
     };
 
     // Store multiple locations for items with same name
@@ -275,7 +216,7 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
       group: 'builtin' as const,
       categoryName: item.category,
       defaultQuantity: item.default_quantity,
-      isContainer: false,
+      isContainer: item.is_container ?? false,
       existingLocation: existingItemsByName().get(item.name.toLowerCase().trim()),
     }));
 
@@ -285,24 +226,10 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
   const handleItemSelect = (item: ComboboxItem) => {
     setName(item.name);
 
-    // Populate category
     if (item.categoryId) {
-      setCategoryId(item.categoryId);
-      setIsNewCategory(false);
+      setCategory(item.categoryId);
     } else if (item.categoryName) {
-      // Match built-in category name to user's categories (case-insensitive)
-      const matchedCategory = categories()?.find(
-        (cat) => cat.name.toLowerCase() === item.categoryName!.toLowerCase()
-      );
-      if (matchedCategory) {
-        setCategoryId(matchedCategory.id);
-        setIsNewCategory(false);
-      } else {
-        // Pre-fill new category with the built-in category name
-        setCategoryId(null);
-        setIsNewCategory(true);
-        setNewCategoryName(item.categoryName);
-      }
+      setCategory(categoryChoiceForName(item.categoryName, categories()));
     }
 
     // Populate quantity
@@ -316,27 +243,6 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
     }
   };
 
-  // Sort categories alphabetically
-  const sortedCategories = createMemo(() => {
-    const cats = categories() || [];
-    return [...cats].sort((a, b) => a.name.localeCompare(b.name));
-  });
-
-  // Built-in category names not already in user's categories
-  const builtInOnlyCategories = createMemo(() => {
-    const userNames = new Set((categories() || []).map((c) => c.name.toLowerCase()));
-    const seen = new Set<string>();
-    return builtInItems.categories
-      .map((c) => c.name)
-      .filter((name) => {
-        const lower = name.toLowerCase();
-        if (userNames.has(lower) || seen.has(lower)) return false;
-        seen.add(lower);
-        return true;
-      })
-      .sort((a, b) => a.localeCompare(b));
-  });
-
   const handleSubmit = async (e: Event, keepOpenAfterSubmit = false) => {
     e.preventDefault();
     if (saving()) return;
@@ -347,78 +253,6 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
       showToast('error', 'Item name is required');
       setSaving(false);
       return;
-    }
-
-    // Create new category if needed
-    let finalCategoryId = categoryId();
-    const newCatNameInput = newCategoryName().trim();
-
-    if (isNewCategory()) {
-      const newCatName = newCatNameInput;
-      if (!newCatName) {
-        showToast('error', 'Category name is required');
-        setSaving(false);
-        return;
-      }
-      const newCategoryCache = categories() ? [...categories()!] : [];
-      // Dedup case-insensitively like the other get-or-create call sites,
-      // instead of always creating — retyping (or re-selecting a built-in
-      // name) used to silently create a duplicate category.
-      const alreadyExists = newCategoryCache.some(
-        (c) => c.name.toLowerCase() === newCatName.toLowerCase()
-      );
-      const category = await getOrCreateCategory(newCatName, newCategoryCache);
-      if (category) {
-        finalCategoryId = category.id;
-        setCategoryId(finalCategoryId);
-        await refreshCategories();
-        showToast(
-          'success',
-          alreadyExists
-            ? `Using existing category "${category.name}"`
-            : `Created category "${newCatName}"`
-        );
-      } else {
-        showToast('error', 'Failed to create category');
-        setSaving(false);
-        return;
-      }
-    }
-
-    // Check if item exists in master list
-    const existingMasterItem = masterItems()?.find(
-      (item) => item.name.toLowerCase() === itemName.toLowerCase()
-    );
-
-    let masterItemId = existingMasterItem?.id;
-    const categoriesList = categories() ? [...categories()!] : [];
-    let categoryName: string | null | undefined = finalCategoryId
-      ? categoriesList.find((cat) => cat.id === finalCategoryId)?.name || newCatNameInput || null
-      : null;
-
-    // If not in master list, add it (unless explicitly disabled)
-    if (!existingMasterItem && !skipMasterAddition()) {
-      const masterItemsCache = masterItems() ? [...masterItems()!] : [];
-      const { item: createdMasterItem } = await getOrCreateMasterItem(
-        {
-          name: itemName,
-          category: categoryName,
-          quantity: quantity(),
-          is_container: isContainer(),
-        },
-        masterItemsCache,
-        categoriesList
-      );
-      if (createdMasterItem) {
-        masterItemId = createdMasterItem.id;
-        categoryName = createdMasterItem.category_name;
-        showToast('success', `Added "${itemName}" to My Items`);
-        if (props.masterItems) {
-          props.onDataChanged?.();
-        }
-      }
-    } else if (existingMasterItem) {
-      categoryName = existingMasterItem.category_name;
     }
 
     // Parse location to determine bag_id and container_item_id
@@ -439,6 +273,42 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
       return;
     }
 
+    // One working copy of categories for both lookups below, so a category
+    // created for this item is found again instead of being created twice.
+    const categoriesCache = [...(categories() ?? [])];
+    const resolved = await resolveCategoryChoice(category(), categoriesCache);
+    if ('error' in resolved) {
+      showToast('error', resolved.error);
+      setSaving(false);
+      return;
+    }
+    const categoryName = resolved.category?.name ?? null;
+    let dataChanged = choiceMayCreateCategory(category());
+
+    const existingMasterItem = masterItems()?.find(
+      (item) => item.name.toLowerCase() === itemName.toLowerCase()
+    );
+    let masterItemId = existingMasterItem?.id;
+
+    // If not in master list, add it (unless explicitly disabled)
+    if (!existingMasterItem && !skipMasterAddition()) {
+      const { item: createdMasterItem } = await getOrCreateMasterItem(
+        {
+          name: itemName,
+          category: categoryName,
+          quantity: quantity(),
+          is_container: isContainer(),
+        },
+        [...(masterItems() ?? [])],
+        categoriesCache
+      );
+      if (createdMasterItem) {
+        masterItemId = createdMasterItem.id;
+        dataChanged = true;
+      }
+    }
+    if (dataChanged) props.onDataChanged();
+
     // Add to trip
     const response = await api.post(endpoints.tripItems(props.tripId), {
       name: itemName,
@@ -451,7 +321,12 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
     });
 
     if (response.success) {
-      showToast('success', 'Item added to trip');
+      showToast(
+        'success',
+        masterItemId && !existingMasterItem
+          ? `Added "${itemName}" to trip and My Items`
+          : `Added "${itemName}" to trip`
+      );
 
       // Get the created item from the response
       const createdItem = response.data as TripItem | undefined;
@@ -460,22 +335,17 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
         // Smart reuse logic for Add Another
         const wasContainer = isContainer();
         const lastLocation = location();
-        const lastCategoryId = categoryId();
 
         // Reset fields (including location to trigger reactivity on restore)
         setName('');
-        setIsNewCategory(false);
-        setNewCategoryName('');
         setIsContainer(false);
         setSkipMasterAddition(false);
         setLocation(''); // Clear location so restoration triggers a signal change
         setSaving(false);
 
-        // Call onSaved with created item to update store (important for containers to appear in list).
-        // When tripItems comes from the parent's store, this update flows back down through the
-        // `tripItems` prop synchronously; only forms fetching their own copy need an explicit refetch.
+        // Update the parent's store (important for containers to appear in the
+        // list); it flows back down through the `tripItems` prop synchronously.
         props.onSaved(createdItem);
-        await refreshTripItemsIfLocal();
 
         if (wasContainer && createdItem) {
           // If we just created a container, pre-select it as the container for the next item
@@ -484,7 +354,7 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
           // For regular items, restore the previous location
           setLocation(lastLocation);
         }
-        setCategoryId(lastCategoryId);
+        setCategory(resolved.category?.id ?? '');
         formRef?.querySelector<HTMLInputElement>('input[type="text"]')?.focus();
       } else {
         props.onSaved(createdItem);
@@ -501,7 +371,7 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
   };
 
   return (
-    <Modal title="Add Item" onClose={props.onClose}>
+    <Modal title="Add Item" onClose={props.onClose} isDirty={() => !!name().trim()}>
       <form ref={formRef} onSubmit={handleAddAnother} class="space-y-4">
         <div>
           <label class="mb-1 block text-sm font-medium text-gray-700">Item Name</label>
@@ -520,61 +390,7 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
 
         <div>
           <label class="mb-1 block text-sm font-medium text-gray-700">Category</label>
-          <Show
-            when={!isNewCategory()}
-            fallback={
-              <div class="flex gap-2">
-                <Input
-                  type="text"
-                  value={newCategoryName()}
-                  onInput={(e) => setNewCategoryName(e.currentTarget.value)}
-                  placeholder="Enter category name"
-                  class="flex-1"
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsNewCategory(false);
-                    setNewCategoryName('');
-                  }}
-                  class="px-3 py-2 text-sm text-gray-600 hover:text-gray-900"
-                >
-                  Cancel
-                </button>
-              </div>
-            }
-          >
-            <select
-              value={categoryId() || ''}
-              onChange={(e) => {
-                const value = e.target.value;
-                if (value === '__new__') {
-                  setIsNewCategory(true);
-                  setCategoryId(null);
-                } else if (value.startsWith('__builtin__:')) {
-                  setIsNewCategory(true);
-                  setCategoryId(null);
-                  setNewCategoryName(value.substring('__builtin__:'.length));
-                } else {
-                  setCategoryId(value || null);
-                }
-              }}
-              class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">No category</option>
-              <For each={sortedCategories()}>
-                {(category) => <option value={category.id}>{category.name}</option>}
-              </For>
-              <Show when={builtInOnlyCategories().length > 0}>
-                <optgroup label="Built-in categories">
-                  <For each={builtInOnlyCategories()}>
-                    {(name) => <option value={`__builtin__:${name}`}>{name}</option>}
-                  </For>
-                </optgroup>
-              </Show>
-              <option value="__new__">+ New category...</option>
-            </select>
-          </Show>
+          <CategoryPicker categories={categories()} value={category()} onChange={setCategory} />
         </div>
 
         <div>
@@ -596,7 +412,7 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
               onChange={(e) => setLocation(e.target.value)}
               class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
             >
-              <option value="">No bag</option>
+              <option value="">{NO_BAG_LABEL}</option>
               <For each={bags()}>
                 {(bag) => <option value={`bag:${bag.id}`}>{bag.name}</option>}
               </For>

@@ -56,9 +56,11 @@ export function TripNotesPanel(props: TripNotesPanelProps) {
   let textareaRef: HTMLTextAreaElement | undefined;
   let panelRef: HTMLDivElement | undefined;
 
-  // Click outside to close
+  // Click outside to close. Uses the event's composed path rather than
+  // `contains(target)`: clicking the notes swaps them for the textarea, which
+  // detaches the clicked node before this document listener runs.
   const handleClickOutside = (e: MouseEvent) => {
-    if (panelRef && !panelRef.contains(e.target as Node)) {
+    if (panelRef && !e.composedPath().includes(panelRef)) {
       // Save before closing if there are changes
       if (localNotes() !== props.notes) {
         props.onNotesChange(localNotes());
@@ -142,11 +144,7 @@ export function TripNotesPanel(props: TripNotesPanelProps) {
     }
   };
 
-  const enterEditMode = (e: MouseEvent) => {
-    // Stop this click from bubbling to the document-level outside-click
-    // listener — it's the click that opened edit mode, not one that should
-    // close it.
-    e.stopPropagation();
+  const enterEditMode = () => {
     setIsEditing(true);
     // Focus textarea after render
     requestAnimationFrame(() => {

@@ -1,15 +1,11 @@
 import { createSignal, For, Show } from 'solid-js';
 import type { BagTemplate } from '../../lib/types';
-import { BAG_TYPES } from '../../lib/types';
-import { BAG_COLORS, getBagColorSwatchClass } from '../../lib/color-utils';
 import { Button } from '../ui/Button';
-import { Input } from '../ui/Input';
+import { CheckIcon } from '../ui/Icons';
 import { showToast } from '../ui/Toast';
+import { BagChip, BagFields, DEFAULT_BAG_FIELDS, type BagFieldValues } from './BagFields';
 
-export interface CustomBagData {
-  name: string;
-  type: 'carry_on' | 'checked' | 'personal' | 'custom';
-  color: string;
+export interface CustomBagData extends BagFieldValues {
   saveToMyBags: boolean;
 }
 
@@ -26,38 +22,35 @@ interface BagSelectionFormProps {
 
 // One-tap starter presets shown when the user has no saved bag templates yet
 // (X4: the empty bag-selection step was a 4-decision dead end for new users).
-const BAG_PRESETS: { type: 'carry_on' | 'checked' | 'personal'; name: string; color: string }[] = [
-  { type: 'carry_on', name: 'Carry-on', color: 'blue' },
-  { type: 'checked', name: 'Checked Bag', color: 'green' },
-  { type: 'personal', name: 'Personal Item', color: 'purple' },
+// Each one also seeds My Bags, so the next trip offers it as a saved bag.
+const BAG_PRESETS: CustomBagData[] = [
+  { type: 'carry_on', name: 'Carry-on', color: 'blue', saveToMyBags: true },
+  { type: 'checked', name: 'Checked Bag', color: 'green', saveToMyBags: true },
+  { type: 'personal', name: 'Personal Item', color: 'purple', saveToMyBags: true },
 ];
+
+const selectedCardClass = (selected: boolean) =>
+  `flex items-center gap-3 rounded-lg border-2 p-3 text-left transition-colors ${
+    selected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-gray-300'
+  }`;
 
 export function BagSelectionForm(props: BagSelectionFormProps) {
   const [showAddForm, setShowAddForm] = createSignal(false);
-  const [newBagName, setNewBagName] = createSignal('');
-  const [newBagType, setNewBagType] = createSignal<'carry_on' | 'checked' | 'personal' | 'custom'>(
-    'carry_on'
-  );
-  const [newBagColor, setNewBagColor] = createSignal('blue');
+  const [newBag, setNewBag] = createSignal<BagFieldValues>(DEFAULT_BAG_FIELDS);
   const [saveToMyBags, setSaveToMyBags] = createSignal(true);
+
+  const hasTemplates = () => props.templates.length > 0;
+  const isSavedTemplateName = (name: string) =>
+    props.templates.some((t) => t.name.toLowerCase() === name.trim().toLowerCase());
 
   // Commit whatever is typed in the add-bag form to the trip. Returns the bag
   // name if one was added, or null when the name is blank (nothing to add).
   const commitCustomBag = (): string | null => {
-    const name = newBagName().trim();
+    const name = newBag().name.trim();
     if (!name) return null;
 
-    props.onAddCustomBag({
-      name,
-      type: newBagType(),
-      color: newBagColor(),
-      saveToMyBags: saveToMyBags(),
-    });
-
-    // Reset form
-    setNewBagName('');
-    setNewBagType('carry_on');
-    setNewBagColor('blue');
+    props.onAddCustomBag({ ...newBag(), name, saveToMyBags: saveToMyBags() });
+    setNewBag(DEFAULT_BAG_FIELDS);
     setSaveToMyBags(true);
     setShowAddForm(false);
     return name;
@@ -79,59 +72,69 @@ export function BagSelectionForm(props: BagSelectionFormProps) {
     props.onSubmit();
   };
 
-  const totalBagsSelected = () => {
-    return props.selectedTemplateIds.size + props.customBags.length;
+  const totalBagsSelected = () => props.selectedTemplateIds.size + props.customBags.length;
+
+  const presetIndex = (preset: CustomBagData) =>
+    props.customBags.findIndex((b) => b.name === preset.name && b.type === preset.type);
+
+  const togglePreset = (preset: CustomBagData) => {
+    const index = presetIndex(preset);
+    if (index === -1) {
+      props.onAddCustomBag(preset);
+    } else {
+      props.onRemoveCustomBag(index);
+    }
   };
 
-  const handleAddPreset = (preset: (typeof BAG_PRESETS)[number]) => {
-    props.onAddCustomBag({
-      name: preset.name,
-      type: preset.type,
-      color: preset.color,
-      saveToMyBags: true,
-    });
-  };
+  const isPreset = (bag: CustomBagData) =>
+    !hasTemplates() && BAG_PRESETS.some((p) => p.name === bag.name && p.type === bag.type);
 
   return (
     <div class="space-y-6">
-      {/* Header */}
       <div>
         <h3 class="text-lg font-semibold text-gray-900">Select Bags for Your Trip</h3>
         <p class="mt-1 text-sm text-gray-600">
-          Choose from My Bags or add new ones. You can skip this step and add bags later.
+          {hasTemplates()
+            ? 'Choose from My Bags or add new ones.'
+            : 'Add the bags you’re bringing.'}{' '}
+          You can skip this step and add bags later.
         </p>
       </div>
 
       {/* Quick Start Presets (shown only when the user has no saved bag templates) */}
-      <Show when={props.templates.length === 0}>
+      <Show when={!hasTemplates()}>
         <div>
           <h4 class="mb-3 text-sm font-medium text-gray-700">Quick Start</h4>
-          <div class="grid grid-cols-3 gap-3">
+          <div class="grid grid-cols-3 gap-2">
             <For each={BAG_PRESETS}>
-              {(preset) => (
-                <button
-                  type="button"
-                  onClick={() => handleAddPreset(preset)}
-                  class="flex flex-col items-center gap-2 rounded-lg border-2 border-gray-200 bg-white p-3 text-center transition-colors hover:border-blue-500 hover:bg-blue-50"
-                >
-                  <div
-                    class={`h-4 w-4 rounded-full border border-gray-300 ${getBagColorSwatchClass(preset.color)}`}
-                  />
-                  <span class="text-sm font-medium text-gray-900">{preset.name}</span>
-                </button>
-              )}
+              {(preset) => {
+                const selected = () => presetIndex(preset) !== -1;
+                return (
+                  <button
+                    type="button"
+                    onClick={() => togglePreset(preset)}
+                    aria-pressed={selected()}
+                    class={`${selectedCardClass(selected())} relative flex-col justify-center gap-2 px-2 text-center`}
+                  >
+                    <BagChip bag={preset} />
+                    <Show when={selected()}>
+                      <CheckIcon class="absolute top-1 right-1 h-4 w-4 text-blue-600" />
+                    </Show>
+                  </button>
+                );
+              }}
             </For>
           </div>
           <p class="mt-2 text-xs text-gray-500">
-            Tap a preset to add it instantly, or create a custom bag below.
+            Tap to add or remove. They’ll also be saved to My Bags for next time.
           </p>
         </div>
       </Show>
 
       {/* Templates Section */}
-      <Show when={props.templates.length > 0}>
+      <Show when={hasTemplates()}>
         <div>
-          <h4 class="mb-3 text-sm font-medium text-gray-700">My Bags (click to select)</h4>
+          <h4 class="mb-3 text-sm font-medium text-gray-700">My Bags (tap to select)</h4>
           <div class="grid gap-3 sm:grid-cols-2">
             <For each={props.templates}>
               {(template) => {
@@ -140,36 +143,13 @@ export function BagSelectionForm(props: BagSelectionFormProps) {
                   <button
                     type="button"
                     onClick={() => props.onTemplateToggle(template.id)}
-                    class={`flex items-center gap-3 rounded-lg border-2 p-3 text-left transition-colors ${
-                      isSelected()
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-200 bg-white hover:border-gray-300'
-                    }`}
+                    aria-pressed={isSelected()}
+                    class={selectedCardClass(isSelected())}
                   >
-                    <div
-                      class={`h-4 w-4 rounded-full border border-gray-300 ${getBagColorSwatchClass(template.color)}`}
-                    />
-                    <div class="flex-1">
-                      <p class="font-medium text-gray-900">{template.name}</p>
-                      <p class="text-xs text-gray-500">
-                        {BAG_TYPES.find((t) => t.type === template.type)?.label || template.type}
-                      </p>
-                    </div>
-                    {isSelected() && (
-                      <svg
-                        class="h-5 w-5 text-blue-600"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                          stroke-width="2"
-                          d="M5 13l4 4L19 7"
-                        />
-                      </svg>
-                    )}
+                    <BagChip bag={template} />
+                    <Show when={isSelected()}>
+                      <CheckIcon class="h-5 w-5 text-blue-600" />
+                    </Show>
                   </button>
                 );
               }}
@@ -194,72 +174,24 @@ export function BagSelectionForm(props: BagSelectionFormProps) {
           </Show>
         </div>
 
-        {/* Add Custom Bag Form */}
         <Show when={showAddForm()}>
           <form
             onSubmit={handleAddCustomBag}
             class="mb-3 space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-3"
           >
-            <div>
-              <label class="mb-1 block text-sm font-medium text-gray-700">Bag Name</label>
-              <Input
-                type="text"
-                value={newBagName()}
-                onInput={(e) => setNewBagName(e.currentTarget.value)}
-                placeholder="e.g., Blue Backpack"
+            <BagFields value={newBag()} onChange={setNewBag} />
+
+            <div class="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="save-to-my-bags"
+                checked={saveToMyBags()}
+                onChange={(e) => setSaveToMyBags(e.currentTarget.checked)}
+                class="btn-compact h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
               />
-            </div>
-
-            <div class="flex items-end gap-3">
-              <div class="flex-1">
-                <label class="mb-1 block text-sm font-medium text-gray-700">Bag Type</label>
-                <select
-                  value={newBagType()}
-                  onChange={(e) => setNewBagType(e.target.value as any)}
-                  class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
-                >
-                  <For each={BAG_TYPES}>
-                    {(type) => <option value={type.type}>{type.label}</option>}
-                  </For>
-                </select>
-              </div>
-
-              <div class="flex items-center gap-1.5 pb-2">
-                <input
-                  type="checkbox"
-                  id="save-to-my-bags"
-                  checked={saveToMyBags()}
-                  onChange={(e) => setSaveToMyBags(e.currentTarget.checked)}
-                  class="btn-compact h-3.5 w-3.5 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
-                />
-                <label
-                  for="save-to-my-bags"
-                  class="text-sm font-medium whitespace-nowrap text-gray-700"
-                  title="Un-check to use this bag only on this trip"
-                >
-                  Save to My Bags
-                </label>
-              </div>
-            </div>
-
-            <div>
-              <label class="mb-1 block text-sm font-medium text-gray-700">Color</label>
-              <div class="flex gap-1.5">
-                <For each={BAG_COLORS}>
-                  {(color) => (
-                    <button
-                      type="button"
-                      onClick={() => setNewBagColor(color.value)}
-                      class={`btn-compact h-10 w-10 rounded-full border border-gray-300 ${color.class} ${
-                        newBagColor() === color.value
-                          ? 'ring-2 ring-blue-500 ring-offset-2'
-                          : 'hover:scale-110'
-                      } transition-transform`}
-                      title={color.label}
-                    />
-                  )}
-                </For>
-              </div>
+              <label for="save-to-my-bags" class="text-sm text-gray-700">
+                Also save to My Bags for future trips
+              </label>
             </div>
 
             <div class="flex gap-2">
@@ -272,7 +204,7 @@ export function BagSelectionForm(props: BagSelectionFormProps) {
                 size="sm"
                 onClick={() => {
                   setShowAddForm(false);
-                  setNewBagName('');
+                  setNewBag(DEFAULT_BAG_FIELDS);
                 }}
               >
                 Cancel
@@ -281,28 +213,20 @@ export function BagSelectionForm(props: BagSelectionFormProps) {
           </form>
         </Show>
 
-        {/* Custom Bags List */}
-        <Show when={props.customBags.length > 0}>
-          <div class="space-y-2">
-            <For each={props.customBags}>
-              {(bag, index) => (
-                <div class="flex items-center justify-between rounded-lg border border-gray-200 bg-white p-3">
-                  <div class="flex items-center gap-3">
-                    <div
-                      class={`h-4 w-4 rounded-full border border-gray-300 ${getBagColorSwatchClass(bag.color)}`}
-                    />
-                    <div>
-                      <p class="font-medium text-gray-900">{bag.name}</p>
-                      <p class="text-xs text-gray-500">
-                        {BAG_TYPES.find((t) => t.type === bag.type)?.label || bag.type}
-                        {bag.saveToMyBags && (
-                          <span class="ml-1 text-blue-600" title="Will be saved to My Bags">
-                            • Saved
-                          </span>
-                        )}
-                      </p>
-                    </div>
-                  </div>
+        {/* Custom bags added so far (presets show as selected cards above instead) */}
+        <div class="space-y-2">
+          <For each={props.customBags}>
+            {(bag, index) => (
+              <Show when={!isPreset(bag)}>
+                <div class="flex items-center gap-3 rounded-lg border border-gray-200 bg-white p-3">
+                  <BagChip
+                    bag={bag}
+                    note={
+                      bag.saveToMyBags && !isSavedTemplateName(bag.name) ? (
+                        <span class="text-blue-600">saves to My Bags</span>
+                      ) : undefined
+                    }
+                  />
                   <button
                     type="button"
                     onClick={() => props.onRemoveCustomBag(index())}
@@ -311,19 +235,12 @@ export function BagSelectionForm(props: BagSelectionFormProps) {
                     Remove
                   </button>
                 </div>
-              )}
-            </For>
-          </div>
-        </Show>
-
-        <Show when={props.customBags.length === 0 && !showAddForm()}>
-          <div class="py-4 text-center text-sm text-gray-500">
-            No new bags added. Click "Add New Bag" to create one.
-          </div>
-        </Show>
+              </Show>
+            )}
+          </For>
+        </div>
       </div>
 
-      {/* Navigation Buttons */}
       <div class="flex justify-between pt-4">
         <Button type="button" variant="secondary" onClick={props.onBack}>
           Back

@@ -1,4 +1,4 @@
-import { createSignal, createResource, For, Show, onMount } from 'solid-js';
+import { createSignal, createResource, For, Show, onCleanup, onMount } from 'solid-js';
 import { authStore } from '../../stores/auth';
 import { api, endpoints } from '../../lib/api';
 import type { Trip, TripWithStats } from '../../lib/types';
@@ -6,7 +6,7 @@ import { Button } from '../ui/Button';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
 import { EmptyState } from '../ui/EmptyState';
 import { Toast, showToast } from '../ui/Toast';
-import { HomeIcon, EditIcon, CopyIcon, TrashIcon } from '../ui/Icons';
+import { EditIcon, CopyIcon, TrashIcon, MoreVerticalIcon } from '../ui/Icons';
 import { TripForm } from './TripForm';
 import { TripFormWithBags } from './TripFormWithBags';
 import { NewTripImportModal } from './NewTripImportModal';
@@ -18,6 +18,8 @@ export function TripsPage() {
   const [showForm, setShowForm] = createSignal(false);
   const [editingTrip, setEditingTrip] = createSignal<Trip | null>(null);
   const [showImport, setShowImport] = createSignal(false);
+  const [showMenu, setShowMenu] = createSignal(false);
+  let menuRef: HTMLDivElement | undefined;
 
   const [trips, { refetch }] = createResource<TripWithStats[]>(async () => {
     return fetchWithErrorHandling(
@@ -27,6 +29,12 @@ export function TripsPage() {
   });
 
   onMount(async () => {
+    const closeMenuOnOutsideClick = (e: MouseEvent) => {
+      if (showMenu() && menuRef && !e.composedPath().includes(menuRef)) setShowMenu(false);
+    };
+    document.addEventListener('mousedown', closeMenuOnOutsideClick);
+    onCleanup(() => document.removeEventListener('mousedown', closeMenuOnOutsideClick));
+
     await authStore.initAuth();
 
     // Auto-open New Trip modal if ?new=true in URL
@@ -40,23 +48,16 @@ export function TripsPage() {
 
   const handleEdit = (trip: Trip) => {
     setEditingTrip(trip);
-    setShowForm(true);
   };
 
   const handleCopy = async (trip: Trip) => {
-    try {
-      const response = await api.post(`/api/trips/${trip.id}/copy`, {});
-
-      if (!response.success) {
-        showToast('error', response.error || 'Failed to copy trip');
-        return;
-      }
-
-      showToast('success', `Created copy of "${trip.name}"`);
-      refetch();
-    } catch (error) {
-      showToast('error', 'Failed to copy trip');
+    const response = await api.post(`/api/trips/${trip.id}/copy`, {});
+    if (!response.success) {
+      showToast('error', response.error || 'Failed to copy trip');
+      return;
     }
+    showToast('success', `Created copy of "${trip.name}"`);
+    refetch();
   };
 
   const handleDelete = async (trip: Trip) => {
@@ -93,33 +94,38 @@ export function TripsPage() {
       <header class="sticky top-0 z-10 border-b border-gray-200 bg-white">
         <div class="container mx-auto px-4 py-4">
           <div class="flex items-center justify-between">
-            <div class="flex items-center gap-4">
-              <a
-                href="/dashboard"
-                class="flex items-center text-gray-600 hover:text-gray-900"
-                title="Home"
-              >
-                <HomeIcon class="h-6 w-6" />
-              </a>
-              <div>
-                <h1 class="text-2xl font-bold text-gray-900">My Trips</h1>
-                <p class="text-sm text-gray-600">Plan and pack for your adventures</p>
-              </div>
+            <div>
+              <h1 class="text-2xl font-bold text-gray-900">My Trips</h1>
+              <p class="text-sm text-gray-600">Plan and pack for your adventures</p>
             </div>
-            <div class="flex gap-2">
-              <Button variant="secondary" size="sm" onClick={() => setShowImport(true)}>
-                Import
-              </Button>
-              <Button
-                size="sm"
-                class="whitespace-nowrap"
-                onClick={() => {
-                  setEditingTrip(null);
-                  setShowForm(true);
-                }}
-              >
+            <div class="flex items-center gap-2">
+              <Button size="sm" class="whitespace-nowrap" onClick={() => setShowForm(true)}>
                 + New Trip
               </Button>
+              <div class="relative" ref={menuRef}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowMenu(!showMenu())}
+                  aria-label="More actions"
+                  aria-expanded={showMenu()}
+                >
+                  <MoreVerticalIcon class="h-5 w-5" />
+                </Button>
+                <Show when={showMenu()}>
+                  <div class="absolute top-full right-0 z-20 mt-1 w-48 rounded-lg border border-gray-200 bg-white shadow-lg">
+                    <button
+                      onClick={() => {
+                        setShowMenu(false);
+                        setShowImport(true);
+                      }}
+                      class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
+                    >
+                      Import trip from file…
+                    </button>
+                  </div>
+                </Show>
+              </div>
             </div>
           </div>
         </div>
@@ -212,28 +218,27 @@ export function TripsPage() {
         </Show>
       </main>
 
-      <Show when={showForm()}>
-        {editingTrip() ? (
+      <Show when={editingTrip()}>
+        {(trip) => (
           <TripForm
-            trip={editingTrip()}
-            onClose={() => {
-              setShowForm(false);
-              setEditingTrip(null);
-            }}
+            trip={trip()}
+            onClose={() => setEditingTrip(null)}
             onSaved={() => {
-              setShowForm(false);
+              setEditingTrip(null);
               refetch();
             }}
           />
-        ) : (
-          <TripFormWithBags
-            onClose={() => setShowForm(false)}
-            onSaved={(tripId) => {
-              // Navigate to the newly created trip's packing page
-              window.location.href = `/trips/${tripId}/pack`;
-            }}
-          />
         )}
+      </Show>
+
+      <Show when={showForm()}>
+        <TripFormWithBags
+          onClose={() => setShowForm(false)}
+          onSaved={(tripId) => {
+            // Navigate to the newly created trip's packing page
+            window.location.href = `/trips/${tripId}/pack`;
+          }}
+        />
       </Show>
 
       <Show when={showImport()}>

@@ -1,55 +1,29 @@
 import { createSignal } from 'solid-js';
 import { Modal } from '../ui/Modal';
-import { Input } from '../ui/Input';
-import { DateInput } from '../ui/DateInput';
-import { Button } from '../ui/Button';
 import { showToast } from '../ui/Toast';
 import { api, endpoints } from '../../lib/api';
-import { normalizeTripDates } from '../../lib/utils';
 import type { Trip } from '../../lib/types';
+import { TripDetailsForm, type TripDetailsData } from './TripDetailsForm';
 
 interface TripFormProps {
-  trip: Trip | null;
+  trip: Trip;
   onClose: () => void;
   onSaved: () => void;
 }
 
+/** Edit an existing trip's details. New trips are created by `TripFormWithBags`. */
 export function TripForm(props: TripFormProps) {
-  const [name, setName] = createSignal(props.trip?.name || '');
-  const [destination, setDestination] = createSignal(props.trip?.destination || '');
-  const [startDate, setStartDate] = createSignal(props.trip?.start_date || '');
-  const [endDate, setEndDate] = createSignal(props.trip?.end_date || '');
-  const [notes, setNotes] = createSignal(props.trip?.notes || '');
   const [saving, setSaving] = createSignal(false);
+  const [dirty, setDirty] = createSignal(false);
 
-  const handleSubmit = async (e: Event) => {
-    e.preventDefault();
-
-    if (!name().trim()) {
-      showToast('error', 'Trip name is required');
-      return;
-    }
-
+  const handleSubmit = async (data: TripDetailsData) => {
+    if (saving()) return;
     setSaving(true);
-
-    const normalizedDates = normalizeTripDates(startDate() || null, endDate() || null);
-
-    const data = {
-      name: name().trim(),
-      destination: destination().trim() || null,
-      start_date: normalizedDates.startDate,
-      end_date: normalizedDates.endDate,
-      notes: notes().trim() || null,
-    };
-
-    const response = props.trip
-      ? await api.put(endpoints.trip(props.trip.id), data)
-      : await api.post(endpoints.trips, data);
-
+    const response = await api.patch(endpoints.trip(props.trip.id), data);
     setSaving(false);
 
     if (response.success) {
-      showToast('success', props.trip ? 'Trip updated' : 'Trip created');
+      showToast('success', 'Trip updated');
       props.onSaved();
     } else {
       showToast('error', response.error || 'Failed to save trip');
@@ -57,50 +31,15 @@ export function TripForm(props: TripFormProps) {
   };
 
   return (
-    <Modal onClose={props.onClose} title={props.trip ? 'Edit Trip' : 'New Trip'}>
-      <form onSubmit={handleSubmit} class="space-y-4">
-        <Input
-          label="Trip Name *"
-          type="text"
-          value={name()}
-          onInput={(e) => setName(e.currentTarget.value)}
-          placeholder="e.g., Summer Vacation 2025"
-          required
-        />
-
-        <Input
-          label="Destination"
-          type="text"
-          value={destination()}
-          onInput={(e) => setDestination(e.currentTarget.value)}
-          placeholder="e.g., Paris, France"
-        />
-
-        <div class="grid grid-cols-2 gap-4">
-          <DateInput label="Start Date" value={startDate()} onInput={setStartDate} />
-          <DateInput label="End Date" value={endDate()} onInput={setEndDate} min={startDate()} />
-        </div>
-
-        <div>
-          <label class="mb-1 block text-sm font-medium text-gray-700">Notes</label>
-          <textarea
-            value={notes()}
-            onInput={(e) => setNotes(e.currentTarget.value)}
-            placeholder="Trip details, reminders, etc."
-            class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-            rows={3}
-          />
-        </div>
-
-        <div class="flex justify-end gap-2 pt-4">
-          <Button type="button" variant="secondary" onClick={props.onClose}>
-            Cancel
-          </Button>
-          <Button type="submit" disabled={saving()}>
-            {saving() ? 'Saving...' : 'Save'}
-          </Button>
-        </div>
-      </form>
+    <Modal onClose={props.onClose} title="Edit Trip" isDirty={dirty}>
+      <TripDetailsForm
+        initialData={props.trip}
+        onSubmit={handleSubmit}
+        onCancel={props.onClose}
+        submitLabel={saving() ? 'Saving...' : 'Save'}
+        submitting={saving()}
+        onDirtyChange={setDirty}
+      />
     </Modal>
   );
 }

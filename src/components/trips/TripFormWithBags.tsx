@@ -13,20 +13,29 @@ interface TripFormWithBagsProps {
   onSaved: (tripId: string) => void;
 }
 
+interface CreateError {
+  message: string;
+  /** The plan's trip limit was reached (HTTP 403). */
+  isLimit: boolean;
+}
+
 export function TripFormWithBags(props: TripFormWithBagsProps) {
   const [step, setStep] = createSignal<1 | 2>(1);
   const [tripData, setTripData] = createSignal<TripDetailsData | null>(null);
+  const [detailsDirty, setDetailsDirty] = createSignal(false);
   const [selectedTemplateIds, setSelectedTemplateIds] = createSignal<Set<string>>(new Set());
   const [customBags, setCustomBags] = createSignal<CustomBagData[]>([]);
   const [creating, setCreating] = createSignal(false);
+  const [createError, setCreateError] = createSignal<CreateError | null>(null);
 
-  // Fetch bag templates
   const [bagTemplates] = createResource<BagTemplate[]>(async () => {
     return fetchWithErrorHandling(
       () => api.get<BagTemplate[]>(endpoints.bagTemplates),
       'Failed to load bags'
     );
   });
+
+  const isDirty = () => tripData() !== null || detailsDirty();
 
   const handleStep1Submit = (data: TripDetailsData) => {
     setTripData(data);
@@ -45,99 +54,102 @@ export function TripFormWithBags(props: TripFormWithBagsProps) {
     });
   };
 
-  const handleAddCustomBag = (bag: CustomBagData) => {
-    setCustomBags((prev) => [...prev, bag]);
-  };
-
-  const handleRemoveCustomBag = (index: number) => {
-    setCustomBags((prev) => prev.filter((_, i) => i !== index));
+  // Save "Save to My Bags" bags as templates, skipping names My Bags already
+  // has (case-insensitive) so re-using a preset or name never duplicates one.
+  // One at a time, so the server's template limit counts each save.
+  const saveNewTemplates = async (templates: BagTemplate[]) => {
+    const savedNames = new Set(templates.map((t) => t.name.toLowerCase()));
+    for (const bag of customBags()) {
+      const key = bag.name.toLowerCase();
+      if (!bag.saveToMyBags || savedNames.has(key)) continue;
+      savedNames.add(key);
+      await api.post(endpoints.bagTemplates, { name: bag.name, type: bag.type, color: bag.color });
+    }
   };
 
   const handleFinalSubmit = async () => {
     const data = tripData();
-    if (!data) return;
+    if (!data || creating()) return;
 
     setCreating(true);
+    setCreateError(null);
 
-    try {
-      // Step 1: Create the trip
-      const tripResponse = await api.post<Trip>(endpoints.trips, data);
+    const tripResponse = await api.post<Trip>(endpoints.trips, data);
+    if (!tripResponse.success || !tripResponse.data) {
+      setCreateError({
+        message: tripResponse.error || 'Failed to create trip. Please try again.',
+        isLimit: tripResponse.statusCode === 403,
+      });
+      setCreating(false);
+      return;
+    }
 
-      if (!tripResponse.success || !tripResponse.data) {
-        showToast('error', tripResponse.error || 'Failed to create trip');
-        setCreating(false);
-        return;
-      }
+    const newTripId = tripResponse.data.id;
+    const templates = bagTemplates() || [];
+    const bagsToAdd = [
+      ...templates.filter((t) => selectedTemplateIds().has(t.id)),
+      ...customBags(),
+    ];
 
-      const newTripId = tripResponse.data.id;
-
-      // Step 2: Create bags from selected templates (independent inserts, run in parallel)
-      const templates = bagTemplates() || [];
-      const selectedTemplates = templates.filter((t) => selectedTemplateIds().has(t.id));
-
-      const templateBagResponses = await Promise.all(
-        selectedTemplates.map((template) =>
+    const [bagResponses] = await Promise.all([
+      Promise.all(
+        bagsToAdd.map((bag, index) =>
           api.post(endpoints.tripBags(newTripId), {
-            name: template.name,
-            type: template.type,
-            color: template.color,
-            sort_order: 0,
-          })
-        )
-      );
-
-      // Step 3: Create custom bags (and optionally save to My Bags), also in parallel
-      const customBagResponses = await Promise.all(
-        customBags().map(async (bag) => {
-          // Save to bag templates if requested
-          if (bag.saveToMyBags) {
-            await api.post(endpoints.bagTemplates, {
-              name: bag.name,
-              type: bag.type,
-              color: bag.color,
-            });
-          }
-
-          // Always add to this trip
-          return api.post(endpoints.tripBags(newTripId), {
             name: bag.name,
             type: bag.type,
             color: bag.color,
-            sort_order: 0,
-          });
-        })
+            sort_order: index,
+          })
+        )
+      ),
+      saveNewTemplates(templates),
+    ]);
+
+    const failedBagCount = bagResponses.filter((response) => !response.success).length;
+    if (failedBagCount > 0) {
+      showToast(
+        'error',
+        `Trip created, but ${failedBagCount} bag${failedBagCount === 1 ? '' : 's'} failed to add. You can add ${failedBagCount === 1 ? 'it' : 'them'} from the trip.`
       );
-
-      const failedBagCount = [...templateBagResponses, ...customBagResponses].filter(
-        (response) => !response.success
-      ).length;
-
-      setCreating(false);
-      if (failedBagCount > 0) {
-        showToast(
-          'error',
-          `Trip created, but ${failedBagCount} bag${failedBagCount === 1 ? '' : 's'} failed to add. You can add ${failedBagCount === 1 ? 'it' : 'them'} from the trip.`
-        );
-      } else {
-        showToast('success', 'Trip created successfully!');
-      }
-      props.onSaved(newTripId);
-    } catch (error) {
-      setCreating(false);
-      showToast('error', 'Failed to create trip. Please try again.');
+    } else {
+      showToast('success', 'Trip created!');
     }
-  };
-
-  const getModalTitle = () => {
-    if (step() === 1) return 'New Trip';
-    return 'Select Bags';
+    props.onSaved(newTripId);
   };
 
   return (
-    <Modal onClose={props.onClose} title={getModalTitle()}>
+    <Modal
+      onClose={props.onClose}
+      title={step() === 1 ? 'New Trip' : 'Select Bags'}
+      isDirty={isDirty}
+    >
       <Show when={!creating()} fallback={<LoadingSpinner text="Creating your trip..." />}>
+        <Show when={createError()}>
+          {(error) => (
+            <div
+              role="alert"
+              class="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"
+            >
+              <p>{error().message}</p>
+              <Show when={error().isLimit}>
+                <a
+                  href="/pricing"
+                  class="mt-1 inline-block font-medium text-blue-700 underline hover:text-blue-900"
+                >
+                  See plans →
+                </a>
+              </Show>
+            </div>
+          )}
+        </Show>
+
         <Show when={step() === 1}>
-          <TripDetailsForm onSubmit={handleStep1Submit} onCancel={props.onClose} />
+          <TripDetailsForm
+            initialData={tripData() ?? undefined}
+            onSubmit={handleStep1Submit}
+            onCancel={props.onClose}
+            onDirtyChange={setDetailsDirty}
+          />
         </Show>
 
         <Show when={step() === 2}>
@@ -150,8 +162,10 @@ export function TripFormWithBags(props: TripFormWithBagsProps) {
               selectedTemplateIds={selectedTemplateIds()}
               customBags={customBags()}
               onTemplateToggle={handleTemplateToggle}
-              onAddCustomBag={handleAddCustomBag}
-              onRemoveCustomBag={handleRemoveCustomBag}
+              onAddCustomBag={(bag) => setCustomBags((prev) => [...prev, bag])}
+              onRemoveCustomBag={(index) =>
+                setCustomBags((prev) => prev.filter((_, i) => i !== index))
+              }
               onBack={() => setStep(1)}
               onSubmit={handleFinalSubmit}
             />

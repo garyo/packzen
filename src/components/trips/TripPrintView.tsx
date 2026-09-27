@@ -11,6 +11,7 @@ import type { Trip, TripItem, Category, Bag } from '../../lib/types';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
 import { fetchWithErrorHandling, fetchSingleWithErrorHandling } from '../../lib/resource-helpers';
 import { formatDateRange } from '../../lib/utils';
+import { NO_BAG_LABEL } from '../../lib/vocabulary';
 
 // One printed checklist line, shared by the top-level item list and the
 // container-contents list.
@@ -95,12 +96,8 @@ export function TripPrintView(props: TripPrintViewProps) {
     );
   });
 
-  // Get bag name by ID
-  const getBagName = (bagId: string | null) => {
-    if (!bagId) return null;
-    const bag = bags()?.find((b) => b.id === bagId);
-    return bag?.name || null;
-  };
+  const getBagName = (bagId: string | null) =>
+    (bagId && bags()?.find((b) => b.id === bagId)?.name) || null;
 
   // Items that should actually render, honoring the skipped-items toggle
   const visibleItems = () => {
@@ -110,154 +107,98 @@ export function TripPrintView(props: TripPrintViewProps) {
 
   const hasSkippedItems = () => (items() || []).some((item) => item.is_skipped);
 
-  // Get container data - containers and their contents
-  const containerData = () => {
-    const itemsList = visibleItems();
-    const containers = itemsList.filter((item) => item.is_container);
-    const containedItems = new Map<string, TripItem[]>();
+  // Containers come from all items, not just visible ones: a skipped container
+  // still heads the section for its contents that aren't skipped.
+  const containersById = () =>
+    new Map((items() || []).filter((item) => item.is_container).map((c) => [c.id, c]));
 
-    // Group items by their container
-    itemsList.forEach((item) => {
-      if (item.container_item_id) {
-        if (!containedItems.has(item.container_item_id)) {
-          containedItems.set(item.container_item_id, []);
-        }
-        containedItems.get(item.container_item_id)!.push(item);
-      }
-    });
-
-    return { containers, containedItems };
-  };
-
-  // Get containers in a specific bag
-  const getContainersInBag = (bagId: string | null) => {
-    const { containers } = containerData();
-    return containers
-      .filter((c) => c.bag_id === bagId)
-      .sort((a, b) => a.name.localeCompare(b.name));
-  };
-
-  // Get contents of a container
-  const getContainerContents = (containerId: string) => {
-    return containerData().containedItems.get(containerId) || [];
-  };
-
-  // Get container name by ID
-  const getContainerName = (containerId: string | null) => {
-    if (!containerId) return null;
-    const container = containerData().containers.find((c) => c.id === containerId);
-    return container?.name || null;
-  };
+  const byName = (a: TripItem, b: TripItem) => a.name.localeCompare(b.name);
 
   // Get location label for an item (for category view)
   const getItemLocationLabel = (item: TripItem) => {
-    if (item.container_item_id) {
-      const containerName = getContainerName(item.container_item_id);
-      const container = containerData().containers.find((c) => c.id === item.container_item_id);
-      const bagName = container ? getBagName(container.bag_id) : null;
-      if (containerName && bagName) {
-        return `${containerName} in ${bagName}`;
-      }
-      return containerName || bagName || null;
+    const container = item.container_item_id
+      ? containersById().get(item.container_item_id)
+      : undefined;
+    if (container) {
+      const bagName = getBagName(container.bag_id);
+      return bagName ? `${container.name} in ${bagName}` : container.name;
     }
     return getBagName(item.bag_id);
   };
 
-  // Group items based on sort preference
-  const groupedItems = () => {
-    const categoriesList = categories();
-    const bagsList = bags();
-    if (!items() || !categoriesList || !bagsList) return [];
-    const itemsList = visibleItems();
+  interface PrintGroup {
+    key: string;
+    title: string;
+    items: TripItem[];
+    containers: { container: TripItem; contents: TripItem[] }[];
+  }
 
-    const sortBy = props.sortBy || 'bag';
+  // Bag view: one group per bag (by id, so two bags with the same name stay
+  // apart), in the packing screen's bag order, with "Not in a bag" last.
+  const groupByBag = (itemsList: TripItem[], categoriesList: Category[]): PrintGroup[] => {
+    const bagsList = [...(bags() || [])].sort(
+      (a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name)
+    );
+    const knownBagIds = new Set(bagsList.map((b) => b.id));
+    const groupKey = (bagId: string | null) => (bagId && knownBagIds.has(bagId) ? bagId : '');
+    const containers = containersById();
+    const isNested = (item: TripItem) =>
+      !!item.container_item_id && containers.has(item.container_item_id);
 
-    if (sortBy === 'bag') {
-      // Group by bag first
-      const groups = new Map<string, TripItem[]>();
+    const categoryOrder = (item: TripItem) =>
+      categoriesList.find((c) => c.name === (item.category_name || 'Uncategorized'))?.sort_order ||
+      999;
+    const byCategoryThenName = (a: TripItem, b: TripItem) =>
+      categoryOrder(a) - categoryOrder(b) || byName(a, b);
 
-      // Add "No Bag" group
-      groups.set('No Bag', []);
+    const visibleIds = new Set(itemsList.map((i) => i.id));
+    const containerSections = [...containers.values()]
+      .map((container) => ({
+        container,
+        contents: itemsList.filter((i) => i.container_item_id === container.id).sort(byName),
+      }))
+      .filter((section) => visibleIds.has(section.container.id) || section.contents.length > 0)
+      .sort((a, b) => byName(a.container, b.container));
 
-      // Add all bags
-      bagsList.forEach((bag) => {
-        groups.set(bag.name, []);
-      });
+    return [
+      ...bagsList.map((bag) => ({ key: bag.id, title: bag.name })),
+      { key: '', title: NO_BAG_LABEL },
+    ]
+      .map(({ key, title }) => ({
+        key,
+        title,
+        items: itemsList
+          .filter((item) => !isNested(item) && groupKey(item.bag_id) === key)
+          .sort(byCategoryThenName),
+        containers: containerSections.filter((s) => groupKey(s.container.bag_id) === key),
+      }))
+      .filter((group) => group.items.length > 0 || group.containers.length > 0);
+  };
 
-      // Distribute items - EXCLUDE items that are inside containers
-      itemsList
-        .filter((item) => !item.container_item_id)
-        .forEach((item) => {
-          const bagName = getBagName(item.bag_id) || 'No Bag';
-          groups.get(bagName)!.push(item);
-        });
-
-      // Convert to array and filter out empty groups (but keep groups with containers)
-      // Sort alphabetically, but put "No Bag" at the end
-      return Array.from(groups.entries())
-        .filter(([groupName, groupItems]) => {
-          if (groupItems.length > 0) return true;
-          // Also keep bag if it has containers
-          const bag = bagsList.find((b) => b.name === groupName);
-          if (bag) {
-            return getContainersInBag(bag.id).length > 0;
-          }
-          return getContainersInBag(null).length > 0 && groupName === 'No Bag';
-        })
-        .sort(([nameA], [nameB]) => {
-          // "No Bag" always goes to the end
-          if (nameA === 'No Bag') return 1;
-          if (nameB === 'No Bag') return -1;
-          return nameA.localeCompare(nameB);
-        })
-        .map(([groupName, groupItems]) => {
-          // Find bag ID for this group
-          const bag = bagsList.find((b) => b.name === groupName);
-          const bagId = bag?.id ?? null;
-
-          return {
-            groupName,
-            bagId,
-            items: groupItems.sort((a, b) => {
-              // Sort by category first, then by name
-              const catA = a.category_name || 'Uncategorized';
-              const catB = b.category_name || 'Uncategorized';
-              if (catA !== catB) {
-                const categoryA = categoriesList.find((c) => c.name === catA);
-                const categoryB = categoriesList.find((c) => c.name === catB);
-                return (categoryA?.sort_order || 999) - (categoryB?.sort_order || 999);
-              }
-              return a.name.localeCompare(b.name);
-            }),
-            containers: getContainersInBag(bagId),
-          };
-        });
-    } else {
-      // Group by category first
-      const groups = new Map<string, TripItem[]>();
-
-      itemsList.forEach((item) => {
-        const categoryName = item.category_name || 'Uncategorized';
-        if (!groups.has(categoryName)) {
-          groups.set(categoryName, []);
-        }
-        groups.get(categoryName)!.push(item);
-      });
-
-      // Sort categories by their sort_order
-      return Array.from(groups.entries())
-        .sort(([catA], [catB]) => {
-          const categoryA = categoriesList.find((c) => c.name === catA);
-          const categoryB = categoriesList.find((c) => c.name === catB);
-          return (categoryA?.sort_order || 999) - (categoryB?.sort_order || 999);
-        })
-        .map(([groupName, groupItems]) => ({
-          groupName,
-          bagId: null as string | null,
-          items: groupItems.sort((a, b) => a.name.localeCompare(b.name)),
-          containers: [] as TripItem[],
-        }));
+  const groupByCategory = (itemsList: TripItem[], categoriesList: Category[]): PrintGroup[] => {
+    const groups = new Map<string, TripItem[]>();
+    for (const item of itemsList) {
+      const categoryName = item.category_name || 'Uncategorized';
+      groups.set(categoryName, [...(groups.get(categoryName) ?? []), item]);
     }
+    const sortOrder = (name: string) =>
+      categoriesList.find((c) => c.name === name)?.sort_order || 999;
+    return [...groups.entries()]
+      .sort(([a], [b]) => sortOrder(a) - sortOrder(b))
+      .map(([title, groupItems]) => ({
+        key: title,
+        title,
+        items: groupItems.sort(byName),
+        containers: [],
+      }));
+  };
+
+  const groupedItems = (): PrintGroup[] => {
+    const categoriesList = categories();
+    if (!items() || !categoriesList || !bags()) return [];
+    return currentSortBy() === 'bag'
+      ? groupByBag(visibleItems(), categoriesList)
+      : groupByCategory(visibleItems(), categoriesList);
   };
 
   return (
@@ -287,12 +228,11 @@ export function TripPrintView(props: TripPrintViewProps) {
           max-width: 8.5in;
           margin: 0 auto;
           padding: 20px;
-          padding-top: 60px;
         }
 
-        @media print {
+        @media screen and (max-width: 640px) {
           .print-container {
-            padding-top: 20px;
+            padding: 16px;
           }
         }
 
@@ -304,8 +244,10 @@ export function TripPrintView(props: TripPrintViewProps) {
 
         .print-header-row {
           display: flex;
+          flex-wrap: wrap;
           justify-content: space-between;
           align-items: baseline;
+          gap: 4px 16px;
         }
 
         .print-title {
@@ -390,6 +332,8 @@ export function TripPrintView(props: TripPrintViewProps) {
 
         .item-name {
           flex: 1;
+          min-width: 0;
+          overflow-wrap: anywhere;
           font-size: 13px;
           font-weight: normal;
         }
@@ -425,6 +369,9 @@ export function TripPrintView(props: TripPrintViewProps) {
           padding: 2px 8px;
           border-radius: 4px;
           white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          max-width: 45%;
         }
 
         .item-notes {
@@ -463,45 +410,55 @@ export function TripPrintView(props: TripPrintViewProps) {
           font-style: italic;
         }
 
-        .action-buttons {
-          position: fixed;
-          top: 20px;
-          right: 20px;
+        .toolbar {
+          position: sticky;
+          top: 0;
+          z-index: 10;
           display: flex;
-          gap: 10px;
+          flex-wrap: wrap;
+          align-items: center;
+          gap: 8px;
+          padding: 10px 20px;
+          background: #fff;
+          border-bottom: 1px solid #e5e7eb;
         }
 
-        .print-button,
-        .sort-button {
-          padding: 12px 24px;
-          background: #3b82f6;
+        .back-link {
+          margin-right: auto;
+          color: #2563eb;
+          font-size: 14px;
+          font-weight: 500;
+          text-decoration: none;
+          white-space: nowrap;
+        }
+
+        .back-link:hover {
+          text-decoration: underline;
+        }
+
+        .toolbar-button {
+          padding: 8px 14px;
+          background: #6b7280;
           color: white;
           border: none;
           border-radius: 8px;
           font-size: 14px;
           font-weight: 500;
           cursor: pointer;
-          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+          white-space: nowrap;
           transition: background 0.2s;
         }
 
-        .print-button:hover,
-        .sort-button:hover {
-          background: #2563eb;
-        }
-
-        .sort-button {
-          background: #6b7280;
-        }
-
-        .sort-button:hover {
+        .toolbar-button:hover {
           background: #4b5563;
         }
 
-        @media print {
-          .action-buttons {
-            display: none;
-          }
+        .toolbar-button.primary {
+          background: #3b82f6;
+        }
+
+        .toolbar-button.primary:hover {
+          background: #2563eb;
         }
 
         .loading-container {
@@ -520,18 +477,21 @@ export function TripPrintView(props: TripPrintViewProps) {
           </div>
         }
       >
-        <div class="action-buttons no-print">
+        <div class="toolbar no-print">
+          <a class="back-link" href={`/trips/${props.tripId}/pack`}>
+            ← Back to list
+          </a>
           <button
-            class="sort-button"
+            class="toolbar-button"
             onClick={() => {
               const newSortBy = currentSortBy() === 'bag' ? 'category' : 'bag';
               window.location.href = buildPrintUrl({ sortBy: newSortBy });
             }}
           >
-            {currentSortBy() === 'bag' ? '📁 Sort by Category' : '👜 Sort by Bag'}
+            {currentSortBy() === 'bag' ? '📁 By Category' : '👜 By Bag'}
           </button>
           <button
-            class="sort-button"
+            class="toolbar-button"
             onClick={() => {
               const newColumns = twoColumn() ? 1 : 2;
               window.localStorage.setItem(PRINT_COLUMNS_STORAGE_KEY, String(newColumns));
@@ -542,7 +502,7 @@ export function TripPrintView(props: TripPrintViewProps) {
           </button>
           <Show when={hasSkippedItems()}>
             <button
-              class="sort-button"
+              class="toolbar-button"
               onClick={() => {
                 window.location.href = buildPrintUrl({ includeSkipped: !includeSkipped() });
               }}
@@ -550,7 +510,7 @@ export function TripPrintView(props: TripPrintViewProps) {
               {includeSkipped() ? '🙈 Hide Skipped' : '👁️ Show Skipped'}
             </button>
           </Show>
-          <button class="print-button" onClick={() => window.print()}>
+          <button class="toolbar-button primary" onClick={() => window.print()}>
             🖨️ Print
           </button>
         </div>
@@ -573,9 +533,9 @@ export function TripPrintView(props: TripPrintViewProps) {
 
           <div class={twoColumn() ? 'items-container two-column' : 'items-container'}>
             <For each={groupedItems()}>
-              {({ groupName, items: groupItems, containers }) => (
+              {({ title, items: groupItems, containers }) => (
                 <div class="category-section">
-                  <h2 class="category-header">{groupName}</h2>
+                  <h2 class="category-header">{title}</h2>
                   <For each={groupItems}>
                     {(item) => (
                       <ItemRow
@@ -591,31 +551,24 @@ export function TripPrintView(props: TripPrintViewProps) {
                     )}
                   </For>
                   {/* Container sections within this bag */}
-                  <Show when={currentSortBy() === 'bag' && containers.length > 0}>
-                    <For each={containers}>
-                      {(container) => {
-                        const contents = getContainerContents(container.id);
-                        return (
-                          <div class="container-section">
-                            <h3 class="container-header">
-                              <span class="container-icon">📦</span>
-                              {container.name}
-                            </h3>
-                            <Show
-                              when={contents.length > 0}
-                              fallback={<p class="container-empty">Empty</p>}
-                            >
-                              <For each={contents.sort((a, b) => a.name.localeCompare(b.name))}>
-                                {(item) => (
-                                  <ItemRow item={item} locationLabel={item.category_name} />
-                                )}
-                              </For>
-                            </Show>
-                          </div>
-                        );
-                      }}
-                    </For>
-                  </Show>
+                  <For each={containers}>
+                    {({ container, contents }) => (
+                      <div class="container-section">
+                        <h3 class="container-header">
+                          <span class="container-icon">📦</span>
+                          {container.name}
+                        </h3>
+                        <Show
+                          when={contents.length > 0}
+                          fallback={<p class="container-empty">Empty</p>}
+                        >
+                          <For each={contents}>
+                            {(item) => <ItemRow item={item} locationLabel={item.category_name} />}
+                          </For>
+                        </Show>
+                      </div>
+                    )}
+                  </For>
                 </div>
               )}
             </For>
