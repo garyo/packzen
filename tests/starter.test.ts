@@ -4,6 +4,7 @@ import {
   builtInItems,
   getStarterItems,
   getStarterQuantity,
+  suggestStarter,
   type StarterModifier,
 } from '../src/lib/built-in-items';
 import type { BuiltInItem } from '../src/lib/types';
@@ -79,4 +80,28 @@ test('starter quantity: per-day items scale with nights and cap at the default',
     4,
     'unknown types assume 3 nights'
   );
+});
+
+test('starter suggestion: the first trip-type word in the name wins', () => {
+  assert.deepEqual(suggestStarter('Beach weekend'), { tripTypeId: 'beach', international: false });
+  assert.equal(suggestStarter('Weekend at the beach').tripTypeId, 'weekend');
+  assert.equal(suggestStarter('Hikes in Utah').tripTypeId, 'hiking');
+  assert.equal(suggestStarter('Grandma').tripTypeId, undefined);
+  // Whole words only: "weekend" doesn't suggest a week-long trip.
+  assert.equal(suggestStarter('Long weekend!').tripTypeId, 'weekend');
+});
+
+test('starter suggestion: international is an option, never the trip type', () => {
+  assert.deepEqual(suggestStarter('Business trip abroad'), {
+    tripTypeId: 'business',
+    international: true,
+  });
+  assert.equal(suggestStarter('International').tripTypeId, undefined);
+});
+
+test('every trip type has a default trip name and keywords', () => {
+  for (const tripType of builtInItems.trip_types) {
+    assert.ok(tripType.trip_name, `${tripType.id} has no trip_name`);
+    assert.ok(tripType.keywords.length > 0, `${tripType.id} has no keywords`);
+  }
 });
