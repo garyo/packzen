@@ -9,7 +9,7 @@ import { createResource, Show, For, createSignal, onMount } from 'solid-js';
 import { api, endpoints } from '../../lib/api';
 import type { Trip, TripItem, Category, Bag } from '../../lib/types';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
-import { fetchWithErrorHandling, fetchSingleWithErrorHandling } from '../../lib/resource-helpers';
+import { fetchWithFallback } from '../../lib/resource-helpers';
 import { formatDateRange } from '../../lib/utils';
 import { NO_BAG_LABEL } from '../../lib/vocabulary';
 
@@ -68,33 +68,35 @@ export function TripPrintView(props: TripPrintViewProps) {
     });
   });
 
-  const [trip] = createResource<Trip | null>(async () => {
-    return fetchSingleWithErrorHandling(
+  // Fallbacks instead of throwing: an errored resource would blank the page.
+  const [trip] = createResource(() =>
+    fetchWithFallback<Trip | null>(
       () => api.get<Trip>(endpoints.trip(props.tripId)),
+      null,
       'Failed to load trip'
-    );
-  });
-
-  const [items] = createResource<TripItem[]>(async () => {
-    return fetchWithErrorHandling(
+    )
+  );
+  const [items] = createResource(() =>
+    fetchWithFallback(
       () => api.get<TripItem[]>(endpoints.tripItems(props.tripId)),
+      [],
       'Failed to load trip items'
-    );
-  });
-
-  const [categories] = createResource<Category[]>(async () => {
-    return fetchWithErrorHandling(
+    )
+  );
+  const [categories] = createResource(() =>
+    fetchWithFallback(
       () => api.get<Category[]>(endpoints.categories),
+      [],
       'Failed to load categories'
-    );
-  });
-
-  const [bags] = createResource<Bag[]>(async () => {
-    return fetchWithErrorHandling(
+    )
+  );
+  const [bags] = createResource(() =>
+    fetchWithFallback(
       () => api.get<Bag[]>(endpoints.tripBags(props.tripId)),
+      [],
       'Failed to load bags'
-    );
-  });
+    )
+  );
 
   const getBagName = (bagId: string | null) =>
     (bagId && bags()?.find((b) => b.id === bagId)?.name) || null;
@@ -470,10 +472,19 @@ export function TripPrintView(props: TripPrintViewProps) {
       `}</style>
 
       <Show
-        when={!trip.loading && !items.loading && !bags.loading && trip() && items() && bags()}
+        when={!trip.loading && !items.loading && !bags.loading && trip()}
         fallback={
           <div class="loading-container">
-            <LoadingSpinner />
+            <Show
+              when={trip.loading || items.loading || bags.loading}
+              fallback={
+                <p>
+                  Couldn't load this trip. <a href={`/trips/${props.tripId}/pack`}>Back to list</a>
+                </p>
+              }
+            >
+              <LoadingSpinner />
+            </Show>
           </div>
         }
       >

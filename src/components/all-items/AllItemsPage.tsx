@@ -15,7 +15,7 @@ import { confirmDialog } from '../ui/ConfirmDialog';
 import { AllItemsPageHeader } from './AllItemsPageHeader';
 import { AllItemsPageTabs } from './AllItemsPageTabs';
 import { BuiltInItemsBrowser } from '../built-in-items/BuiltInItemsBrowser';
-import { fetchWithErrorHandling } from '../../lib/resource-helpers';
+import { fetchWithErrorHandling, fetchWithFallback } from '../../lib/resource-helpers';
 import { resolveMasterItems } from '../../lib/item-helpers';
 import { syncManager } from '../../lib/sync-manager';
 
@@ -37,8 +37,9 @@ export function AllItemsPage() {
   const [categories, { refetch: refetchCategories, mutate: mutateCategories }] = createResource<
     Category[]
   >(() =>
-    fetchWithErrorHandling(
+    fetchWithFallback(
       () => api.get<Category[]>(endpoints.categories),
+      [],
       'Failed to load categories'
     )
   );
@@ -53,8 +54,9 @@ export function AllItemsPage() {
   );
 
   const [bagTemplates, { refetch: refetchBagTemplates }] = createResource<BagTemplate[]>(() =>
-    fetchWithErrorHandling(
+    fetchWithFallback(
       () => api.get<BagTemplate[]>(endpoints.bagTemplates),
+      [],
       'Failed to load bags'
     )
   );
