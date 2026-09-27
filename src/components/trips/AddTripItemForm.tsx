@@ -28,6 +28,7 @@ import {
 
 interface AddTripItemFormProps {
   tripId: string;
+  /** The bag to start in; null means "Not in a bag", undefined means no choice. */
   preSelectedBagId?: string | null;
   preSelectedContainerId?: string | null;
   /** A name to start with, e.g. from a search that found nothing. */
@@ -76,8 +77,8 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
       setLocation(`container:${props.preSelectedContainerId}`);
     } else if (props.preSelectedBagId) {
       setLocation(`bag:${props.preSelectedBagId}`);
-    } else if (currentBags.length === 1) {
-      // Auto-select if there's only one bag
+    } else if (props.preSelectedBagId === undefined && currentBags.length === 1) {
+      // With no bag chosen and only one bag on the trip, start in it
       setLocation(`bag:${currentBags[0].id}`);
     }
     setInitialLocationSet(true);

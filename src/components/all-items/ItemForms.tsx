@@ -13,7 +13,12 @@ import { showToast } from '../ui/Toast';
 import { api, endpoints } from '../../lib/api';
 import { searchItems } from '../../lib/search';
 import { builtInItems } from '../../lib/built-in-items';
-import type { Category, MasterItemWithCategory } from '../../lib/types';
+import { getOrCreateCategory } from '../../lib/item-helpers';
+import type { BuiltInItem, Category, MasterItemWithCategory } from '../../lib/types';
+
+// A Suggestion's category the user doesn't have yet: kept as `new:<name>` in
+// the draft and created on save.
+const NEW_CATEGORY = 'new:';
 
 interface ItemDraft {
   name: string;
@@ -51,21 +56,21 @@ export function AddItemForm(props: {
   const [adding, setAdding] = createSignal(false);
   const nameId = createUniqueId();
 
+  const toSuggestion = (item: BuiltInItem, idx: number): ComboboxItem => ({
+    id: `builtin-${idx}`,
+    name: item.name,
+    description: item.description,
+    group: 'builtin',
+    categoryName: item.category,
+    defaultQuantity: item.default_quantity,
+    isContainer: item.is_container ?? false,
+  });
+
   // Autocomplete from Suggestions only: this form adds to My Items itself.
   const suggestions = createMemo((): ComboboxItem[] => {
     const query = draft.name.trim();
     if (query.length < 2) return [];
-    return searchItems(query, builtInItems.items)
-      .slice(0, 8)
-      .map((item, idx) => ({
-        id: `builtin-${idx}`,
-        name: item.name,
-        description: item.description,
-        group: 'builtin',
-        categoryName: item.category,
-        defaultQuantity: item.default_quantity,
-        isContainer: item.is_container ?? false,
-      }));
+    return searchItems(query, builtInItems.items).slice(0, 8).map(toSuggestion);
   });
 
   const handleSelect = (item: ComboboxItem) => {
@@ -74,7 +79,7 @@ export function AddItemForm(props: {
     setDraft({
       name: item.name,
       description: item.description || '',
-      category_id: category?.id ?? '',
+      category_id: category?.id ?? (item.categoryName ? NEW_CATEGORY + item.categoryName : ''),
       quantity: item.defaultQuantity ?? 1,
       is_container: item.isContainer ?? false,
     });
@@ -82,13 +87,27 @@ export function AddItemForm(props: {
 
   const handleAdd = async (e: Event) => {
     e.preventDefault();
-    const payload = toPayload(draft);
-    if (!payload.name) {
+    if (!draft.name.trim()) {
       showToast('error', 'Item name is required');
       return;
     }
 
+    // A name typed exactly like a Suggestion, without picking it, takes its
+    // details unless the user already set some.
+    const match = builtInItems.items.find(
+      (item) => item.name.toLowerCase() === draft.name.trim().toLowerCase()
+    );
+    if (match && !draft.category_id && !draft.description.trim()) {
+      handleSelect(toSuggestion(match, 0));
+    }
+
     setAdding(true);
+    let categoryId = draft.category_id;
+    if (categoryId.startsWith(NEW_CATEGORY)) {
+      const name = categoryId.slice(NEW_CATEGORY.length);
+      categoryId = (await getOrCreateCategory(name, [...props.categories()]))?.id ?? '';
+    }
+    const payload = toPayload({ ...draft, category_id: categoryId });
     const response = await api.post<MasterItemWithCategory>(endpoints.masterItems, payload);
     setAdding(false);
 
@@ -221,6 +240,11 @@ function ItemDetailsFields(props: {
             class={fieldClass}
           >
             <option value="">No category</option>
+            <Show when={props.draft.category_id.startsWith(NEW_CATEGORY)}>
+              <option value={props.draft.category_id}>
+                {props.draft.category_id.slice(NEW_CATEGORY.length)} (new)
+              </option>
+            </Show>
             <For each={props.categories()}>
               {(cat) => (
                 <option value={cat.id}>

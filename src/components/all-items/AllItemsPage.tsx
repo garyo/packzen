@@ -84,6 +84,10 @@ export function AllItemsPage() {
 
   const handleItemAdded = (added: MasterItemWithCategory) => {
     mutateItems((prev) => [...(prev ?? []), added]);
+    // Adding a Suggestion can create its category.
+    if (added.category_id && !categories()?.some((c) => c.id === added.category_id)) {
+      refetchCategories();
+    }
   };
 
   const handleDataChanged = () => {

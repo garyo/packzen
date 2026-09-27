@@ -66,7 +66,16 @@ export function TripFormWithBags(props: TripFormWithBagsProps) {
       const key = bag.name.toLowerCase();
       if (!bag.saveToMyBags || savedNames.has(key)) continue;
       savedNames.add(key);
-      await api.post(endpoints.bagTemplates, { name: bag.name, type: bag.type, color: bag.color });
+      const response = await api.post(endpoints.bagTemplates, {
+        name: bag.name,
+        type: bag.type,
+        color: bag.color,
+      });
+      // The trip still gets the bag; say why My Bags didn't (e.g. the plan limit).
+      if (!response.success) {
+        showToast('info', `"${bag.name}" wasn't saved to My Bags: ${response.error ?? 'error'}`);
+        return;
+      }
     }
   };
 

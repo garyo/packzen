@@ -17,8 +17,13 @@ export function useItemSearch(
   const [debouncedQuery, setDebouncedQuery] = createSignal('');
   const [scrollTarget, setScrollTarget] = createSignal<string | null>(null);
 
+  // Debounce typing, but show the full list again as soon as search clears.
   createEffect(() => {
     const value = query();
+    if (!value.trim()) {
+      setDebouncedQuery('');
+      return;
+    }
     const timeoutId = setTimeout(() => setDebouncedQuery(value), SEARCH_DEBOUNCE_MS);
     onCleanup(() => clearTimeout(timeoutId));
   });
@@ -58,10 +63,11 @@ export function useItemSearch(
     return !!items()?.some((item) => item.name.toLowerCase() === needle);
   };
 
-  // Once search closes (e.g. by tapping a result), scroll to the chosen item.
+  // Once search closes (e.g. by tapping a result) and the full list is back,
+  // scroll to the chosen item.
   createEffect(() => {
     const itemId = scrollTarget();
-    if (!itemId || isSearching()) return;
+    if (!itemId || isSearching() || debouncedQuery()) return;
     requestAnimationFrame(() => {
       document
         .getElementById(`trip-item-${itemId}`)
