@@ -423,6 +423,8 @@ export function TripPrintView(props: TripPrintViewProps) {
         }
 
         .back-link {
+          display: inline-flex;
+          align-items: center;
           margin-right: auto;
           color: #2563eb;
           font-size: 14px;
@@ -436,6 +438,7 @@ export function TripPrintView(props: TripPrintViewProps) {
         }
 
         .toolbar-button {
+          min-height: 44px;
           padding: 8px 14px;
           background: #6b7280;
           color: white;
@@ -458,6 +461,21 @@ export function TripPrintView(props: TripPrintViewProps) {
 
         .toolbar-button.primary:hover {
           background: #2563eb;
+        }
+
+        @media screen and (max-width: 640px) {
+          .toolbar {
+            gap: 6px;
+            padding: 8px 12px;
+          }
+          .back-link,
+          .toolbar-button {
+            font-size: 13px;
+          }
+          .toolbar-button {
+            min-height: 36px;
+            padding: 6px 10px;
+          }
         }
 
         .loading-container {
@@ -490,27 +508,27 @@ export function TripPrintView(props: TripPrintViewProps) {
             ← Back to list
           </a>
           <button
-            class="toolbar-button"
+            class="btn-compact toolbar-button"
             onClick={() => {
               const newSortBy = currentSortBy() === 'bag' ? 'category' : 'bag';
               window.location.href = buildPrintUrl({ sortBy: newSortBy });
             }}
           >
-            {currentSortBy() === 'bag' ? '📁 By Category' : '👜 By Bag'}
+            {currentSortBy() === 'bag' ? '📁 Group by Category' : '👜 Group by Bag'}
           </button>
           <button
-            class="toolbar-button"
+            class="btn-compact toolbar-button"
             onClick={() => {
               const newColumns = twoColumn() ? 1 : 2;
               window.localStorage.setItem(PRINT_COLUMNS_STORAGE_KEY, String(newColumns));
               window.location.href = buildPrintUrl({ columns: newColumns });
             }}
           >
-            {twoColumn() ? '📄 1 Column' : '📄 2 Columns'}
+            {twoColumn() ? '📄 Use 1 Column' : '📄 Use 2 Columns'}
           </button>
           <Show when={hasSkippedItems()}>
             <button
-              class="toolbar-button"
+              class="btn-compact toolbar-button"
               onClick={() => {
                 window.location.href = buildPrintUrl({ includeSkipped: !includeSkipped() });
               }}
@@ -518,7 +536,7 @@ export function TripPrintView(props: TripPrintViewProps) {
               {includeSkipped() ? '🙈 Hide Skipped' : '👁️ Show Skipped'}
             </button>
           </Show>
-          <button class="toolbar-button primary" onClick={() => window.print()}>
+          <button class="btn-compact toolbar-button primary" onClick={() => window.print()}>
             🖨️ Print
           </button>
         </div>

@@ -357,7 +357,6 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
 
             <a
               href={printHref()}
-              target="_blank"
               class={TOOL_BUTTON}
               aria-label="Print checklist"
               title="Print checklist"
