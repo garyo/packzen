@@ -1,39 +1,29 @@
 /**
  * BuiltInItemsBrowser Component
  *
- * Modal for browsing and selecting built-in packing items
- * Supports filtering by trip type, category, and search
- * Users can select items and import them to master list or add to a trip
+ * Modal for browsing Suggestions (the built-in packing items) and adding a
+ * selection to My Items. Filters by trip type, category, and search.
  */
 
-import { createSignal, For, Show, createMemo, createResource } from 'solid-js';
+import { createSignal, For, Show, createMemo } from 'solid-js';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
-import type { SelectedBuiltInItem, Bag, TripItem } from '../../lib/types';
-import {
-  builtInItems,
-  getCategoryIcon,
-  getItemsByTripTypes,
-  getCategoriesForTripTypes,
-} from '../../lib/built-in-items';
-import { api, endpoints } from '../../lib/api';
+import { QuantityInput } from '../ui/QuantityInput';
+import { ChevronRightIcon } from '../ui/Icons';
+import type { BuiltInItem, SelectedBuiltInItem } from '../../lib/types';
+import { builtInItems, getCategoryIcon } from '../../lib/built-in-items';
 
 interface BuiltInItemsBrowserProps {
   onClose: () => void;
-  onImportToMaster?: (items: SelectedBuiltInItem[]) => Promise<void>;
-  tripId?: string; // Optional: for "Add to Trip" workflow
-  bags?: Bag[]; // Pre-loaded bags (avoids refetching what the parent already has)
-  tripItems?: TripItem[]; // Pre-loaded trip items, used to find containers
-  onAddToTrip?: (
-    items: SelectedBuiltInItem[],
-    bagId?: string | null,
-    containerId?: string | null
-  ) => Promise<void>;
+  onImportToMaster: (items: SelectedBuiltInItem[]) => Promise<void>;
 }
 
 // Built-in items aren't uniquely identified by name alone (the same name can
 // appear under multiple categories), so selection state is keyed by the pair.
 const itemKey = (item: { category: string; name: string }) => `${item.category}::${item.name}`;
+
+const categoryOrder = (name: string) =>
+  builtInItems.categories.find((c) => c.name === name)?.sort_order ?? 999;
 
 export function BuiltInItemsBrowser(props: BuiltInItemsBrowserProps) {
   const [searchQuery, setSearchQuery] = createSignal('');
@@ -42,199 +32,99 @@ export function BuiltInItemsBrowser(props: BuiltInItemsBrowserProps) {
   const [selectedItems, setSelectedItems] = createSignal<Map<string, number>>(new Map());
   const [isImporting, setIsImporting] = createSignal(false);
   const [expandedCategories, setExpandedCategories] = createSignal<Set<string>>(new Set());
-  const [selectedBag, setSelectedBag] = createSignal<string | null>(null);
-  const [selectedContainer, setSelectedContainer] = createSignal<string | null>(null);
-  const [keepOpen, setKeepOpen] = createSignal(false);
 
-  // Use pre-loaded bags/trip items if the parent (trip workflow) already has
-  // them; only fetch when they're missing (e.g. no parent-provided data).
-  const [fetchedBags] = createResource<Bag[], string>(
-    () => (props.bags ? undefined : props.tripId),
-    async (tripId: string) => {
-      const response = await api.get<Bag[]>(endpoints.tripBags(tripId));
-      return response.success && response.data ? response.data : [];
-    }
+  // Items for any of the selected trip types (none selected = all items).
+  const tripTypeItems = createMemo(() => {
+    const tripTypes = selectedTripTypes();
+    if (tripTypes.size === 0) return builtInItems.items;
+    return builtInItems.items.filter((item) => item.trip_types.some((t) => tripTypes.has(t)));
+  });
+
+  const availableCategories = createMemo(() =>
+    [...new Set(tripTypeItems().map((item) => item.category))].sort(
+      (a, b) => categoryOrder(a) - categoryOrder(b)
+    )
   );
-  const bags = () => props.bags ?? fetchedBags() ?? [];
 
-  const [fetchedTripItems] = createResource<TripItem[], string>(
-    () => (props.tripItems ? undefined : props.tripId),
-    async (tripId: string) => {
-      const response = await api.get<TripItem[]>(endpoints.tripItems(tripId));
-      return response.success && response.data ? response.data : [];
-    }
-  );
-  const tripItems = () => props.tripItems ?? fetchedTripItems() ?? [];
-
-  // Get available containers
-  const availableContainers = () => {
-    const items = tripItems() || [];
-    return items.filter((item) => item.is_container);
-  };
-
-  // Filter items based on search, trip types, and category
-  const filteredItems = createMemo(() => {
-    let items = builtInItems.items;
-
-    // Filter by trip types (intersection - item must have ALL selected types)
-    const tripTypes = Array.from(selectedTripTypes());
-    if (tripTypes.length > 0) {
-      items = getItemsByTripTypes(tripTypes);
-    }
-
-    // Filter by category
+  // A category picked earlier stops applying once the trip types exclude it.
+  const activeCategory = () => {
     const category = selectedCategory();
-    if (category) {
-      items = items.filter((item) => item.category === category);
-    }
+    return category && availableCategories().includes(category) ? category : null;
+  };
 
-    // Filter by search query
-    const query = searchQuery().toLowerCase().trim();
-    if (query) {
-      items = items.filter(
-        (item) =>
-          item.name.toLowerCase().includes(query) || item.description?.toLowerCase().includes(query)
-      );
-    }
+  const query = () => searchQuery().toLowerCase().trim();
 
-    return items;
+  const filteredItems = createMemo(() => {
+    const category = activeCategory();
+    const q = query();
+    return tripTypeItems().filter(
+      (item) =>
+        (!category || item.category === category) &&
+        (!q || item.name.toLowerCase().includes(q) || item.description?.toLowerCase().includes(q))
+    );
   });
 
-  // Group filtered items by category
   const groupedItems = createMemo(() => {
-    const items = filteredItems();
-    const groups = new Map<string, typeof items>();
-
-    items.forEach((item) => {
-      if (!groups.has(item.category)) {
-        groups.set(item.category, []);
-      }
-      groups.get(item.category)!.push(item);
-    });
-
-    // Sort categories by sort_order and pre-sort items within each category
-    return Array.from(groups.entries())
-      .sort(([a], [b]) => {
-        const categoryA = builtInItems.categories.find((c) => c.name === a);
-        const categoryB = builtInItems.categories.find((c) => c.name === b);
-        return (categoryA?.sort_order || 999) - (categoryB?.sort_order || 999);
-      })
+    const groups = new Map<string, BuiltInItem[]>();
+    for (const item of filteredItems()) {
+      groups.set(item.category, [...(groups.get(item.category) ?? []), item]);
+    }
+    return [...groups.entries()]
+      .sort(([a], [b]) => categoryOrder(a) - categoryOrder(b))
       .map(
-        ([category, categoryItems]) =>
-          [category, categoryItems.sort((a, b) => a.name.localeCompare(b.name))] as [
-            string,
-            typeof items,
-          ]
+        ([category, items]) =>
+          [category, items.sort((a, b) => a.name.localeCompare(b.name))] as const
       );
   });
 
-  // Get available categories for current filters
-  const availableCategories = createMemo(() => {
-    const tripTypes = Array.from(selectedTripTypes());
-    return getCategoriesForTripTypes(tripTypes);
-  });
-
-  const toggleTripType = (tripTypeId: string) => {
-    setSelectedTripTypes((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(tripTypeId)) {
-        newSet.delete(tripTypeId);
-      } else {
-        newSet.add(tripTypeId);
-      }
-      return newSet;
-    });
+  const toggleInSet = (set: Set<string>, value: string) => {
+    const next = new Set(set);
+    if (!next.delete(value)) next.add(value);
+    return next;
   };
 
-  const toggleItemSelection = (key: string, defaultQuantity: number) => {
+  const toggleItemSelection = (item: BuiltInItem) => {
     setSelectedItems((prev) => {
-      const newMap = new Map(prev);
-      if (newMap.has(key)) {
-        newMap.delete(key);
-      } else {
-        newMap.set(key, defaultQuantity);
-      }
-      return newMap;
+      const next = new Map(prev);
+      const key = itemKey(item);
+      if (!next.delete(key)) next.set(key, item.default_quantity);
+      return next;
     });
   };
 
-  const toggleCategoryExpansion = (category: string) => {
-    setExpandedCategories((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(category)) {
-        newSet.delete(category);
-      } else {
-        newSet.add(category);
-      }
-      return newSet;
-    });
+  const setItemQuantity = (key: string, quantity: number) => {
+    setSelectedItems((prev) => new Map(prev).set(key, quantity));
   };
 
-  const updateItemQuantity = (key: string, quantity: number) => {
+  const setCategorySelected = (items: readonly BuiltInItem[], selected: boolean) => {
     setSelectedItems((prev) => {
-      const newMap = new Map(prev);
-      newMap.set(key, Math.max(1, quantity));
-      return newMap;
-    });
-  };
-
-  const selectAllInCategory = (category: string) => {
-    const categoryItems = filteredItems().filter((item) => item.category === category);
-    setSelectedItems((prev) => {
-      const newMap = new Map(prev);
-      categoryItems.forEach((item) => {
+      const next = new Map(prev);
+      for (const item of items) {
         const key = itemKey(item);
-        if (!newMap.has(key)) {
-          newMap.set(key, item.default_quantity);
-        }
-      });
-      return newMap;
-    });
-  };
-
-  const deselectAllInCategory = (category: string) => {
-    const categoryItems = filteredItems().filter((item) => item.category === category);
-    setSelectedItems((prev) => {
-      const newMap = new Map(prev);
-      categoryItems.forEach((item) => {
-        newMap.delete(itemKey(item));
-      });
-      return newMap;
+        if (!selected) next.delete(key);
+        else if (!next.has(key)) next.set(key, item.default_quantity);
+      }
+      return next;
     });
   };
 
   const handleImport = async () => {
-    if (selectedItems().size === 0) return;
-
-    const items: SelectedBuiltInItem[] = Array.from(selectedItems().entries()).map(
-      ([key, quantity]) => {
-        const item = builtInItems.items.find((i) => itemKey(i) === key)!;
-        return {
-          name: item.name,
-          description: item.description,
-          category: item.category,
-          quantity,
-          is_container: item.is_container,
-        };
-      }
-    );
+    const items: SelectedBuiltInItem[] = [...selectedItems().entries()].map(([key, quantity]) => {
+      const item = builtInItems.items.find((i) => itemKey(i) === key)!;
+      return {
+        name: item.name,
+        description: item.description,
+        category: item.category,
+        quantity,
+        is_container: item.is_container,
+      };
+    });
+    if (items.length === 0) return;
 
     setIsImporting(true);
-
     try {
-      if (props.onImportToMaster) {
-        await props.onImportToMaster(items);
-      } else if (props.onAddToTrip) {
-        await props.onAddToTrip(items, selectedBag(), selectedContainer());
-      }
-
-      if (keepOpen()) {
-        // Keep dialog open but reset selections for next batch
-        setSelectedItems(new Map());
-        setKeepOpen(false);
-      } else {
-        props.onClose();
-      }
+      await props.onImportToMaster(items);
+      props.onClose();
     } catch (error) {
       console.error('Failed to import items:', error);
     } finally {
@@ -246,41 +136,39 @@ export function BuiltInItemsBrowser(props: BuiltInItemsBrowserProps) {
 
   return (
     <Modal title="Browse Suggestions" onClose={props.onClose} size="large">
-      {/* Search & Category - side by side on larger screens */}
       <div class="mb-4 grid gap-4 md:grid-cols-2">
-        <div>
-          <input
-            type="text"
-            placeholder="Search items..."
-            value={searchQuery()}
-            onInput={(e) => setSearchQuery(e.target.value)}
-            class="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-        <div>
-          <select
-            value={selectedCategory() || ''}
-            onChange={(e) => setSelectedCategory(e.target.value || null)}
-            class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">All Categories</option>
-            <For each={availableCategories()}>
-              {(category) => <option value={category}>{category}</option>}
-            </For>
-          </select>
-        </div>
+        <input
+          type="search"
+          placeholder="Search suggestions..."
+          aria-label="Search suggestions"
+          value={searchQuery()}
+          onInput={(e) => setSearchQuery(e.currentTarget.value)}
+          class="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+        />
+        <select
+          aria-label="Category"
+          value={activeCategory() ?? ''}
+          onChange={(e) => setSelectedCategory(e.currentTarget.value || null)}
+          class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">All Categories</option>
+          <For each={availableCategories()}>
+            {(category) => <option value={category}>{category}</option>}
+          </For>
+        </select>
       </div>
 
-      {/* Trip Type Filter */}
-      <div class="mb-4">
-        <label class="mb-2 block text-sm font-medium text-gray-700">Trip Types:</label>
+      <fieldset class="mb-4">
+        <legend class="mb-2 block text-sm font-medium text-gray-700">Trip types</legend>
         <div class="flex flex-wrap gap-2">
           <For each={builtInItems.trip_types}>
             {(tripType) => {
               const isSelected = () => selectedTripTypes().has(tripType.id);
               return (
                 <button
-                  onClick={() => toggleTripType(tripType.id)}
+                  type="button"
+                  aria-pressed={isSelected()}
+                  onClick={() => setSelectedTripTypes((prev) => toggleInSet(prev, tripType.id))}
                   class={`rounded-full px-3 py-1 text-sm transition-colors ${
                     isSelected()
                       ? 'bg-blue-600 text-white'
@@ -294,54 +182,10 @@ export function BuiltInItemsBrowser(props: BuiltInItemsBrowserProps) {
             }}
           </For>
         </div>
-      </div>
+      </fieldset>
 
-      {/* Container & Bag Selectors - side by side on larger screens (only show for trip workflow) */}
-      <Show when={props.onAddToTrip}>
-        <div class="mb-4 grid gap-4 md:grid-cols-2">
-          {/* Container Selector */}
-          <Show when={availableContainers().length > 0}>
-            <div>
-              <label class="mb-1 block text-sm font-medium text-gray-700">Container:</label>
-              <select
-                value={selectedContainer() || ''}
-                onChange={(e) => {
-                  setSelectedContainer(e.target.value || null);
-                  if (e.target.value) {
-                    setSelectedBag(null); // Clear bag if selecting container
-                  }
-                }}
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">No container</option>
-                <For each={availableContainers()}>
-                  {(container) => <option value={container.id}>📦 {container.name}</option>}
-                </For>
-              </select>
-            </div>
-          </Show>
-
-          {/* Bag Selector (only show if not using container) */}
-          <Show when={!selectedContainer()}>
-            <div>
-              <label class="mb-1 block text-sm font-medium text-gray-700">Bag:</label>
-              <select
-                value={selectedBag() || ''}
-                onChange={(e) => setSelectedBag(e.target.value || null)}
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">No bag</option>
-                <For each={bags()}>{(bag) => <option value={bag.id}>{bag.name}</option>}</For>
-              </select>
-            </div>
-          </Show>
-        </div>
-      </Show>
-
-      {/* Selected Count */}
       <div class="mb-4 text-sm font-medium text-gray-700">Selected: {selectedCount()} items</div>
 
-      {/* Items List */}
       <div class="max-h-96 space-y-4 overflow-y-auto border-t border-gray-200 pt-4">
         <Show
           when={groupedItems().length > 0}
@@ -354,34 +198,24 @@ export function BuiltInItemsBrowser(props: BuiltInItemsBrowserProps) {
         >
           <For each={groupedItems()}>
             {([category, categoryItems]) => {
-              const categoryIcon = getCategoryIcon(category);
-              const isExpanded = () => expandedCategories().has(category);
-              const allSelected = () =>
-                categoryItems.every((item) => selectedItems().has(itemKey(item)));
-              const someSelected = () =>
+              // Searching shows every match without extra taps.
+              const isExpanded = () => !!query() || expandedCategories().has(category);
+              const anySelected = () =>
                 categoryItems.some((item) => selectedItems().has(itemKey(item)));
 
               return (
                 <div class="border-b border-gray-200 pb-4 last:border-0 last:pb-0">
                   <div class="mb-2 flex items-center justify-between">
                     <button
-                      onClick={() => toggleCategoryExpansion(category)}
+                      type="button"
+                      aria-expanded={isExpanded()}
+                      onClick={() => setExpandedCategories((prev) => toggleInSet(prev, category))}
                       class="flex flex-1 items-center gap-2 text-left font-semibold text-gray-900 hover:text-gray-700"
                     >
-                      <svg
+                      <ChevronRightIcon
                         class={`h-5 w-5 transition-transform ${isExpanded() ? 'rotate-90' : ''}`}
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                          stroke-width="2"
-                          d="M9 5l7 7-7 7"
-                        />
-                      </svg>
-                      <span class="text-lg">{categoryIcon}</span>
+                      />
+                      <span class="text-lg">{getCategoryIcon(category)}</span>
                       {category}
                       <span class="text-sm font-normal text-gray-500">
                         ({categoryItems.length})
@@ -389,54 +223,49 @@ export function BuiltInItemsBrowser(props: BuiltInItemsBrowserProps) {
                     </button>
                     <Button
                       size="sm"
-                      variant={allSelected() ? 'secondary' : 'ghost'}
-                      onClick={() =>
-                        allSelected() || someSelected()
-                          ? deselectAllInCategory(category)
-                          : selectAllInCategory(category)
-                      }
+                      variant={anySelected() ? 'secondary' : 'ghost'}
+                      onClick={() => setCategorySelected(categoryItems, !anySelected())}
                     >
-                      {allSelected() || someSelected() ? 'Deselect All' : 'Select All'}
+                      {anySelected() ? 'Deselect All' : 'Select All'}
                     </Button>
                   </div>
                   <Show when={isExpanded()}>
-                    <div class="space-y-2">
+                    <div class="space-y-1">
                       <For each={categoryItems}>
                         {(item) => {
                           const key = itemKey(item);
                           const isSelected = () => selectedItems().has(key);
-                          const quantity = () => selectedItems().get(key) || item.default_quantity;
-
                           return (
-                            <div class="flex items-start gap-3 rounded p-2 hover:bg-gray-50">
-                              <input
-                                type="checkbox"
-                                checked={isSelected()}
-                                onChange={() => toggleItemSelection(key, item.default_quantity)}
-                                class="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                              />
-                              <div class="flex-1">
-                                <p class="font-medium text-gray-900">
-                                  {item.is_container && (
-                                    <span class="mr-1 text-xs" title="Container">
-                                      📦
+                            <div class="flex items-start gap-3 rounded hover:bg-gray-50">
+                              <label class="flex flex-1 cursor-pointer items-start gap-3 p-2">
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected()}
+                                  onChange={() => toggleItemSelection(item)}
+                                  class="btn-compact mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                />
+                                <span class="flex-1">
+                                  <span class="block font-medium text-gray-900">
+                                    {item.is_container && (
+                                      <span class="mr-1 text-xs" title="Container">
+                                        📦
+                                      </span>
+                                    )}
+                                    {item.name}
+                                  </span>
+                                  {item.description && (
+                                    <span class="block text-sm text-gray-600">
+                                      {item.description}
                                     </span>
                                   )}
-                                  {item.name}
-                                </p>
-                                {item.description && (
-                                  <p class="text-sm text-gray-600">{item.description}</p>
-                                )}
-                              </div>
+                                </span>
+                              </label>
                               <Show when={isSelected()}>
-                                <input
-                                  type="number"
-                                  min="1"
-                                  value={quantity()}
-                                  onInput={(e) =>
-                                    updateItemQuantity(key, parseInt(e.target.value) || 1)
-                                  }
-                                  class="w-16 rounded border border-gray-300 px-2 py-1 text-center text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                                <QuantityInput
+                                  value={selectedItems().get(key) ?? item.default_quantity}
+                                  onChange={(n) => setItemQuantity(key, n)}
+                                  aria-label={`Quantity of ${item.name}`}
+                                  class="mt-1 w-16 px-2 py-1 text-center text-sm"
                                 />
                               </Show>
                             </div>
@@ -452,31 +281,13 @@ export function BuiltInItemsBrowser(props: BuiltInItemsBrowserProps) {
         </Show>
       </div>
 
-      {/* Actions */}
       <div class="mt-6 flex flex-wrap justify-end gap-2">
         <Button variant="secondary" onClick={props.onClose} disabled={isImporting()}>
           Cancel
         </Button>
-        <Show when={props.onImportToMaster}>
-          <Button onClick={handleImport} disabled={selectedCount() === 0 || isImporting()}>
-            {isImporting() ? 'Adding...' : `Add to My Items (${selectedCount()})`}
-          </Button>
-        </Show>
-        <Show when={props.onAddToTrip}>
-          <Button
-            variant="secondary"
-            onClick={() => {
-              setKeepOpen(true);
-              handleImport();
-            }}
-            disabled={selectedCount() === 0 || isImporting()}
-          >
-            Add & Continue
-          </Button>
-          <Button onClick={handleImport} disabled={selectedCount() === 0 || isImporting()}>
-            {isImporting() ? 'Adding...' : `Add to Trip (${selectedCount()})`}
-          </Button>
-        </Show>
+        <Button onClick={handleImport} disabled={selectedCount() === 0 || isImporting()}>
+          {isImporting() ? 'Adding...' : `Add to My Items (${selectedCount()})`}
+        </Button>
       </div>
     </Modal>
   );
