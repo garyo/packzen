@@ -1,3 +1,5 @@
+import { createUniqueId } from 'solid-js';
+
 interface DateInputProps {
   label: string;
   value: string;
@@ -7,13 +9,15 @@ interface DateInputProps {
 }
 
 export function DateInput(props: DateInputProps) {
+  const id = createUniqueId();
   return (
     <div>
-      <label class="mb-1 block text-sm font-medium text-gray-700">
+      <label for={id} class="mb-1 block text-sm font-medium text-gray-700">
         {props.label}
         {props.required && ' *'}
       </label>
       <input
+        id={id}
         type="date"
         value={props.value}
         onInput={(e) => props.onInput(e.currentTarget.value)}

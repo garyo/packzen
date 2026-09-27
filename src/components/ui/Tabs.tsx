@@ -17,10 +17,12 @@ export function TabNav(props: TabNavProps) {
     <div class="border-b border-gray-200 bg-white">
       {/* Mobile: horizontal scroll, Desktop: centered */}
       <div class="scrollbar-hide overflow-x-auto md:overflow-visible">
-        <div class="flex min-w-max md:min-w-0 md:justify-center">
+        <div role="tablist" class="flex min-w-max md:min-w-0 md:justify-center">
           <For each={props.tabs}>
             {(tab) => (
               <button
+                type="button"
+                id={`tab-${tab.id}`}
                 onClick={() => props.onChange(tab.id)}
                 class={`flex items-center gap-2 border-b-2 px-6 py-4 text-sm font-medium whitespace-nowrap transition-colors md:px-4 md:py-3 ${
                   props.activeTab === tab.id
