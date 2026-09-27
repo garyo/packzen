@@ -1263,6 +1263,60 @@ test('Analytics endpoint accepts only list_printed with a trip id (S2)', async (
   assert.deepEqual(JSON.parse(rows[0].props!), { tripId });
 });
 
+test('An item is never both packed and skipped; trip counts ignore skipped items (C7)', async () => {
+  const d1 = await createTestDatabase();
+  const db = drizzle(d1);
+  const userId = 'pack_state_user';
+  const trip = await db
+    .insert(trips)
+    .values({ clerk_user_id: userId, name: 'Pack State' })
+    .returning()
+    .get();
+  const params = { tripId: trip.id };
+  const patch = async (body: Record<string, unknown>) => {
+    const response = await callApi(tripItemsApi.PATCH, d1, userId, {
+      method: 'PATCH',
+      body,
+      params,
+    });
+    assert.equal(response.status, 200);
+    return (await response.json()) as { is_packed: boolean; is_skipped: boolean };
+  };
+
+  const item = await db
+    .insert(tripItems)
+    .values({ trip_id: trip.id, name: 'Umbrella', is_packed: true })
+    .returning()
+    .get();
+
+  const skipped = await patch({ id: item.id, is_skipped: true });
+  assert.equal(skipped.is_packed, false);
+  assert.equal(skipped.is_skipped, true);
+  const packedAgain = await patch({ id: item.id, is_packed: true });
+  assert.equal(packedAgain.is_packed, true);
+  assert.equal(packedAgain.is_skipped, false);
+  const both = await patch({ id: item.id, is_packed: true, is_skipped: true });
+  assert.equal(both.is_packed, false);
+  assert.equal(both.is_skipped, true);
+
+  const created = await callApi(tripItemsApi.POST, d1, userId, {
+    method: 'POST',
+    body: { items: [{ name: 'Kite', is_packed: true, is_skipped: true }] },
+    params,
+  });
+  const [kite] = (await created.json()) as { is_packed: boolean; is_skipped: boolean }[];
+  assert.equal(kite.is_packed, false);
+  assert.equal(kite.is_skipped, true);
+
+  await db.insert(tripItems).values({ trip_id: trip.id, name: 'Passport', is_packed: true });
+  await db.insert(tripItems).values({ trip_id: trip.id, name: 'Map' });
+
+  const list = await callApi(tripsApiIndex.GET, d1, userId);
+  const [stats] = (await list.json()) as { items_total: number; items_packed: number }[];
+  assert.equal(stats.items_total, 2, 'skipped Umbrella and Kite are not counted');
+  assert.equal(stats.items_packed, 1);
+});
+
 test('Plan limits consult the billing override only when the session plan falls short (P1)', async () => {
   let fetches = 0;
   const fetchOverride = async () => {

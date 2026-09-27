@@ -115,7 +115,8 @@ function newItemRow(tripId: string, item: TripItemCreate): typeof tripItems.$inf
     master_item_id: item.master_item_id || null,
     container_item_id: item.container_item_id || null,
     is_container: item.is_container,
-    is_packed: item.is_packed,
+    // An item is never both packed and skipped; skipping wins.
+    is_packed: item.is_packed && !item.is_skipped,
     is_skipped: item.is_skipped,
     notes: item.notes || null,
   };
@@ -366,13 +367,20 @@ export const PATCH: APIRoute = createPatchHandler(
       }
     }
 
+    // An item is unpacked, packed or skipped — never both packed and skipped.
+    // Setting one clears the other; skipping wins a patch that sets both.
+    const packState = is_skipped
+      ? { is_skipped: true, is_packed: false }
+      : is_packed
+        ? { is_packed: true, is_skipped: false }
+        : { is_packed, is_skipped };
+
     // Drizzle leaves out undefined fields, so only the fields sent are updated.
     const updated = await db
       .update(tripItems)
       .set({
         ...fields,
-        is_packed,
-        is_skipped,
+        ...packState,
         bag_id,
         container_item_id,
         is_container,
@@ -382,7 +390,7 @@ export const PATCH: APIRoute = createPatchHandler(
       .returning()
       .get();
 
-    if (is_packed) {
+    if (packState.is_packed) {
       logEvent(db, 'item_packed', { userId, props: { tripId: trip.id } });
     }
     return updated;

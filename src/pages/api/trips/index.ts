@@ -9,6 +9,7 @@ import { normalizeTripDates } from '../../../lib/utils';
 import { logEvent } from '../../../lib/analytics';
 
 export const GET: APIRoute = createGetHandler(async ({ db, userId }) => {
+  // Skipped items don't count toward the total, and a skipped item is never packed.
   return await db
     .select({
       id: trips.id,
@@ -21,8 +22,8 @@ export const GET: APIRoute = createGetHandler(async ({ db, userId }) => {
       created_at: trips.created_at,
       updated_at: trips.updated_at,
       bag_count: sql<number>`(SELECT COUNT(*) FROM bags WHERE bags.trip_id = trips.id)`,
-      items_total: sql<number>`(SELECT COUNT(*) FROM trip_items WHERE trip_items.trip_id = trips.id)`,
-      items_packed: sql<number>`(SELECT COUNT(*) FROM trip_items WHERE trip_items.trip_id = trips.id AND trip_items.is_packed = 1)`,
+      items_total: sql<number>`(SELECT COUNT(*) FROM trip_items WHERE trip_items.trip_id = trips.id AND trip_items.is_skipped = 0)`,
+      items_packed: sql<number>`(SELECT COUNT(*) FROM trip_items WHERE trip_items.trip_id = trips.id AND trip_items.is_packed = 1 AND trip_items.is_skipped = 0)`,
     })
     .from(trips)
     .where(eq(trips.clerk_user_id, userId))
