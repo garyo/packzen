@@ -199,22 +199,9 @@ export function ReplaceBagModal(props: ReplaceBagModalProps) {
 
             <BagFields value={formData()} onChange={setFormData} />
 
-            <div class="flex gap-2">
-              <Button type="submit" size="sm" disabled={saving()}>
-                Replace Bag
-              </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                onClick={() => {
-                  setShowCustomForm(false);
-                  setFormData(DEFAULT_BAG_FIELDS);
-                }}
-              >
-                Cancel
-              </Button>
-            </div>
+            <Button type="submit" size="sm" disabled={saving()}>
+              Replace Bag
+            </Button>
           </form>
         </Show>
       </div>

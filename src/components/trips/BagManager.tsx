@@ -8,6 +8,8 @@ import { showToast } from '../ui/Toast';
 import { confirmDialog } from '../ui/ConfirmDialog';
 import { EditIcon, TrashIcon } from '../ui/Icons';
 import { BagChip, BagFields, DEFAULT_BAG_FIELDS, type BagFieldValues } from '../ui/BagFields';
+import { NO_BAG_LABEL } from '../../lib/vocabulary';
+import { byName } from '../../lib/item-placement';
 
 interface BagManagerProps {
   tripId: string;
@@ -25,13 +27,21 @@ export function BagManager(props: BagManagerProps) {
 
   const [bags, { refetch }] = createResource<Bag[]>(async () => {
     const response = await api.get<Bag[]>(endpoints.tripBags(props.tripId));
-    return response.success && response.data ? response.data : [];
+    return response.success && response.data ? response.data.sort(byName) : [];
   });
 
   const [bagTemplates] = createResource<BagTemplate[]>(async () => {
     const response = await api.get<BagTemplate[]>(endpoints.bagTemplates);
     return response.success && response.data ? response.data : [];
   });
+
+  // My Bags not already on this trip, so one tap can't add a duplicate.
+  const availableTemplates = () => {
+    const tripBagNames = new Set(bags()?.map((bag) => bag.name.toLowerCase()));
+    return (bagTemplates() ?? []).filter(
+      (template) => !tripBagNames.has(template.name.toLowerCase())
+    );
+  };
 
   const runExclusive = async (action: () => Promise<void>) => {
     if (busy()) return;
@@ -90,7 +100,7 @@ export function BagManager(props: BagManagerProps) {
   const handleDelete = async (bag: Bag) => {
     const confirmed = await confirmDialog({
       title: `Delete "${bag.name}"?`,
-      message: 'Items in this bag will not be deleted.',
+      message: `Its items won't be deleted; they'll move to "${NO_BAG_LABEL}".`,
       confirmLabel: 'Delete',
       destructive: true,
     });
@@ -213,11 +223,11 @@ export function BagManager(props: BagManagerProps) {
         </div>
 
         {/* Add from Templates */}
-        <Show when={(bagTemplates()?.length || 0) > 0}>
+        <Show when={availableTemplates().length > 0}>
           <div class="border-t border-gray-200 pt-4">
             <h3 class="mb-3 font-semibold text-gray-900">Add from My Bags</h3>
             <div class="grid grid-cols-2 gap-2">
-              <For each={bagTemplates()}>
+              <For each={availableTemplates()}>
                 {(template) => (
                   <button
                     onClick={() => handleAddFromTemplate(template)}

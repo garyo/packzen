@@ -12,6 +12,7 @@ import { LoadingSpinner } from '../ui/LoadingSpinner';
 import { fetchWithFallback } from '../../lib/resource-helpers';
 import { formatDateRange } from '../../lib/utils';
 import { NO_BAG_LABEL } from '../../lib/vocabulary';
+import { byName } from '../../lib/item-placement';
 
 // One printed checklist line, shared by the top-level item list and the
 // container-contents list.
@@ -114,8 +115,6 @@ export function TripPrintView(props: TripPrintViewProps) {
   const containersById = () =>
     new Map((items() || []).filter((item) => item.is_container).map((c) => [c.id, c]));
 
-  const byName = (a: TripItem, b: TripItem) => a.name.localeCompare(b.name);
-
   // Get location label for an item (for category view)
   const getItemLocationLabel = (item: TripItem) => {
     const container = item.container_item_id
@@ -138,9 +137,7 @@ export function TripPrintView(props: TripPrintViewProps) {
   // Bag view: one group per bag (by id, so two bags with the same name stay
   // apart), in the packing screen's bag order, with "Not in a bag" last.
   const groupByBag = (itemsList: TripItem[], categoriesList: Category[]): PrintGroup[] => {
-    const bagsList = [...(bags() || [])].sort(
-      (a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name)
-    );
+    const bagsList = [...(bags() || [])].sort(byName);
     const knownBagIds = new Set(bagsList.map((b) => b.id));
     const groupKey = (bagId: string | null) => (bagId && knownBagIds.has(bagId) ? bagId : '');
     const containers = containersById();

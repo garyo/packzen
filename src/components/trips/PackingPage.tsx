@@ -2,6 +2,7 @@ import {
   createSignal,
   createResource,
   createEffect,
+  createMemo,
   Show,
   Switch,
   Match,
@@ -162,8 +163,10 @@ export function PackingPage(props: PackingPageProps) {
   const containers = () => (items() ?? []).filter((item) => item.is_container);
   const bagName = (bagId: string | null) =>
     bags()?.find((bag) => bag.id === bagId)?.name ?? NO_BAG_LABEL;
+  // Bags in the order every list shows them.
+  const sortedBags = createMemo(() => [...(bags() ?? [])].sort(byName));
   // The bag new items go in by default: the first one, as the lists show them.
-  const firstBagId = () => [...(bags() ?? [])].sort(byName)[0]?.id ?? null;
+  const firstBagId = () => sortedBags()[0]?.id ?? null;
 
   // --- Packing ---
 
@@ -563,7 +566,7 @@ export function PackingPage(props: PackingPageProps) {
             preSelectedBagId={target().bagId}
             preSelectedContainerId={target().containerId}
             initialName={target().name}
-            bags={bags()}
+            bags={bags() && sortedBags()}
             categories={categories()}
             tripItems={items()}
             masterItems={masterItems()}
@@ -584,7 +587,7 @@ export function PackingPage(props: PackingPageProps) {
         {(item) => (
           <ItemActionSheet
             item={item()}
-            bags={[...(bags() ?? [])].sort(byName)}
+            bags={sortedBags()}
             containers={containers().filter((c) => c.id !== item().id)}
             onMoveToBag={(bagId) => moveItemToBag(item().id, bagId)}
             onMoveToContainer={(containerId) => moveItemToContainer(item().id, containerId)}
@@ -602,7 +605,7 @@ export function PackingPage(props: PackingPageProps) {
           <ReplaceBagModal
             tripId={props.tripId}
             currentBag={bag()}
-            tripBags={bags()}
+            tripBags={sortedBags()}
             onClose={() => setReplacingBag(null)}
             onReplaced={reloadItemsAndBags}
           />
@@ -615,7 +618,7 @@ export function PackingPage(props: PackingPageProps) {
             tripId={props.tripId}
             item={item()}
             allItems={items()}
-            bags={bags()}
+            bags={sortedBags()}
             categories={categories()}
             onDataChanged={refetchCategories}
             onClose={() => setEditingItem(null)}
@@ -658,7 +661,7 @@ export function PackingPage(props: PackingPageProps) {
       <Show when={selectMode() && selectedItems().size > 0}>
         <SelectModeActionBar
           selectedCount={() => selectedItems().size}
-          bags={bags}
+          bags={sortedBags}
           categories={categories}
           containers={containers}
           onAssignToBag={(bagId) =>

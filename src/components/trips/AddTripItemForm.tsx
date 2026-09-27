@@ -18,6 +18,7 @@ import { searchItems } from '../../lib/search';
 import { builtInItems } from '../../lib/built-in-items';
 import { getOrCreateMasterItem } from '../../lib/item-helpers';
 import { NO_BAG_LABEL } from '../../lib/vocabulary';
+import { byName } from '../../lib/item-placement';
 import {
   CategoryPicker,
   categoryChoiceForName,
@@ -84,11 +85,8 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
     setInitialLocationSet(true);
   });
 
-  // Get available containers
-  const availableContainers = () => {
-    const items = tripItems() || [];
-    return items.filter((item) => item.is_container);
-  };
+  const availableContainers = () =>
+    (tripItems() ?? []).filter((item) => item.is_container).sort(byName);
 
   const existingItemsByName = createMemo(() => {
     const items = tripItems() || [];
