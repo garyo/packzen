@@ -1,214 +1,177 @@
-# PackZen - Production Deployment Guide
+# PackZen — Deployment Runbook
 
-This guide walks through deploying PackZen to **Cloudflare Workers with Static Assets** (the modern recommended approach as of 2025).
+PackZen is a **Cloudflare Worker** (with static assets) at **https://packzen.org**,
+backed by the D1 database `packzen-db` and Clerk auth. Pushing to `main`
+deploys it through Cloudflare Workers Builds, usually within a minute.
 
-## Why Cloudflare Workers (Not Pages)?
+## How the app is served
 
-As of 2025, **Cloudflare Workers with Static Assets** is the recommended deployment method:
+- **Static pages** (landing, `/trips`, `/all-items`, sign-in/up, pricing, …) are
+  built once and served as files. The Worker never runs for them.
+- **Server-rendered pages**: `/trips/[id]/pack` and `/trips/[id]/print`
+  (`prerender = false`), plus every `/api/*` route. These run in the Worker, go
+  through `src/middleware.ts`, and read runtime secrets.
+- Build output (Astro 7 + `@astrojs/cloudflare` 14): `dist/client/` (static
+  assets) and `dist/server/` (the Worker, with a generated `wrangler.json`).
+  `wrangler deploy` finds it on its own; `wrangler.jsonc` `main` points at the
+  adapter's entrypoint.
 
-- All future investment and features go into Workers (not Pages)
-- Workers supports both static assets AND server-side rendering
-- Same cost structure as Pages (static assets are free)
-- More features: Durable Objects, Cron Triggers, better observability
-- Pages is still supported but not where new development happens
+## Configuration: where each value lives
 
-Our `wrangler.jsonc` is already configured for the modern Workers approach with the `assets` binding.
+| Value                          | Where                                | Notes                                                                                                                                                        |
+| ------------------------------ | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `PUBLIC_CLERK_PUBLISHABLE_KEY` | committed `.env.production` **only** | Public by design. Baked in at build time; the build fails without it (`scripts/check-build-env.js`). **Never** set it as a Worker secret or var — see below. |
+| `CLERK_SECRET_KEY`             | Worker runtime secret                | `wrangler secret put CLERK_SECRET_KEY`. Never a build variable.                                                                                              |
+| `CLERK_WEBHOOK_SECRET`         | Worker runtime secret                | Verifies Clerk webhooks (`/api/webhooks/clerk`, `user.created`/`user.deleted`).                                                                              |
+| Clerk fallback redirects       | `wrangler.jsonc` `vars`              | `CLERK_SIGN_IN_FALLBACK_REDIRECT_URL` / `…SIGN_UP…` = `/trips`.                                                                                              |
+| `DB` (D1 binding)              | `wrangler.jsonc` `d1_databases`      | `packzen-db`, id `7adf70b9-…`; migrations in `db/migrations/`.                                                                                               |
+| Node version (Workers Builds)  | Workers Builds settings              | ≥ 22.12 (Astro 6+). Set `NODE_VERSION` if the default is older.                                                                                              |
 
-## Prerequisites
+**Why the publishable key must not be a Worker secret:** Clerk 4 looks up
+`PUBLIC_CLERK_PUBLISHABLE_KEY` at runtime in this order: Worker env
+(`cloudflare:workers`) → `process.env` → the value baked in at build. A Worker
+secret therefore _overrides_ the built-in key on server-rendered pages only.
+On 2026-09-27 a stale secret (the old key for `clerk.packzen.garyo.workers.dev`)
+did exactly that: `/trips` worked but every pack page failed with
+`ERR_SSL_VERSION_OR_CIPHER_MISMATCH` loading `clerk.packzen.garyo.workers.dev`.
+The fix was `wrangler secret delete PUBLIC_CLERK_PUBLISHABLE_KEY`.
 
-1. Cloudflare account with Workers enabled
-2. Clerk account with production app configured
-3. Wrangler CLI authenticated (`npx wrangler login`)
+**Why secrets must not be build variables:** Astro 6+ inlines build-time env
+into the server bundle, so a secret present at build time ends up in the
+deployed code. For the same reason, never deploy a build made locally: your
+`.env` holds dev keys and `.env.production.local` holds live values, and Vite
+loads both.
 
-## Step 1: Set Up Production Clerk App
+## Continuous deployment (Workers Builds)
 
-1. Go to https://dashboard.clerk.com
-2. Create a production application (or use existing one)
-3. Copy your production keys:
-   - **Publishable Key**: Starts with `pk_live_...`
-   - **Secret Key**: Starts with `sk_live_...` (keep this secure!)
+Dashboard: Workers & Pages → packzen → Settings → Build.
 
-### NOTES:
+- **Build command:** `bun run build`
+- **Deploy command:** `bun run deploy` — applies pending D1 migrations
+  (`wrangler d1 migrations apply packzen-db --remote`), then `wrangler deploy`.
+  The Workers Builds API token needs **D1 edit** permission for that step.
+  (Not verified from the repo; if the deploy command is plain
+  `npx wrangler deploy`, migrations don't run automatically — the release
+  checklist applies them by hand first, which is safe either way.)
+- **Build variables:** none are needed. No secrets here.
+- Build logs are only visible in the dashboard; the wrangler OAuth token has no
+  Workers Builds scope, so the API returns 403 for them.
 
-Follow instructions at [https://clerk.com/docs/guides/configure/auth-strategies/social-connections/google]
+GitHub Actions (`.github/workflows/build.yml`) runs tests, typecheck and a
+build on pushes to `main` and on PRs. It does not deploy.
 
-## Step 2: Create Production D1 Database ✅
+## Release checklist
 
-**Already completed!** The production database is configured:
+1. **Local checks** (all must pass):
 
-- Database name: `packzen-db`
-- Region: ENAM (Eastern North America)
+   ```bash
+   bun run test && bun run typecheck && bun run build
+   ```
 
-If you need to create a different database:
+2. **Migrations first.** See what production is missing, read the SQL, and
+   estimate how many rows it touches:
 
-```bash
-npx wrangler d1 create packzen-db
-```
+   ```bash
+   bunx wrangler d1 migrations list packzen-db --remote
+   bunx wrangler d1 execute packzen-db --remote --command "select count(*) from …"
+   bun run db:migrate:prod
+   ```
 
-Then update the `database_id` in `wrangler.jsonc`.
+   Migrations must be additive or data-preserving **and** work with the code
+   currently deployed, so they can run before the new code and survive a
+   rollback. D1 Time Travel can restore the database to a point in time if a
+   migration goes wrong.
 
-## Step 3: Run Production Migrations ✅
+3. **Ship:** fast-forward `main`, tag the release (the About screen shows the
+   tag via `git describe --exact-match`), and push both:
 
-**Already completed!** All migrations have been applied to the production database.
+   ```bash
+   git tag -a vX.Y.Z -m "…"
+   git push --atomic origin main vX.Y.Z
+   ```
 
-To apply new migrations (after a schema change):
+4. **Watch for the deployment** (usually < 1 minute after the push):
 
-```bash
-bun run db:migrate:prod
-```
+   ```bash
+   bunx wrangler deployments list --json   # newest by created_on
+   ```
 
-## Step 4: Set Environment Variables (Secrets)
+5. **Verify** (next section). If anything is wrong, **roll back first**, then
+   debug.
 
-Set production secrets for your Worker using Wrangler CLI:
+## Verifying a deployment
 
-### Set Secrets via Wrangler
-
-The Clerk publishable key is not a secret and is needed at **build** time
-(static pages bake it in), so it lives in the committed `.env.production`. The
-build fails if it's missing (`scripts/check-build-env.js`).
-
-```bash
-# Set Clerk secret key (private - server-side only)
-npx wrangler secret put CLERK_SECRET_KEY
-# When prompted, paste: sk_live_...
-
-# Set the Clerk webhook signing secret (private - server-side only)
-npx wrangler secret put CLERK_WEBHOOK_SECRET
-# When prompted, paste: whsec_...
-```
-
-### Important Notes
-
-- Use **production** Clerk keys (`pk_live_*`, `sk_live_*`), NOT test keys
-- `CLERK_SECRET_KEY` is sensitive - never commit to git or expose publicly
-- Secrets are encrypted and only available at runtime
-- The Worker reads them at runtime (`env` from `cloudflare:workers`)
-- Keep `CLERK_SECRET_KEY` and `CLERK_WEBHOOK_SECRET` as **runtime secrets
-  only**, never as build variables (Workers Builds) or in a local `.env` you
-  build for production from: Astro 6+ inlines build-time env into the server
-  bundle, so a secret present at build time ends up in the deployed code
-
-## Step 5: Deploy to Cloudflare Workers
-
-### Continuous Deployment (Workers Builds)
-
-Pushing to `main` deploys automatically through Cloudflare Workers Builds
-(Workers & Pages → packzen → Settings → Build). Its settings:
-
-- **Node version**: 22.12 or later (Astro 6+ requires it); set the
-  `NODE_VERSION` build variable if the default is older
-- **Build command**: `bun run build`
-- **Deploy command**: `bun run deploy`, which applies pending D1 migrations
-  (`wrangler d1 migrations apply packzen-db --remote`) and then runs
-  `wrangler deploy`
-- **API token**: needs D1 edit permission (for the migrations) as well as
-  Workers deploy permission
-- **Build variables**: no Clerk secrets (see Step 4)
-
-### Deploying by hand
-
-Only when Workers Builds is unavailable:
+Without an account:
 
 ```bash
-bun run build
-bun run deploy
+curl -sI https://packzen.org/ | grep -iE 'content-security|nosniff|referrer|permissions'  # 4 headers
+curl -s -X POST -H 'content-type: application/json' -d '{}' -w ' %{http_code}\n' https://packzen.org/api/trips  # 401
+curl -sL https://packzen.org/dashboard | grep -o 'url=/trips'   # retired page redirects
+
+# Which Clerk domain a server-rendered page uses — must be clerk.packzen.org only:
+curl -s https://packzen.org/trips/<any-trip-id>/pack \
+  | grep -oE 'pk_live_[A-Za-z0-9]+' | sort -u \
+  | while read k; do echo "${k#pk_live_}==" | base64 -d 2>/dev/null; echo; done
 ```
 
-Never deploy a local build made with the live secret key in `.env` (or any
-other env file Astro loads for production builds): it would be inlined into
-the uploaded bundle.
+In a browser (signed out is enough): `/sign-in` must show the Clerk form, and a
+pack URL must redirect to sign-in — not show "Couldn't load sign-in". Check the
+console for Clerk errors.
 
-A deploy:
+With a real account (the agent can't do this): sign in, open a trip, add, pack,
+edit and print items; check plan limits and the pricing table.
 
-1. Uploads your Worker script (`dist/server/`, via the config the build writes to `dist/server/wrangler.json`)
-2. Uploads static assets from `dist/client/`
-3. Binds the D1 database
-4. Makes your app live at `https://packzen.<your-subdomain>.workers.dev`
+## Rollback
 
-## Step 6: Verify Deployment
+```bash
+bunx wrangler deployments list --json          # find the previous version_id
+bunx wrangler rollback <version-id> --message "why" -y
+```
 
-After deployment, test the following:
-
-- [ ] Sign up creates a new user
-- [ ] Sign in works with existing credentials
-- [ ] Users can only see their own data
-- [ ] Creating trips, items, categories works
-- [ ] Bag organization and packing works
-- [ ] Trip copying works
-- [ ] Data persists across page refreshes
-- [ ] API returns 401 for unauthenticated requests
-
-## Step 7: Configure Custom Domain (Optional)
-
-1. Go to Cloudflare Workers & Pages → packzen → Settings → Domains & Routes
-2. Add custom domain (e.g., packzen.com)
-3. Cloudflare will automatically configure DNS if domain is in your account
-4. Update Clerk's authorized domains to include your custom domain
+This switches the Worker and its static assets back immediately. Database
+migrations stay applied, which is why they must be compatible with the previous
+code. Later pushes deploy normally again.
 
 ## Troubleshooting
 
-### "Authentication not configured" error
+**"Couldn't load sign-in" / console says "Clerk did not load".** Clerk's
+script never loaded. Look at the network tab: which `clerk.*` host does it
+request?
 
-- Check that CLERK_SECRET_KEY is set as a Worker secret (`npx wrangler secret list`)
-- Verify it's the production secret key (sk*live*\*)
+- **Nothing requested:** the build had no publishable key. The build guard
+  should now prevent this; check `.env.production`.
+- **A wrong host** (e.g. `clerk.packzen.garyo.workers.dev`,
+  `ERR_SSL_VERSION_OR_CIPHER_MISMATCH`): a publishable key for another domain is
+  winning. Decode it (`echo <part after pk_live_>== | base64 -d`), then run
+  `bunx wrangler secret list` and delete any `PUBLIC_CLERK_PUBLISHABLE_KEY` secret.
 
-### "Database not found" error
+**Signed-in API calls return 401.** Check that `CLERK_SECRET_KEY` is set
+(`bunx wrangler secret list`) and belongs to the same Clerk instance as the
+publishable key (`clerk.packzen.org`).
 
-- Ensure database migrations ran: `bun run db:migrate:prod`
-- Verify `database_id` in wrangler.jsonc matches your D1 database
-- Check bindings in deployed Worker: `npx wrangler deployments list`
+**Logs:** `bunx wrangler tail` streams live Worker logs (observability is on in
+`wrangler.jsonc`).
 
-### Users can't sign in/sign up
+## Changing the database schema
 
-- Check secrets are set: `npx wrangler secret list`
-- Verify Clerk production app has correct authorized domains
-- Check browser console for Clerk errors
+Migrations are hand-written SQL; there is no generate step.
 
-### CORS errors
+1. Add the next numbered file to `db/migrations/` (additive or data-preserving).
+2. Mirror the change in `db/schema.ts`.
+3. `bun run db:migrate` (local), then `bun run test` — tests build their
+   schema from the migration files.
+4. Apply to production as in the release checklist.
 
-- Ensure your deployment domain is added to Clerk's authorized domains
-- For custom domains, wait for DNS propagation (up to 24 hours)
+## One-time setup (already done; for rebuilding from scratch)
 
-## Environment Variables Reference
-
-| Variable                     | Required | Example     | Description                           |
-| ---------------------------- | -------- | ----------- | ------------------------------------- |
-| PUBLIC_CLERK_PUBLISHABLE_KEY | Yes      | pk*live*... | Build-time, in `.env.production`      |
-| CLERK_SECRET_KEY             | Yes      | sk*live*... | Clerk secret key (private)            |
-| CLERK_WEBHOOK_SECRET         | Yes      | whsec\_...  | Clerk webhook signing secret          |
-| DB                           | Auto     | -           | D1 database binding (auto-configured) |
-
-## Maintenance
-
-### Updating the Database Schema
-
-Migrations are hand-written SQL (there is no generate step):
-
-1. Add the next numbered `.sql` file to `db/migrations/` (additive or
-   data-preserving only)
-2. Mirror the change in `db/schema.ts`
-3. Test locally: `bun run db:migrate`, then `bun run test`
-4. Deploy: `bun run deploy` applies it before the new code goes live (or run
-   `bun run db:migrate:prod` ahead of time)
-
-### Monitoring
-
-Cloudflare Workers provides:
-
-- Real-time logs: `npx wrangler tail`
-- Analytics in Cloudflare dashboard
-- Observability enabled in wrangler.jsonc
-
-For advanced monitoring, consider:
-
-- Sentry for error tracking
-- Cloudflare Web Analytics for user metrics
-- Cloudflare Logpush for log storage
-
-## Sources
-
-- [Cloudflare Workers Static Assets](https://developers.cloudflare.com/workers/static-assets/)
-- [Astro Cloudflare Adapter](https://docs.astro.build/en/guides/integrations-guide/cloudflare/)
-- [Deploy Astro to Cloudflare](https://docs.astro.build/en/guides/deploy/cloudflare/)
-- [Full-Stack Development on Cloudflare Workers](https://blog.cloudflare.com/full-stack-development-on-cloudflare-workers/)
-- [Migrate from Pages to Workers](https://developers.cloudflare.com/workers/static-assets/compatibility-matrix/)
+1. Clerk: a production instance whose frontend API is `clerk.packzen.org`;
+   Google sign-in per
+   <https://clerk.com/docs/guides/configure/auth-strategies/social-connections/google>;
+   a webhook to `https://packzen.org/api/webhooks/clerk` for `user.*` events.
+2. D1: `bunx wrangler d1 create packzen-db`, put the id in `wrangler.jsonc`,
+   then `bun run db:migrate:prod`.
+3. Secrets: `bunx wrangler secret put CLERK_SECRET_KEY` and
+   `CLERK_WEBHOOK_SECRET`. The publishable key goes in `.env.production`.
+4. Workers Builds: connect the GitHub repo and use the settings above.
+5. Custom domain: Worker → Settings → Domains & Routes → `packzen.org`; add it to
+   Clerk's allowed domains.

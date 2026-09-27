@@ -167,48 +167,12 @@ which build their database from them):
 └── package.json
 ```
 
-## Deployment to Cloudflare
+## Deployment
 
-This is a **Worker**, not a Pages project — `wrangler.jsonc` is the
-serving config, and it is committed and load-bearing. Pushing to `main`
-auto-deploys via Cloudflare Workers Builds.
-
-### 1. Deploying by hand
-
-Only needed if Workers Builds is unavailable, or to ship without a push:
-
-```bash
-# Build the project
-bun run build
-
-# Apply pending D1 migrations to production, then deploy the Worker (and its static assets)
-bun run deploy
-```
-
-Never do this from a checkout whose env files hold the live Clerk secret key:
-the build inlines build-time env into the server bundle (see `DEPLOYMENT.md`).
-
-The first deployment will create a new Worker in your Cloudflare account.
-
-### 2. Set Production Secrets
-
-```bash
-# Set Clerk secret key
-npx wrangler secret put CLERK_SECRET_KEY
-# Paste your Clerk secret key when prompted
-```
-
-### 3. Set the Publishable Key
-
-The Clerk publishable key is public and baked in at build time, so it lives in
-the committed `.env.production` (the build fails without it). Only secrets go
-through `wrangler secret put`.
-
-### 4. Apply Database Migrations to Production
-
-```bash
-bun run db:migrate:prod
-```
+This is a Cloudflare **Worker** (not a Pages project). Pushing to `main`
+deploys it through Workers Builds. **[DEPLOYMENT.md](DEPLOYMENT.md)** is the
+runbook: where each config value and secret lives, the release checklist,
+verification, rollback and troubleshooting.
 
 ## Mobile-First Design Principles
 
