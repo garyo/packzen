@@ -139,7 +139,10 @@ function DraggableSourceItem(props: DraggableItemProps) {
             <button
               type="button"
               class="flex flex-shrink-0 items-center justify-center text-gray-400 hover:text-red-600"
-              onClick={() => props.onRemove(tripItemId())}
+              onClick={(e) => {
+                e.stopPropagation();
+                props.onRemove(tripItemId());
+              }}
               aria-label={`Remove ${props.name} from trip`}
               title="Remove from trip"
             >

@@ -140,6 +140,20 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
       return null;
     };
 
+    // Tapping a search result finds it: swallow the click that follows this
+    // mousedown so it doesn't also pack the item (or hit a card button).
+    // A press that never becomes a click is cleared by the next mousedown.
+    const swallowNextClick = () => {
+      const swallow = (e: MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        document.removeEventListener('mousedown', stop, true);
+      };
+      const stop = () => document.removeEventListener('click', swallow, true);
+      document.addEventListener('click', swallow, { capture: true, once: true });
+      document.addEventListener('mousedown', stop, { capture: true, once: true });
+    };
+
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as HTMLElement | null;
       if (showMenu() && menuRef && !menuRef.contains(target)) setShowMenu(false);
@@ -149,7 +163,10 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
       if (isSearchOpen() && !inSearch) {
         const tripItemId = findTripItemId(target);
         closeSearch();
-        if (tripItemId) props.onScrollToItemRequest?.(tripItemId);
+        if (tripItemId) {
+          swallowNextClick();
+          props.onScrollToItemRequest?.(tripItemId);
+        }
       }
     };
 
