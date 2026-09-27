@@ -1,4 +1,4 @@
-import { createSignal, createEffect, createMemo, For, Show } from 'solid-js';
+import { createSignal, createEffect, createMemo, onMount, For, Show } from 'solid-js';
 import { api, endpoints } from '../../lib/api';
 import type { Bag, Category, MasterItemWithCategory, TripItem } from '../../lib/types';
 import { Modal } from '../ui/Modal';
@@ -22,6 +22,8 @@ interface AddTripItemFormProps {
   tripId: string;
   preSelectedBagId?: string | null;
   preSelectedContainerId?: string | null;
+  /** A name to start with, e.g. from a search that found nothing. */
+  initialName?: string;
   // The parent's data; undefined while it is still loading.
   bags: Bag[] | undefined;
   categories: Category[] | undefined;
@@ -34,7 +36,7 @@ interface AddTripItemFormProps {
 }
 
 export function AddTripItemForm(props: AddTripItemFormProps) {
-  const [name, setName] = createSignal('');
+  const [name, setName] = createSignal(props.initialName ?? '');
   const [quantity, setQuantity] = createSignal(1);
   const [category, setCategory] = createSignal<CategoryChoice>('');
   const [location, setLocation] = createSignal<string>('');
@@ -242,6 +244,13 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
       setIsContainer(item.isContainer);
     }
   };
+
+  // A starting name that matches a saved item or suggestion fills in its details too.
+  onMount(() => {
+    const initial = props.initialName?.trim().toLowerCase();
+    const match = initial && searchResults().find((item) => item.name.toLowerCase() === initial);
+    if (match) handleItemSelect(match);
+  });
 
   const handleSubmit = async (e: Event, keepOpenAfterSubmit = false) => {
     e.preventDefault();

@@ -1,16 +1,31 @@
 /**
- * PackingPageHeader Component
- *
- * Header with progress bar, trip info, and action buttons
- * Extracted from PackingPage for better separation of concerns
+ * The packing page header: trip name and progress, the Pack | Add switch,
+ * search (a miss offers to add the item), print, and the ⋮ menu.
  */
 
-import { Show, type Accessor, onMount, onCleanup, createEffect, createSignal } from 'solid-js';
+import {
+  Show,
+  type Accessor,
+  type JSX,
+  onMount,
+  onCleanup,
+  createEffect,
+  createSignal,
+} from 'solid-js';
 import type { Trip } from '../../lib/types';
 import { packingProgress, type PackingStats } from '../../lib/packing-stats';
 import { Button } from '../ui/Button';
-import { ChevronLeftIcon, EditIcon, SearchIcon, MoreVerticalIcon, PrinterIcon } from '../ui/Icons';
+import {
+  ChevronLeftIcon,
+  EditIcon,
+  SearchIcon,
+  MoreVerticalIcon,
+  PrinterIcon,
+  PlusIcon,
+} from '../ui/Icons';
 import { formatDateRange } from '../../lib/utils';
+
+export type ViewMode = 'pack' | 'add';
 
 interface PackingPageHeaderProps {
   trip: Accessor<Trip | null | undefined>;
@@ -20,14 +35,14 @@ interface PackingPageHeaderProps {
   visibleItemCount: Accessor<number>;
   selectMode: Accessor<boolean>;
   sortBy: Accessor<'bag' | 'category'>;
-  viewMode: Accessor<'pack' | 'add'>;
+  viewMode: Accessor<ViewMode>;
   showUnpackedOnly: Accessor<boolean>;
   onToggleShowUnpackedOnly: () => void;
   onToggleSelectMode: () => void;
   onToggleSortBy: () => void;
-  onToggleViewMode: () => void;
-  onAddItem: () => void;
+  onSetViewMode: (mode: ViewMode) => void;
   onManageBags: () => void;
+  onShowNotes: () => void;
   onExport: () => void;
   onImport: () => void;
   onClearAll: () => void;
@@ -35,7 +50,55 @@ interface PackingPageHeaderProps {
   onEditTrip: () => void;
   searchQuery: Accessor<string>;
   onSearchChange: (value: string) => void;
+  /** Whether an item on the list is named exactly like the search. */
+  searchHasExactMatch: Accessor<boolean>;
+  /** Add a new item with this name. */
+  onAddNamed: (name: string) => void;
   onScrollToItemRequest?: (itemId: string) => void;
+}
+
+const TOOL_BUTTON =
+  'flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg text-gray-700 transition-colors hover:bg-gray-100 lg:h-9 lg:w-9';
+
+function MenuItem(props: { onClick: () => void; danger?: boolean; children: JSX.Element }) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      onClick={props.onClick}
+      class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm hover:bg-gray-100"
+      classList={{ 'text-red-600': props.danger, 'text-gray-900': !props.danger }}
+    >
+      {props.children}
+    </button>
+  );
+}
+
+function ModeSwitch(props: { mode: ViewMode; onChange: (mode: ViewMode) => void }) {
+  const option = (mode: ViewMode, label: string) => (
+    <button
+      type="button"
+      aria-pressed={props.mode === mode}
+      onClick={() => props.onChange(mode)}
+      class="flex-1 rounded-md px-4 text-sm font-semibold transition-colors lg:!min-h-8"
+      classList={{
+        'bg-white text-blue-700 shadow-sm': props.mode === mode,
+        'text-gray-600 hover:text-gray-900': props.mode !== mode,
+      }}
+    >
+      {label}
+    </button>
+  );
+  return (
+    <div
+      role="group"
+      aria-label="Mode"
+      class="flex flex-1 rounded-lg bg-gray-100 p-0.5 lg:w-44 lg:flex-none"
+    >
+      {option('pack', 'Pack')}
+      {option('add', 'Add')}
+    </div>
+  );
 }
 
 export function PackingPageHeader(props: PackingPageHeaderProps) {
@@ -47,65 +110,63 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
   let searchInputRef: HTMLInputElement | undefined;
 
   const printHref = () => `/trips/${props.trip()?.id}/print?sortBy=${props.sortBy()}`;
+  const isPacking = () => props.viewMode() === 'pack';
 
-  const isSearchActive = () => props.searchQuery().trim().length > 0;
+  const query = () => props.searchQuery().trim();
   const openSearch = () => setIsSearchOpen(true);
   const closeSearch = () => {
     if (!isSearchOpen()) return;
     setIsSearchOpen(false);
-    if (isSearchActive()) {
-      props.onSearchChange('');
-    }
+    if (query()) props.onSearchChange('');
+  };
+  const canAddQuery = () => !!query() && !props.searchHasExactMatch();
+  const addQuery = () => {
+    const name = query();
+    closeSearch();
+    props.onAddNamed(name);
   };
 
-  // Handle clicks outside menu and ESC key
+  const menuAction = (action: () => void) => () => {
+    setShowMenu(false);
+    action();
+  };
+
   onMount(() => {
     const findTripItemId = (node: HTMLElement | null): string | null => {
       while (node) {
-        if (node.dataset && node.dataset.tripItemId) {
-          return node.dataset.tripItemId;
-        }
+        if (node.dataset?.tripItemId) return node.dataset.tripItemId;
         node = node.parentElement;
       }
       return null;
     };
 
     const handleClickOutside = (e: MouseEvent) => {
-      if (showMenu() && menuRef && !menuRef.contains(e.target as Node)) {
-        setShowMenu(false);
-      }
       const target = e.target as HTMLElement | null;
-      const clickedInsideSearchTrigger =
-        searchContainerRef && target ? searchContainerRef.contains(target) : false;
-      const clickedInsideOverlay =
-        searchOverlayRef && target ? searchOverlayRef.contains(target) : false;
-
-      if (isSearchOpen() && !clickedInsideSearchTrigger && !clickedInsideOverlay) {
+      if (showMenu() && menuRef && !menuRef.contains(target)) setShowMenu(false);
+      const inSearch =
+        !!target &&
+        (!!searchContainerRef?.contains(target) || !!searchOverlayRef?.contains(target));
+      if (isSearchOpen() && !inSearch) {
         const tripItemId = findTripItemId(target);
         closeSearch();
-        if (tripItemId) {
-          props.onScrollToItemRequest?.(tripItemId);
-        }
+        if (tripItemId) props.onScrollToItemRequest?.(tripItemId);
       }
     };
 
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        if (showMenu()) setShowMenu(false);
-        if (isSearchOpen()) closeSearch();
-      }
+      if (e.key !== 'Escape') return;
+      setShowMenu(false);
+      closeSearch();
     };
 
-    const isTypingContext = (target: EventTarget | null): boolean => {
+    const isTypingContext = (target: EventTarget | null) => {
       const el = target as HTMLElement | null;
-      if (!el) return false;
-      const tag = el.tagName;
-      return tag === 'INPUT' || tag === 'TEXTAREA' || el.isContentEditable;
+      return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
     };
 
     const handleSlashShortcut = (e: KeyboardEvent) => {
       if (e.key !== '/' || e.metaKey || e.ctrlKey || e.altKey) return;
-      if (isTypingContext(e.target)) return;
+      if (isTypingContext(e.target) || !isPacking() || props.selectMode()) return;
       if (!isSearchOpen()) {
         e.preventDefault();
         openSearch();
@@ -115,7 +176,6 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
     document.addEventListener('mousedown', handleClickOutside);
     document.addEventListener('keydown', handleEscape);
     document.addEventListener('keydown', handleSlashShortcut);
-
     onCleanup(() => {
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleEscape);
@@ -124,291 +184,223 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
   });
 
   createEffect(() => {
-    if (isSearchOpen()) {
-      requestAnimationFrame(() => {
-        searchInputRef?.focus();
-      });
-    }
+    if (isSearchOpen()) requestAnimationFrame(() => searchInputRef?.focus());
   });
+
+  const stats = () => props.stats();
 
   return (
     <header class="relative flex-shrink-0 border-b border-gray-200 bg-white">
-      <div class="container mx-auto px-4 py-4 lg:py-2 [@media(max-height:500px)]:!py-1">
-        {/* Two-row layout on mobile/tablet, single row on desktop */}
-        <div class="mb-3 flex flex-col gap-2 lg:mb-2 lg:flex-row lg:items-center lg:justify-between [@media(max-height:500px)]:mb-1 [@media(max-height:500px)]:flex-row [@media(max-height:500px)]:flex-wrap [@media(max-height:500px)]:items-center [@media(max-height:500px)]:justify-between">
-          {/* Title row */}
-          <div class="flex min-w-0 flex-1 items-center gap-2 [@media(max-height:500px)]:min-w-[16rem]">
-            <a
-              href="/trips"
-              class="flex flex-shrink-0 items-center text-gray-600 hover:text-gray-900"
-              title="Back to Trips"
+      <div class="container mx-auto flex flex-wrap items-center gap-x-4 gap-y-1 px-2 pt-1 pb-2 md:px-4 lg:py-2">
+        {/* Title and progress */}
+        <div class="flex min-w-0 basis-full items-center lg:flex-1 lg:basis-0">
+          <a
+            href="/trips"
+            class="flex flex-shrink-0 items-center justify-center text-gray-600 hover:text-gray-900"
+            title="Back to My Trips"
+            aria-label="Back to My Trips"
+          >
+            <ChevronLeftIcon class="h-6 w-6" />
+          </a>
+          <div class="min-w-0 flex-1">
+            <button
+              type="button"
+              onClick={props.onEditTrip}
+              class="btn-compact flex max-w-full items-center gap-1.5 text-left text-gray-900 hover:text-blue-700"
+              title="Edit trip name and dates"
             >
-              <ChevronLeftIcon class="h-6 w-6 lg:h-5 lg:w-5" />
-            </a>
-            <div class="min-w-0 flex-1">
-              <div class="flex items-center">
-                <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0">
-                  <h1 class="text-xl font-bold break-words text-gray-900 lg:text-lg">
-                    {props.trip()?.name || 'Packing'}
-                  </h1>
-                  <p class="text-xs text-gray-600">
-                    {formatDateRange(props.trip()?.start_date, props.trip()?.end_date) ||
-                      'No dates set'}
-                  </p>
-                </div>
-                <button
-                  onClick={props.onEditTrip}
-                  class="flex-shrink-0 rounded p-1 text-gray-600 hover:bg-gray-200 hover:text-gray-900"
-                  title="Edit trip details"
-                >
-                  <EditIcon class="h-4 w-4" />
-                </button>
-              </div>
+              <h1 class="truncate text-lg leading-tight font-bold">
+                {props.trip()?.name || 'Packing'}
+              </h1>
+              <EditIcon class="h-3.5 w-3.5 flex-shrink-0 text-gray-400" />
+            </button>
+            <p class="truncate text-xs text-gray-600">
+              <Show when={formatDateRange(props.trip()?.start_date, props.trip()?.end_date)}>
+                {(dates) => <span class="hidden sm:inline">{dates()} · </span>}
+              </Show>
               <Show
-                when={props.showUnpackedOnly() && props.viewMode() === 'pack'}
+                when={props.showUnpackedOnly() && isPacking()}
                 fallback={
-                  <p class="text-xs text-gray-600">
-                    {props.stats().packed} of {props.stats().total} packed
-                    <Show when={props.stats().skipped > 0}>
-                      <span class="text-gray-500"> · {props.stats().skipped} skipped</span>
+                  <>
+                    {stats().packed} of {stats().total} packed
+                    <Show when={stats().skipped > 0}>
+                      <span class="text-gray-500"> · {stats().skipped} skipped</span>
                     </Show>
-                    <Show when={props.stats().remaining > 0 && props.viewMode() === 'pack'}>
+                    <Show when={stats().remaining > 0 && stats().packed > 0 && isPacking()}>
                       {' · '}
                       <button
                         type="button"
                         onClick={props.onToggleShowUnpackedOnly}
-                        class="btn-compact text-blue-600 hover:text-blue-800 hover:underline"
-                        title="Click to show only unpacked items"
+                        class="btn-compact text-blue-600 hover:underline"
+                        title="Show only what's left to pack"
                       >
-                        {props.stats().remaining} left to pack
+                        {stats().remaining} left
                       </button>
                     </Show>
-                  </p>
+                  </>
                 }
               >
-                <p class="text-xs">
-                  <button
-                    onClick={props.onToggleShowUnpackedOnly}
-                    class="rounded bg-blue-100 px-1.5 py-0.5 text-blue-700 hover:bg-blue-200"
-                    title="Click to show all items"
+                <button
+                  type="button"
+                  onClick={props.onToggleShowUnpackedOnly}
+                  class="btn-compact rounded bg-blue-100 px-1.5 text-blue-700 hover:bg-blue-200"
+                  title="Show all items"
+                >
+                  Showing {stats().remaining} left ✕
+                </button>
+              </Show>
+            </p>
+          </div>
+        </div>
+
+        {/* Toolbar */}
+        <Show
+          when={!props.selectMode()}
+          fallback={
+            <div class="flex w-full items-center gap-2 lg:w-auto">
+              <span class="flex-1 text-sm text-gray-600">Tap items to select them</span>
+              <Button variant="secondary" size="sm" onClick={props.onToggleSelectMode}>
+                Done
+              </Button>
+            </div>
+          }
+        >
+          <div class="flex w-full items-center gap-1 lg:w-auto">
+            <ModeSwitch mode={props.viewMode()} onChange={props.onSetViewMode} />
+
+            <Show when={isPacking()}>
+              <div class="relative" ref={searchContainerRef}>
+                <button
+                  type="button"
+                  class={TOOL_BUTTON}
+                  classList={{ 'bg-blue-50 text-blue-700': isSearchOpen() || !!query() }}
+                  onClick={() => (isSearchOpen() ? closeSearch() : openSearch())}
+                  title="Search items (/)"
+                  aria-label="Search items"
+                >
+                  <SearchIcon class="h-5 w-5" />
+                </button>
+                <Show when={isSearchOpen()}>
+                  <div
+                    ref={searchOverlayRef}
+                    class="fixed top-2 left-1/2 z-40 w-[min(calc(100vw-1rem),360px)] -translate-x-1/2 rounded-lg border border-gray-200 bg-white p-2 shadow-lg"
                   >
-                    Showing {props.stats().remaining} unpacked ✕
-                  </button>
-                </p>
+                    <div class="relative">
+                      <input
+                        ref={searchInputRef}
+                        type="text"
+                        inputmode="search"
+                        enterkeyhint="search"
+                        value={props.searchQuery()}
+                        onInput={(e) => props.onSearchChange(e.currentTarget.value)}
+                        onKeyDown={(e) => {
+                          if (
+                            e.key === 'Enter' &&
+                            canAddQuery() &&
+                            props.visibleItemCount() === 0
+                          ) {
+                            e.preventDefault();
+                            addQuery();
+                          }
+                        }}
+                        placeholder="Search or add an item…"
+                        aria-label="Search items"
+                        class="w-full appearance-none rounded-md border border-gray-200 py-2 pr-9 pl-2 text-base focus:border-blue-400 focus:ring-1 focus:ring-blue-400 focus:outline-none"
+                      />
+                      <Show when={query()}>
+                        <button
+                          type="button"
+                          onClick={() => props.onSearchChange('')}
+                          class="btn-compact absolute top-1/2 right-1 -translate-y-1/2 rounded-md px-2 py-1 text-sm font-semibold text-gray-500 hover:text-gray-900"
+                          aria-label="Clear search"
+                        >
+                          ×
+                        </button>
+                      </Show>
+                    </div>
+                    <div class="mt-1 flex min-h-5 items-center justify-between gap-2 text-xs text-gray-500">
+                      <span>
+                        {query() ? `${props.visibleItemCount()} of ${props.itemCount()}` : ' '}
+                      </span>
+                      <Show when={canAddQuery()}>
+                        <button
+                          type="button"
+                          onClick={addQuery}
+                          class="flex min-w-0 items-center gap-1 rounded-md px-2 font-medium text-blue-700 hover:bg-blue-50"
+                        >
+                          <PlusIcon class="h-4 w-4 flex-shrink-0" />
+                          <span class="truncate">Add “{query()}”</span>
+                        </button>
+                      </Show>
+                    </div>
+                  </div>
+                </Show>
+              </div>
+            </Show>
+
+            <a
+              href={printHref()}
+              target="_blank"
+              class={TOOL_BUTTON}
+              aria-label="Print checklist"
+              title="Print checklist"
+            >
+              <PrinterIcon class="h-5 w-5" />
+            </a>
+
+            <div class="relative" ref={menuRef}>
+              <button
+                type="button"
+                class={TOOL_BUTTON}
+                onClick={() => setShowMenu(!showMenu())}
+                aria-label="More actions"
+                aria-haspopup="menu"
+                aria-expanded={showMenu()}
+              >
+                <MoreVerticalIcon class="h-5 w-5" />
+              </button>
+              <Show when={showMenu()}>
+                {/* Anchored to the right edge: ⋮ is always the last control. */}
+                <div
+                  role="menu"
+                  class="absolute top-full right-0 z-30 mt-1 max-h-[75dvh] w-56 max-w-[calc(100vw-1rem)] overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
+                >
+                  <Show when={isPacking()}>
+                    <MenuItem onClick={menuAction(props.onToggleSelectMode)}>Select</MenuItem>
+                    <MenuItem onClick={menuAction(props.onToggleSortBy)}>
+                      {props.sortBy() === 'bag' ? 'Group by category' : 'Group by bag'}
+                    </MenuItem>
+                  </Show>
+                  <MenuItem onClick={menuAction(props.onManageBags)}>Bags…</MenuItem>
+                  <MenuItem onClick={menuAction(props.onShowNotes)}>
+                    Trip notes
+                    <Show when={props.trip()?.notes?.trim()}>
+                      <span class="h-2 w-2 rounded-full bg-blue-500" aria-label="has notes" />
+                    </Show>
+                  </MenuItem>
+                  <MenuItem onClick={menuAction(props.onEditTrip)}>Edit trip details…</MenuItem>
+                  <div class="my-1 border-t border-gray-100" />
+                  <MenuItem onClick={menuAction(props.onExport)}>Export trip</MenuItem>
+                  <MenuItem onClick={menuAction(props.onImport)}>Import / merge trip…</MenuItem>
+                  <div class="my-1 border-t border-gray-100" />
+                  <MenuItem danger onClick={menuAction(props.onClearAll)}>
+                    Unpack all
+                  </MenuItem>
+                  <MenuItem danger onClick={menuAction(props.onDeleteTrip)}>
+                    Delete trip
+                  </MenuItem>
+                </div>
               </Show>
             </div>
           </div>
+        </Show>
+      </div>
 
-          {/* Buttons row */}
-          <div class="flex flex-shrink-0 flex-wrap items-stretch gap-2">
-            <Show
-              when={props.selectMode()}
-              fallback={
-                <>
-                  <div class="relative flex" ref={searchContainerRef}>
-                    <Button
-                      variant={isSearchActive() || isSearchOpen() ? 'primary' : 'secondary'}
-                      size="sm"
-                      class="h-full !px-2 md:!px-3 [@media(max-height:500px)]:!py-0.5"
-                      onClick={() => (isSearchOpen() ? closeSearch() : openSearch())}
-                      title="Search items"
-                    >
-                      <SearchIcon class="h-4 w-4" />
-                    </Button>
-                    <Show when={isSearchOpen()}>
-                      <div
-                        ref={searchOverlayRef}
-                        class="fixed top-2 left-1/2 z-40 w-[min(90%,320px)] -translate-x-1/2 rounded-lg border border-gray-200 bg-white p-2 shadow-lg md:w-[min(70%,360px)]"
-                      >
-                        <div class="relative">
-                          <input
-                            ref={searchInputRef}
-                            type="text"
-                            inputmode="search"
-                            value={props.searchQuery()}
-                            onInput={(e) => props.onSearchChange(e.currentTarget.value)}
-                            placeholder="Search items..."
-                            class="w-full appearance-none rounded-md border border-gray-200 py-1.5 pr-8 pl-2 text-sm focus:border-blue-400 focus:ring-1 focus:ring-blue-400 focus:outline-none"
-                          />
-                          <Show when={props.searchQuery().trim().length > 0}>
-                            <button
-                              type="button"
-                              onClick={() => props.onSearchChange('')}
-                              class="absolute top-1/2 right-1 -translate-y-1/2 rounded-md px-1 py-0.5 text-xs font-semibold text-gray-500 transition hover:text-gray-900"
-                              aria-label="Clear search"
-                            >
-                              ×
-                            </button>
-                          </Show>
-                          <Show when={!props.searchQuery().trim()}>
-                            <span class="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 text-gray-300">
-                              /
-                            </span>
-                          </Show>
-                        </div>
-                        <p class="mt-1 min-h-[1rem] text-[11px] text-gray-500">
-                          {props.searchQuery().trim().length > 0
-                            ? `${props.visibleItemCount()} of ${props.itemCount()}`
-                            : '\u00A0'}
-                        </p>
-                      </div>
-                    </Show>
-                  </div>
-                  <a
-                    href={printHref()}
-                    target="_blank"
-                    class="inline-flex h-full items-center justify-center rounded-lg bg-gray-200 !px-2 text-sm font-medium text-gray-900 transition-colors hover:bg-gray-300 focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:outline-none md:!px-3 [@media(max-height:500px)]:!py-0.5"
-                    aria-label="Print checklist"
-                    title="Print checklist"
-                  >
-                    <PrinterIcon class="h-4 w-4" />
-                  </a>
-                  {/* Mode toggle button - primary CTA */}
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    class="!px-2 md:!px-3 [@media(max-height:500px)]:!py-0.5"
-                    onClick={props.onToggleViewMode}
-                  >
-                    <span class="hidden md:inline">
-                      {props.viewMode() === 'add' ? 'Start Packing' : 'Add Items'}
-                    </span>
-                    <span class="md:hidden">{props.viewMode() === 'add' ? 'Pack' : 'Add'}</span>
-                  </Button>
-                  {/* Only show these in Pack mode */}
-                  <Show when={props.viewMode() === 'pack'}>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      class="!px-2 md:!px-3 [@media(max-height:500px)]:!py-0.5"
-                      onClick={props.onManageBags}
-                    >
-                      Bags
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      class="!px-2 md:!px-3 [@media(max-height:500px)]:!py-0.5"
-                      onClick={props.onAddItem}
-                    >
-                      <span class="hidden md:inline">Quick Add</span>
-                      <span class="text-center text-xs leading-tight md:hidden">
-                        <div>Quick</div>
-                        <div>Add</div>
-                      </span>
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      class="!hidden !px-2 md:!inline-flex md:!px-3 [@media(max-height:500px)]:!py-0.5"
-                      onClick={props.onToggleSelectMode}
-                    >
-                      Select Batch
-                    </Button>
-                  </Show>
-                  <Show when={props.viewMode() === 'pack'}>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      class="!px-2 md:!px-3 [@media(max-height:500px)]:!py-0.5"
-                      onClick={props.onToggleSortBy}
-                      title={`Currently sorting by ${props.sortBy()}. Click to switch.`}
-                    >
-                      <div class="text-center text-xs leading-tight">
-                        <div class="text-[10px] text-gray-500">Sort:</div>
-                        <div class="font-medium">
-                          {props.sortBy() === 'bag' ? 'by Bag' : 'by Category'}
-                        </div>
-                      </div>
-                    </Button>
-                  </Show>
-                  <div class="relative flex" ref={menuRef}>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      class="h-full !px-2 md:!px-3 [@media(max-height:500px)]:!py-0.5"
-                      onClick={() => setShowMenu(!showMenu())}
-                      aria-label="More actions"
-                    >
-                      <MoreVerticalIcon class="h-4 w-4" />
-                    </Button>
-                    <Show when={showMenu()}>
-                      <div class="absolute top-full right-0 z-20 mt-1 w-48 rounded-lg border border-gray-200 bg-white shadow-lg">
-                        <Show when={props.viewMode() === 'pack'}>
-                          <button
-                            onClick={() => {
-                              props.onToggleSelectMode();
-                              setShowMenu(false);
-                            }}
-                            class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 md:hidden"
-                          >
-                            Select Batch
-                          </button>
-                        </Show>
-                        <a
-                          href={printHref()}
-                          target="_blank"
-                          onClick={() => setShowMenu(false)}
-                          class="block w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
-                        >
-                          🖨️ Print Checklist
-                        </a>
-                        <button
-                          onClick={() => {
-                            props.onExport();
-                            setShowMenu(false);
-                          }}
-                          class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
-                        >
-                          Export Trip
-                        </button>
-                        <button
-                          onClick={() => {
-                            props.onImport();
-                            setShowMenu(false);
-                          }}
-                          class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
-                        >
-                          Import/Merge Trip
-                        </button>
-                        <button
-                          onClick={() => {
-                            props.onClearAll();
-                            setShowMenu(false);
-                          }}
-                          class="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-gray-100"
-                        >
-                          Clear All (Unpack)
-                        </button>
-                        <button
-                          onClick={() => {
-                            props.onDeleteTrip();
-                            setShowMenu(false);
-                          }}
-                          class="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-gray-100"
-                        >
-                          Delete Trip
-                        </button>
-                      </div>
-                    </Show>
-                  </div>
-                </>
-              }
-            >
-              <Button variant="secondary" size="sm" onClick={props.onToggleSelectMode}>
-                Cancel
-              </Button>
-            </Show>
-          </div>
-        </div>
-
-        {/* Progress Bar */}
-        <div class="h-3 w-full rounded-full bg-gray-200">
-          <div
-            class="h-3 rounded-full bg-green-600 transition-all duration-300"
-            style={{ width: `${packingProgress(props.stats())}%` }}
-          />
-        </div>
+      <div class="h-1 w-full bg-gray-100" aria-hidden="true">
+        <div
+          class="h-1 bg-green-600 transition-all duration-300"
+          style={{ width: `${packingProgress(stats())}%` }}
+        />
       </div>
     </header>
   );

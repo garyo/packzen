@@ -215,7 +215,7 @@ export function BagManager(props: BagManagerProps) {
         {/* Add from Templates */}
         <Show when={(bagTemplates()?.length || 0) > 0}>
           <div class="border-t border-gray-200 pt-4">
-            <h3 class="mb-3 font-semibold text-gray-900">Quick Add from My Bags</h3>
+            <h3 class="mb-3 font-semibold text-gray-900">Add from My Bags</h3>
             <div class="grid grid-cols-2 gap-2">
               <For each={bagTemplates()}>
                 {(template) => (

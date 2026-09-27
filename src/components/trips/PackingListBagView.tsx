@@ -13,16 +13,13 @@ import {
   createSignal,
   onCleanup,
   onMount,
-  type Accessor,
   type JSX,
 } from 'solid-js';
 import type { Bag, TripItem } from '../../lib/types';
 import { NO_BAG_LABEL } from '../../lib/vocabulary';
 import { packingStats } from '../../lib/packing-stats';
 import { byName, categoryOf, groupSorted, placeItems } from '../../lib/item-placement';
-import { TripNotesButton } from './TripNotesButton';
-import { TripNotesPanel } from './TripNotesPanel';
-import { getBagColorClass, getBagColorStyle } from '../../lib/color-utils';
+import { BagSwatch } from './BagFields';
 import { EditIcon, PlusIcon, SwitchBagIcon } from '../ui/Icons';
 import {
   AllPackedNote,
@@ -68,9 +65,6 @@ function WayfindingNavBar(props: {
   navItems: NavItem[];
   currentSection: () => string | null;
   onScrollToSection: (sectionId: string) => void;
-  hasNotes: boolean;
-  showNotesPanel: boolean;
-  onToggleNotesPanel: () => void;
 }) {
   const drag = useDragState();
 
@@ -87,7 +81,7 @@ function WayfindingNavBar(props: {
   return (
     <div class="sticky top-0 z-10 -mx-4 bg-gray-50/95 px-4 py-1.5 backdrop-blur-sm md:-mx-3 md:px-3 [@media(max-height:500px)]:py-0.5">
       <div class="flex items-center gap-x-1 gap-y-0">
-        <div class="flex flex-1 flex-wrap gap-x-1 gap-y-0 [@media(max-height:500px)]:flex-nowrap [@media(max-height:500px)]:overflow-x-auto [@media(max-height:500px)]:whitespace-nowrap">
+        <div class="flex min-h-8 flex-1 flex-wrap gap-x-1 gap-y-0 [@media(max-height:500px)]:flex-nowrap [@media(max-height:500px)]:overflow-x-auto [@media(max-height:500px)]:whitespace-nowrap">
           <For each={props.navItems}>
             {(navItem) => (
               <button
@@ -103,21 +97,13 @@ function WayfindingNavBar(props: {
                 ) : navItem.id === null ? (
                   <span class="text-[10px]">👕</span>
                 ) : (
-                  <div
-                    class={`h-2 w-2 rounded-full border border-gray-300 ${getBagColorClass(navItem.color)}`}
-                    style={getBagColorStyle(navItem.color)}
-                  />
+                  <BagSwatch color={navItem.color} class="h-2 w-2" />
                 )}
                 <span class="max-w-[130px] truncate">{navItem.name}</span>
               </button>
             )}
           </For>
         </div>
-        <TripNotesButton
-          hasNotes={props.hasNotes}
-          isOpen={props.showNotesPanel}
-          onClick={props.onToggleNotesPanel}
-        />
       </div>
     </div>
   );
@@ -127,10 +113,6 @@ interface PackingListBagViewProps extends PackingListProps {
   onAddToBag: (bagId: string | null) => void;
   onAddToContainer: (containerId: string) => void;
   onReplaceBag: (bag: Bag) => void;
-  tripNotes: string;
-  showNotesPanel: Accessor<boolean>;
-  onToggleNotesPanel: () => void;
-  onNotesChange: (notes: string) => void;
 }
 
 export function PackingListBagView(props: PackingListBagViewProps) {
@@ -206,23 +188,12 @@ export function PackingListBagView(props: PackingListBagViewProps) {
 
   return (
     <PackDnd onDrop={(item, target) => dropInto(props, item, target)}>
-      <div class="space-y-6 md:space-y-3">
+      <div class="space-y-3">
         <Show when={navItems().length > 1}>
           <WayfindingNavBar
             navItems={navItems()}
             currentSection={currentSection}
             onScrollToSection={scrollToElement}
-            hasNotes={Boolean(props.tripNotes.trim())}
-            showNotesPanel={props.showNotesPanel()}
-            onToggleNotesPanel={props.onToggleNotesPanel}
-          />
-        </Show>
-
-        <Show when={props.showNotesPanel()}>
-          <TripNotesPanel
-            notes={props.tripNotes}
-            onNotesChange={props.onNotesChange}
-            onClose={props.onToggleNotesPanel}
           />
         </Show>
 
@@ -240,16 +211,13 @@ export function PackingListBagView(props: PackingListBagViewProps) {
                 data={{ type: 'bag', bagId: bag.id }}
                 activeClass="bg-blue-100 ring-2 ring-blue-400"
               >
-                <div id={bagSectionId(bag.id)} class="p-2">
-                  <div class="mb-3 flex items-center gap-2 px-2 py-1 md:mb-1.5">
+                <div id={bagSectionId(bag.id)} class="p-1 md:p-2">
+                  <div class="mb-1 flex items-center gap-2 px-1">
                     <Show
                       when={bag.id !== null}
                       fallback={<span class="text-lg md:text-base">👕</span>}
                     >
-                      <div
-                        class={`h-3 w-3 rounded-full border border-gray-300 md:h-2.5 md:w-2.5 ${getBagColorClass(bag.color)}`}
-                        style={getBagColorStyle(bag.color)}
-                      />
+                      <BagSwatch color={bag.color} class="h-3 w-3" />
                     </Show>
                     <h2 class="flex-1 text-lg font-semibold text-gray-900 md:text-base">
                       {bag.name}
@@ -262,16 +230,18 @@ export function PackingListBagView(props: PackingListBagViewProps) {
                         onClick={() => props.onReplaceBag(bag)}
                         class="flex h-7 w-7 items-center justify-center rounded-full text-gray-400 hover:bg-gray-200 hover:text-gray-600"
                         title="Replace this bag"
+                        aria-label={`Replace ${bag.name}`}
                       >
                         <SwitchBagIcon class="h-4 w-4" />
                       </button>
                     </Show>
                     <button
                       onClick={() => props.onAddToBag(bag.id)}
-                      class="flex h-7 w-7 items-center justify-center rounded-full bg-blue-500 text-white hover:bg-blue-600"
+                      class="flex items-center justify-center rounded-full text-blue-600 hover:bg-blue-50"
                       title="Add an item to this bag"
+                      aria-label={`Add an item to ${bag.name}`}
                     >
-                      <PlusIcon class="h-4 w-4" />
+                      <PlusIcon class="h-5 w-5" />
                     </button>
                   </div>
                   <Show when={!allPacked()} fallback={<AllPackedNote count={stats().total} />}>
@@ -281,8 +251,8 @@ export function PackingListBagView(props: PackingListBagViewProps) {
                           items={[...categoryGroups().get(category)!].sort(byName)}
                           showUnpackedOnly={props.showUnpackedOnly()}
                           renderCard={renderCard}
-                          class="mb-4 md:mb-2"
-                          titleClass="mb-2 flex items-center gap-1 px-1 text-sm font-medium text-gray-600 md:mb-1 md:text-xs"
+                          class="mb-3 md:mb-2"
+                          titleClass="mb-1.5 flex items-center gap-1 px-1 text-sm font-medium text-gray-600 md:mb-1 md:text-xs"
                           title={
                             <>
                               <span class="text-base md:text-sm">{iconFor(category)}</span>
@@ -379,19 +349,15 @@ function ContainerSection(props: {
           </button>
           <button
             onClick={props.onAdd}
-            class="flex h-6 w-6 items-center justify-center rounded-full bg-blue-500 text-white hover:bg-blue-600"
+            class="flex items-center justify-center rounded-full text-blue-600 hover:bg-blue-50"
             title="Add an item to this container"
           >
-            <PlusIcon class="h-3.5 w-3.5" />
+            <PlusIcon class="h-5 w-5" />
           </button>
         </div>
         <Show
           when={props.contents.length > 0}
-          fallback={
-            <p class="text-xs text-gray-500 md:text-sm">
-              No items yet. Drag items here or use the + button.
-            </p>
-          }
+          fallback={<p class="text-xs text-gray-500 md:text-sm">Empty. Tap + to add items here.</p>}
         >
           <Show when={allPacked()}>
             <AllPackedNote count={stats().total} />

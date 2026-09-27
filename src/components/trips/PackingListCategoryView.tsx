@@ -9,7 +9,7 @@ import { For, Show, createMemo } from 'solid-js';
 import type { TripItem } from '../../lib/types';
 import { packingStats } from '../../lib/packing-stats';
 import { byName, categoryOf, placeItems } from '../../lib/item-placement';
-import { getBagColorClass, getBagColorStyle } from '../../lib/color-utils';
+import { BagSwatch } from './BagFields';
 import {
   AllPackedNote,
   ItemGroup,
@@ -85,7 +85,7 @@ export function PackingListCategoryView(props: PackingListProps) {
         if (target.category === categoryOf(item)) dropInto(props, item, target);
       }}
     >
-      <div class="space-y-6 md:space-y-3">
+      <div class="space-y-4 md:space-y-3">
         <For each={[...sections().keys()]}>
           {(category) => {
             const section = () => sections().get(category)!;
@@ -110,7 +110,7 @@ export function PackingListCategoryView(props: PackingListProps) {
                           items={sortedItems(section().byBag.get(bagId))}
                           showUnpackedOnly={props.showUnpackedOnly()}
                           renderCard={renderCard}
-                          class="mb-4 md:mb-2"
+                          class="mb-3 md:mb-2"
                           titleClass={`${GROUP_TITLE_CLASS} text-gray-600`}
                           dropZone={{
                             id: `category-${category}-bag-${bagId ?? 'none'}`,
@@ -124,10 +124,7 @@ export function PackingListCategoryView(props: PackingListProps) {
                                 when={bagId !== null}
                                 fallback={<span class="text-base md:text-sm">👕</span>}
                               >
-                                <div
-                                  class={`h-2.5 w-2.5 rounded-full border border-gray-300 md:h-2 md:w-2 ${getBagColorClass(bag().color)}`}
-                                  style={getBagColorStyle(bag().color)}
-                                />
+                                <BagSwatch color={bag().color} class="h-2.5 w-2.5" />
                               </Show>
                               {bag().name}
                             </>
@@ -146,7 +143,7 @@ export function PackingListCategoryView(props: PackingListProps) {
                           items={sortedItems(section().byContainer.get(containerId))}
                           showUnpackedOnly={props.showUnpackedOnly()}
                           renderCard={renderCard}
-                          class="mb-4 md:mb-2"
+                          class="mb-3 md:mb-2"
                           titleClass={`${GROUP_TITLE_CLASS} text-blue-700`}
                           dropZone={{
                             id: `category-${category}-container-${containerId}`,

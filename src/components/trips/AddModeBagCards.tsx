@@ -1,8 +1,8 @@
 /**
  * AddModeBagCards Component
  *
- * Right panel showing compact bag cards as drop targets
- * Each card shows category breakdown of items in the bag
+ * Add mode's bags (and their containers): tap one to add items to it, or on
+ * desktop drop items onto it. Each card shows what's in it by category.
  */
 
 import { Show, For, createMemo, createSignal, type Accessor } from 'solid-js';
@@ -13,14 +13,15 @@ import { NO_BAG_LABEL } from '../../lib/vocabulary';
 import { packingStats } from '../../lib/packing-stats';
 import { byName, categoryOf, groupSorted, placeItems } from '../../lib/item-placement';
 import { SwitchBagIcon } from '../ui/Icons';
+import { BagChip } from './BagFields';
 
 interface AddModeBagCardsProps {
   items: Accessor<TripItem[] | undefined>;
   bags: Accessor<Bag[] | undefined>;
   onReplaceBag: (bag: Bag) => void;
-  // For click-to-add: selected target (bag or container) gets highlighted border
-  selectedTarget: Accessor<SelectedTarget | undefined>;
-  onSelectTarget: (target: SelectedTarget | undefined) => void;
+  /** Where tapped items go; its card is highlighted. */
+  selectedTarget: Accessor<SelectedTarget>;
+  onSelectTarget: (target: SelectedTarget) => void;
 }
 
 interface BagCardProps {
@@ -37,8 +38,8 @@ interface BagCardProps {
   expandedCardId: Accessor<string | null>;
   onToggleExpandCard: (id: string) => void;
   onReplaceBag: (bag: Bag) => void;
-  selectedTarget: Accessor<SelectedTarget | undefined>;
-  onSelectTarget: (target: SelectedTarget | undefined) => void;
+  selectedTarget: Accessor<SelectedTarget>;
+  onSelectTarget: (target: SelectedTarget) => void;
 }
 
 const bagCardId = (bagId: string | null) => `add-mode-bag-${bagId ?? 'none'}`;
@@ -72,23 +73,19 @@ function DroppableBagCard(props: BagCardProps) {
 
   const isSelected = () => {
     const selected = props.selectedTarget();
-    return (
-      !!selected &&
-      selected.bagId === target().bagId &&
-      selected.containerId === target().containerId
-    );
+    return selected.bagId === target().bagId && selected.containerId === target().containerId;
   };
 
-  const toggleSelected = () => props.onSelectTarget(isSelected() ? undefined : target());
+  const select = () => props.onSelectTarget(target());
 
   return (
     <div
       ref={droppable.ref}
       role="button"
       tabindex={0}
-      aria-label={`Select ${name()} as target ${props.container ? 'container' : 'bag'}`}
+      aria-label={`Add items to ${name()}`}
       aria-pressed={isSelected()}
-      class="cursor-pointer rounded-lg border-2 px-1 py-2 transition-all md:p-3"
+      class="cursor-pointer rounded-lg border-2 px-2 py-1.5 transition-all md:p-3"
       classList={{
         'border-blue-400 bg-blue-50 shadow-md': droppable.isActiveDroppable,
         'border-green-500 bg-green-50 ring-2 ring-green-200':
@@ -99,84 +96,71 @@ function DroppableBagCard(props: BagCardProps) {
       }}
       onClick={(e) => {
         e.stopPropagation();
-        toggleSelected();
+        select();
       }}
       onKeyDown={(e) => {
         // Only keys aimed at the card itself, not at controls inside it.
         if (e.target !== e.currentTarget) return;
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
-          toggleSelected();
+          select();
         }
       }}
     >
-      {/* Header */}
-      <div class="flex items-center justify-between gap-1 md:gap-2">
-        <div class="flex min-w-0 flex-1 items-center gap-1 md:gap-2">
-          {/* Disclosure triangle */}
-          <button
-            type="button"
-            class="flex h-4 w-4 flex-shrink-0 items-center justify-center text-gray-400 hover:text-gray-600 md:h-5 md:w-5"
-            onClick={(e) => {
-              e.stopPropagation();
-              props.onToggleExpand();
-            }}
-            title={props.isExpanded ? 'Collapse' : 'Expand'}
-          >
-            <span
-              class="text-[10px] transition-transform md:text-xs"
-              classList={{ 'rotate-90': props.isExpanded }}
-            >
-              ▶
-            </span>
-          </button>
-          {props.container ? (
-            <span class="flex-shrink-0 text-sm md:text-lg">📦</span>
-          ) : props.bag ? (
-            <div
-              class="h-2.5 w-2.5 flex-shrink-0 rounded-full md:h-4 md:w-4"
-              style={{ 'background-color': props.bag.color || '#6b7280' }}
-            />
-          ) : (
-            <span class="flex-shrink-0 text-sm md:text-lg">📋</span>
-          )}
-          {/* Desktop: bag name inline with icons */}
-          <span class="hidden min-w-0 flex-1 truncate text-base leading-normal font-semibold text-gray-900 md:inline">
-            {name()}
+      <div class="flex items-center gap-2">
+        <button
+          type="button"
+          class="btn-compact flex h-8 w-5 flex-shrink-0 items-center justify-center text-gray-400 hover:text-gray-600"
+          onClick={(e) => {
+            e.stopPropagation();
+            props.onToggleExpand();
+          }}
+          aria-label={props.isExpanded ? 'Hide contents' : 'Show contents'}
+          aria-expanded={props.isExpanded}
+        >
+          <span class="text-xs transition-transform" classList={{ 'rotate-90': props.isExpanded }}>
+            ▶
           </span>
-          <Show when={!props.container && props.bag}>
-            {(bag) => (
+        </button>
+        <Show
+          when={!props.container && props.bag}
+          fallback={
+            <>
+              <span class="w-4 flex-shrink-0 text-center text-sm">
+                {props.container ? '📦' : '👕'}
+              </span>
+              <span class="min-w-0 flex-1 truncate text-sm font-medium text-gray-900">
+                {name()}
+              </span>
+            </>
+          }
+        >
+          {(bag) => (
+            <>
+              <BagChip bag={bag()} />
               <button
+                type="button"
                 onClick={(e) => {
                   e.stopPropagation();
                   props.onReplaceBag(bag());
                 }}
-                class="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full text-gray-400 hover:bg-gray-200 hover:text-gray-600 md:h-6 md:w-6"
+                class="btn-compact flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-gray-400 hover:bg-gray-200 hover:text-gray-600"
                 title="Replace this bag"
+                aria-label={`Replace ${bag().name}`}
               >
-                <SwitchBagIcon class="h-3 w-3 md:h-3.5 md:w-3.5" />
+                <SwitchBagIcon class="h-3.5 w-3.5" />
               </button>
-            )}
-          </Show>
-        </div>
-        <span class="flex-shrink-0 text-[10px] text-gray-500 md:text-sm">
+            </>
+          )}
+        </Show>
+        <span class="flex-shrink-0 text-xs text-gray-500 md:text-sm">
           {stats().packed}/{stats().total}
         </span>
       </div>
 
-      {/* Mobile: bag name on its own full-width row below the icons */}
-      <div class="mt-0.5 text-sm leading-tight font-semibold break-words text-gray-900 md:hidden">
-        {name()}
-      </div>
-
-      {/* Category Summary - hidden on mobile */}
       <Show
         when={groupedByCategory().length > 0}
-        fallback={
-          <div class="mt-1 text-center text-xs text-gray-400 italic md:text-sm">
-            Drop items here
-          </div>
-        }
+        fallback={<div class="mt-1 pl-7 text-xs text-gray-400 italic">Empty</div>}
       >
         <div class="mt-1 hidden flex-wrap gap-x-3 gap-y-1 text-sm text-gray-600 md:flex">
           <For each={groupedByCategory()}>
@@ -256,8 +240,8 @@ export function AddModeBagCards(props: AddModeBagCardsProps) {
 
   return (
     <div class="space-y-1.5 md:space-y-3">
-      <h3 class="mb-1 text-[10px] font-semibold tracking-wide text-gray-500 uppercase md:mb-4 md:text-sm">
-        Drop items into bags, or click bag then +
+      <h3 class="mb-2 hidden text-sm font-semibold text-gray-500 md:block">
+        Choose where new items go, or drag items onto a bag
       </h3>
 
       <For each={cards()}>

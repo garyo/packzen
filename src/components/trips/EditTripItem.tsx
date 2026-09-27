@@ -26,7 +26,10 @@ interface EditTripItemProps {
   onClose: () => void;
   /** Called with the updated item, or with nothing when the parent should refetch. */
   onSaved: (updatedItem?: TripItem) => void;
-  onDeleted: (deletedItemId: string, movedItemIds?: string[]) => void;
+  /** Delete the item (and any contents), offering Undo. */
+  onDelete: () => void;
+  /** A container was deleted here after its contents were moved out. */
+  onDeleted: (deletedItemId: string, movedItemIds: string[]) => void;
 }
 
 const locationOf = (item: TripItem) =>
@@ -138,62 +141,42 @@ export function EditTripItem(props: EditTripItemProps) {
     (props.allItems ?? []).filter((item) => item.container_item_id === props.item.id);
   const [choosingContainerDelete, setChoosingContainerDelete] = createSignal(false);
 
-  const handleDelete = () => {
-    if (containedItems().length > 0) {
-      setChoosingContainerDelete(true);
-    } else {
-      void deleteWithUndo();
-    }
+  // A plain delete needs no confirmation: the toast offers Undo instead.
+  const deleteWithUndo = () => {
+    props.onDelete();
+    props.onClose();
   };
 
-  // A plain delete needs no confirmation: the toast offers Undo instead.
-  const deleteWithUndo = async () => {
-    if (saving()) return;
-    setSaving(true);
-    const item = props.item;
-    const response = await api.delete(endpoints.tripItems(props.tripId), {
-      body: JSON.stringify({ id: item.id }),
-    });
-    if (!response.success) {
-      showToast('error', response.error || 'Failed to delete item');
-      setSaving(false);
-      return;
-    }
-    props.onDeleted(item.id);
-    props.onClose();
-    const { tripId, onSaved } = props;
-    showToast('success', `Deleted "${item.name}"`, {
-      action: { label: 'Undo', onClick: () => void restoreItem(tripId, item, onSaved) },
-    });
+  const handleDelete = () => {
+    if (containedItems().length > 0) setChoosingContainerDelete(true);
+    else deleteWithUndo();
   };
 
   // The contents keep the container's own location, not any unsaved edit.
   const containerDestination = () =>
     bags().find((b) => b.id === props.item.bag_id)?.name ?? NO_BAG_LABEL;
 
-  const deleteContainer = async (keepContents: boolean) => {
+  const deleteContainerKeepingContents = async () => {
     if (saving()) return;
     setSaving(true);
     const movedItemIds: string[] = [];
 
-    if (keepContents) {
-      for (const item of containedItems()) {
-        const moveResponse = await api.patch(endpoints.tripItems(props.tripId), {
-          id: item.id,
-          container_item_id: null,
-          bag_id: props.item.bag_id || null,
-        });
-        if (!moveResponse.success) {
-          // Abort before deleting the container - otherwise the server-side cascade
-          // would delete the children the user asked to keep. Some items may already
-          // have been moved, so refresh from the server to stay in sync.
-          showToast('error', moveResponse.error || 'Failed to move items out of container');
-          props.onSaved();
-          setSaving(false);
-          return;
-        }
-        movedItemIds.push(item.id);
+    for (const item of containedItems()) {
+      const moveResponse = await api.patch(endpoints.tripItems(props.tripId), {
+        id: item.id,
+        container_item_id: null,
+        bag_id: props.item.bag_id || null,
+      });
+      if (!moveResponse.success) {
+        // Abort before deleting the container - otherwise the server-side cascade
+        // would delete the children the user asked to keep. Some items may already
+        // have been moved, so refresh from the server to stay in sync.
+        showToast('error', moveResponse.error || 'Failed to move items out of container');
+        props.onSaved();
+        setSaving(false);
+        return;
       }
+      movedItemIds.push(item.id);
     }
 
     const response = await api.delete(endpoints.tripItems(props.tripId), {
@@ -202,11 +185,9 @@ export function EditTripItem(props: EditTripItemProps) {
     if (response.success) {
       showToast(
         'success',
-        keepContents
-          ? `Container deleted. ${movedItemIds.length} items moved to ${containerDestination()}.`
-          : `Deleted "${props.item.name}" and its contents`
+        `Container deleted. ${movedItemIds.length} items moved to ${containerDestination()}.`
       );
-      props.onDeleted(props.item.id, keepContents ? movedItemIds : undefined);
+      props.onDeleted(props.item.id, movedItemIds);
       props.onClose();
     } else {
       showToast('error', response.error || 'Failed to delete item');
@@ -345,10 +326,10 @@ export function EditTripItem(props: EditTripItemProps) {
             {containedItems().length !== 1 ? 's' : ''} inside. What would you like to do?
           </p>
           <div class="flex flex-col gap-3">
-            <Button onClick={() => deleteContainer(true)} disabled={saving()}>
+            <Button onClick={deleteContainerKeepingContents} disabled={saving()}>
               Keep items (move to {containerDestination()})
             </Button>
-            <Button variant="danger" onClick={() => deleteContainer(false)} disabled={saving()}>
+            <Button variant="danger" onClick={deleteWithUndo} disabled={saving()}>
               Delete all ({containedItems().length + 1} items)
             </Button>
             <Button
@@ -363,27 +344,4 @@ export function EditTripItem(props: EditTripItemProps) {
       </Show>
     </Modal>
   );
-}
-
-/** Re-create a deleted item with the same fields (it gets a new id), then have the parent refetch. */
-async function restoreItem(tripId: string, item: TripItem, onSaved: () => void) {
-  const response = await api.post(endpoints.tripItems(tripId), {
-    name: item.name,
-    category_name: item.category_name,
-    quantity: item.quantity,
-    bag_id: item.bag_id,
-    container_item_id: item.container_item_id,
-    master_item_id: item.master_item_id,
-    notes: item.notes,
-    is_container: item.is_container,
-    is_packed: item.is_packed,
-    is_skipped: item.is_skipped,
-    merge_duplicates: false,
-  });
-  if (response.success) {
-    showToast('success', `Restored "${item.name}"`);
-    onSaved();
-  } else {
-    showToast('error', response.error || 'Failed to restore item');
-  }
 }

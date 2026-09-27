@@ -1,4 +1,4 @@
-import { createSignal, createResource, Show, onMount, onCleanup } from 'solid-js';
+import { createSignal, createResource, createEffect, Show, onMount, onCleanup } from 'solid-js';
 import { api, endpoints } from '../../lib/api';
 import type { Trip, TripItem, Bag, Category, MasterItemWithCategory } from '../../lib/types';
 import { NO_BAG_LABEL } from '../../lib/vocabulary';
@@ -7,7 +7,6 @@ import { EmptyState } from '../ui/EmptyState';
 import { Button } from '../ui/Button';
 import { Toast, showToast } from '../ui/Toast';
 import { confirmDialog } from '../ui/ConfirmDialog';
-import { ChevronLeftIcon } from '../ui/Icons';
 import { isSmallScreen } from '../../lib/utils';
 import { BagManager } from './BagManager';
 import { EditTripItem } from './EditTripItem';
@@ -15,18 +14,20 @@ import { AddTripItemForm } from './AddTripItemForm';
 import { TripImportModal } from './TripImportModal';
 import { ReplaceBagModal } from './ReplaceBagModal';
 import { TripForm } from './TripForm';
-import { PackingPageHeader } from './PackingPageHeader';
+import { PackingPageHeader, type ViewMode } from './PackingPageHeader';
 import { PackingListBagView } from './PackingListBagView';
 import { PackingListCategoryView } from './PackingListCategoryView';
 import type { PackingListProps } from './PackingListParts';
 import { AddModeView } from './AddModeView';
 import { SelectModeActionBar } from './SelectModeActionBar';
 import { StarterListPanel } from './StarterListPanel';
-import { MoveItemModal } from './MoveItemModal';
+import { ItemActionSheet } from './ItemActionSheet';
+import { TripNotesPanel } from './TripNotesPanel';
 import { useItemSearch } from './useItemSearch';
 import { fetchWithFallback } from '../../lib/resource-helpers';
 import { createTripItemsStore } from '../../lib/trip-items-store';
 import { createTripItemAdder, itemCount } from '../../lib/trip-item-adder';
+import { byName } from '../../lib/item-placement';
 import { syncManager } from '../../lib/sync-manager';
 import { tripToYAML, downloadYAML } from '../../lib/yaml';
 import { deleteTripWithConfirm } from '../../lib/trip-actions';
@@ -35,29 +36,47 @@ interface PackingPageProps {
   tripId: string;
 }
 
+/**
+ * A trip started with one tap on My Trips opens with ?starter=<trip type>.
+ * Read it once and drop it from the URL, so a reload doesn't re-apply it.
+ */
+function takeStarterParam(): string | null {
+  const url = new URL(window.location.href);
+  const tripTypeId = url.searchParams.get('starter');
+  if (tripTypeId) {
+    url.searchParams.delete('starter');
+    window.history.replaceState(null, '', url);
+  }
+  return tripTypeId;
+}
+
 export function PackingPage(props: PackingPageProps) {
   const store = createTripItemsStore(props.tripId);
   const items = store.items;
 
   const [showBagManager, setShowBagManager] = createSignal(false);
   const [editingItem, setEditingItem] = createSignal<TripItem | null>(null);
-  const [movingItem, setMovingItem] = createSignal<TripItem | null>(null);
+  const [actionItem, setActionItem] = createSignal<TripItem | null>(null);
   const [replacingBag, setReplacingBag] = createSignal<Bag | null>(null);
   const [showImport, setShowImport] = createSignal(false);
   const [showEditTrip, setShowEditTrip] = createSignal(false);
   const [showNotesPanel, setShowNotesPanel] = createSignal(false);
-  // Where the Add Item form puts its item; null while the form is closed.
+  // Where the Add Item form puts its item, and any name to start with; null while closed.
   const [addFormTarget, setAddFormTarget] = createSignal<{
     bagId: string | null;
     containerId: string | null;
+    name?: string;
   } | null>(null);
-  const openAddForm = (bagId: string | null = null, containerId: string | null = null) =>
-    setAddFormTarget({ bagId, containerId });
+  const openAddForm = (
+    bagId: string | null = null,
+    containerId: string | null = null,
+    name?: string
+  ) => setAddFormTarget({ bagId, containerId, name });
 
   const [selectMode, setSelectMode] = createSignal(false);
   const [selectedItems, setSelectedItems] = createSignal<Set<string>>(new Set());
   const [sortBy, setSortBy] = createSignal<'bag' | 'category'>('bag');
-  const [viewMode, setViewMode] = createSignal<'pack' | 'add'>('pack');
+  const [viewMode, setViewMode] = createSignal<ViewMode>('pack');
   const [showUnpackedOnly, setShowUnpackedOnly] = createSignal(false);
 
   // A failed load toasts and falls back, so the page still renders.
@@ -125,6 +144,8 @@ export function PackingPage(props: PackingPageProps) {
   const containers = () => (items() ?? []).filter((item) => item.is_container);
   const bagName = (bagId: string | null) =>
     bags()?.find((bag) => bag.id === bagId)?.name ?? NO_BAG_LABEL;
+  // The bag new items go in by default: the first one, as the lists show them.
+  const firstBagId = () => [...(bags() ?? [])].sort(byName)[0]?.id ?? null;
 
   // --- Packing ---
 
@@ -171,7 +192,7 @@ export function PackingPage(props: PackingPageProps) {
   const handleClearAll = async () => {
     const packedIds = () => (items() ?? []).filter((item) => item.is_packed).map((item) => item.id);
     if (packedIds().length === 0) {
-      showToast('error', 'No packed items to clear');
+      showToast('info', 'Nothing is packed yet');
       return;
     }
     const confirmed = await confirmDialog({
@@ -266,17 +287,31 @@ export function PackingPage(props: PackingPageProps) {
     refetchBags();
   };
 
-  const handleEditItemDeleted = (deletedItemId: string, movedItemIds?: string[]) => {
-    if (movedItemIds?.length) {
-      // "Keep items": the contents were moved out of the container first.
-      store.local.update(movedItemIds, {
-        container_item_id: null,
-        bag_id: store.find(deletedItemId)?.bag_id ?? null,
-      });
-    }
-    // Takes any remaining contents with it, as the server did.
+  // "Keep items": the contents were moved out of the container before it was deleted.
+  const handleContainerDeleted = (deletedItemId: string, movedItemIds: string[]) => {
+    store.local.update(movedItemIds, {
+      container_item_id: null,
+      bag_id: store.find(deletedItemId)?.bag_id ?? null,
+    });
     store.local.remove([deletedItemId]);
   };
+
+  const deleteItem = (item: TripItem) =>
+    void store.deleteItems([item.id], { label: `Deleted ${item.name}` });
+
+  // A one-tap trip from My Trips arrives with a starter list to apply once.
+  let pendingStarter = takeStarterParam();
+  const [applyingStarter, setApplyingStarter] = createSignal(!!pendingStarter);
+  createEffect(() => {
+    if (!pendingStarter || store.state.loading || bags.loading) return;
+    const tripTypeId = pendingStarter;
+    pendingStarter = null;
+    if (store.renderableItems().length > 0) {
+      setApplyingStarter(false);
+      return;
+    }
+    void adder.addStarter(tripTypeId, [], firstBagId()).finally(() => setApplyingStarter(false));
+  });
 
   const handleUpdateTripNotes = async (notes: string) => {
     const response = await api.patch(endpoints.trip(props.tripId), { notes });
@@ -317,16 +352,14 @@ export function PackingPage(props: PackingPageProps) {
     selectedItems,
     showUnpackedOnly,
     onTogglePacked: togglePacked,
-    onToggleSkipped: toggleSkipped,
     onEditItem: setEditingItem,
+    onOpenItemActions: setActionItem,
     onToggleItemSelection: toggleItemSelection,
     onMoveItemToBag: moveItemToBag,
     onMoveItemToContainer: moveItemToContainer,
-    // The move sheet is only useful when there's somewhere to move to.
-    get onRequestMoveItem() {
-      return (bags()?.length ?? 0) > 0 || containers().length > 0 ? setMovingItem : undefined;
-    },
   };
+
+  const notes = () => trip()?.notes?.trim() ?? '';
 
   return (
     <div class="flex h-screen flex-col bg-gray-50">
@@ -342,8 +375,8 @@ export function PackingPage(props: PackingPageProps) {
         onToggleShowUnpackedOnly={() => setShowUnpackedOnly(!showUnpackedOnly())}
         onToggleSelectMode={toggleSelectMode}
         onToggleSortBy={() => setSortBy(sortBy() === 'bag' ? 'category' : 'bag')}
-        onAddItem={() => openAddForm()}
         onManageBags={() => setShowBagManager(true)}
+        onShowNotes={() => setShowNotesPanel(true)}
         onExport={handleExport}
         onImport={() => setShowImport(true)}
         onClearAll={handleClearAll}
@@ -351,10 +384,12 @@ export function PackingPage(props: PackingPageProps) {
         onEditTrip={() => setShowEditTrip(true)}
         searchQuery={search.query}
         onSearchChange={search.setQuery}
+        searchHasExactMatch={search.hasExactMatch}
+        onAddNamed={(name) => openAddForm(firstBagId(), null, name)}
         visibleItemCount={() => search.results()?.length ?? 0}
         onScrollToItemRequest={search.scrollToItem}
         viewMode={viewMode}
-        onToggleViewMode={() => setViewMode(viewMode() === 'pack' ? 'add' : 'pack')}
+        onSetViewMode={setViewMode}
       />
 
       {/* Main content - scrollable area */}
@@ -366,8 +401,9 @@ export function PackingPage(props: PackingPageProps) {
               bags={bags}
               masterItems={masterItems}
               onAddItems={adder.addItems}
+              onAddStarter={adder.addStarter}
               onRemoveFromTrip={removeFromTrip}
-              onAddNewItem={() => openAddForm()}
+              onAddNewItem={(target, name) => openAddForm(target.bagId, target.containerId, name)}
               onManageBags={() => setShowBagManager(true)}
               onReplaceBag={setReplacingBag}
             />
@@ -375,8 +411,32 @@ export function PackingPage(props: PackingPageProps) {
         </Show>
 
         <Show when={viewMode() === 'pack'}>
-          <div class="container mx-auto px-2 py-6 pb-20 md:px-3 md:py-3 md:pb-16">
-            <Show when={!store.state.loading} fallback={<LoadingSpinner text="Loading items..." />}>
+          <div class="container mx-auto px-2 pt-2 pb-20 md:px-3 md:pt-3 md:pb-16">
+            <Show when={showNotesPanel()}>
+              <TripNotesPanel
+                notes={trip()?.notes || ''}
+                onNotesChange={handleUpdateTripNotes}
+                onClose={() => setShowNotesPanel(false)}
+              />
+            </Show>
+            <Show when={!showNotesPanel() && notes()}>
+              <button
+                type="button"
+                onClick={() => setShowNotesPanel(true)}
+                class="mb-2 flex w-full items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 text-left text-sm text-amber-900"
+              >
+                <span class="flex-shrink-0 font-medium">Notes</span>
+                <span class="min-w-0 flex-1 truncate text-amber-800/80">{notes()}</span>
+              </button>
+            </Show>
+            <Show
+              when={!store.state.loading && !applyingStarter()}
+              fallback={
+                <LoadingSpinner
+                  text={applyingStarter() ? 'Setting up your list…' : 'Loading items...'}
+                />
+              }
+            >
               <Show
                 when={!store.state.error}
                 fallback={
@@ -392,18 +452,19 @@ export function PackingPage(props: PackingPageProps) {
                   when={store.renderableItems().length > 0}
                   fallback={
                     <StarterListPanel
-                      store={store}
+                      tripName={trip()?.name ?? ''}
                       bags={bags}
-                      ensureCategories={adder.ensureCategories}
+                      onAddStarter={adder.addStarter}
+                      onAddItems={() => setViewMode('add')}
                     />
                   }
                 >
                   <Show
                     when={!search.noResults()}
                     fallback={
-                      <div class="py-16 text-center text-gray-500">
-                        No items match "{search.query().trim()}". Try adjusting your search.
-                      </div>
+                      <p class="py-16 text-center text-gray-500">
+                        Nothing on this list matches “{search.query().trim()}”.
+                      </p>
                     }
                   >
                     <Show
@@ -415,10 +476,6 @@ export function PackingPage(props: PackingPageProps) {
                         onAddToBag={(bagId) => openAddForm(bagId)}
                         onAddToContainer={(containerId) => openAddForm(null, containerId)}
                         onReplaceBag={setReplacingBag}
-                        tripNotes={trip()?.notes || ''}
-                        showNotesPanel={showNotesPanel}
-                        onToggleNotesPanel={() => setShowNotesPanel(!showNotesPanel())}
-                        onNotesChange={handleUpdateTripNotes}
                       />
                     </Show>
                   </Show>
@@ -435,6 +492,7 @@ export function PackingPage(props: PackingPageProps) {
             tripId={props.tripId}
             preSelectedBagId={target().bagId}
             preSelectedContainerId={target().containerId}
+            initialName={target().name}
             bags={bags()}
             categories={categories()}
             tripItems={items()}
@@ -452,15 +510,18 @@ export function PackingPage(props: PackingPageProps) {
         )}
       </Show>
 
-      <Show when={movingItem()}>
+      <Show when={actionItem()}>
         {(item) => (
-          <MoveItemModal
+          <ItemActionSheet
             item={item()}
-            bags={bags() ?? []}
+            bags={[...(bags() ?? [])].sort(byName)}
             containers={containers().filter((c) => c.id !== item().id)}
             onMoveToBag={(bagId) => moveItemToBag(item().id, bagId)}
             onMoveToContainer={(containerId) => moveItemToContainer(item().id, containerId)}
-            onClose={() => setMovingItem(null)}
+            onToggleSkipped={() => toggleSkipped(item())}
+            onEdit={() => setEditingItem(item())}
+            onDelete={() => removeFromTrip(item().id)}
+            onClose={() => setActionItem(null)}
           />
         )}
       </Show>
@@ -488,7 +549,8 @@ export function PackingPage(props: PackingPageProps) {
             onDataChanged={refetchCategories}
             onClose={() => setEditingItem(null)}
             onSaved={handleEditItemSaved}
-            onDeleted={handleEditItemDeleted}
+            onDelete={() => deleteItem(item())}
+            onDeleted={handleContainerDeleted}
           />
         )}
       </Show>
@@ -544,19 +606,6 @@ export function PackingPage(props: PackingPageProps) {
             void store.deleteItems(takeSelection(), { label: (n) => `Deleted ${itemCount(n)}` })
           }
         />
-      </Show>
-
-      {/* Back Button */}
-      <Show when={!selectMode() || selectedItems().size === 0}>
-        <div class="fixed bottom-4 left-4 hidden md:block [@media(max-height:500px)]:hidden">
-          <a
-            href="/trips"
-            class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-3 shadow-lg hover:bg-gray-50"
-          >
-            <ChevronLeftIcon class="h-5 w-5" />
-            Back
-          </a>
-        </div>
       </Show>
     </div>
   );
