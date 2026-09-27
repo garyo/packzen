@@ -25,12 +25,14 @@ export function Button(props: ButtonProps) {
     lg: 'px-6 py-3 text-lg',
   };
 
-  const variant = local.variant || 'primary';
-  const size = local.size || 'md';
-
   return (
     <button
-      class={cn(baseStyles, variantStyles[variant], sizeStyles[size], local.class)}
+      class={cn(
+        baseStyles,
+        variantStyles[local.variant ?? 'primary'],
+        sizeStyles[local.size ?? 'md'],
+        local.class
+      )}
       {...others}
     >
       {local.children}

@@ -1,6 +1,7 @@
 import { createUniqueId, onCleanup, onMount, type JSX } from 'solid-js';
 import { Portal } from 'solid-js/web';
 import { CloseIcon } from './Icons';
+import { confirmDialog } from './ConfirmDialog';
 
 interface ModalProps {
   onClose: () => void;
@@ -8,20 +9,28 @@ interface ModalProps {
   children: JSX.Element;
   size?: 'small' | 'medium' | 'large';
   /**
-   * When true, a backdrop click asks for confirmation before discarding
-   * (via `window.confirm`) instead of closing immediately. Defaults to
-   * false, which preserves the original instant-close behavior.
+   * When provided and returning true, dismissing via backdrop or Escape asks
+   * before discarding. The explicit close button always closes.
    */
-  confirmDiscardOnBackdrop?: boolean;
+  isDirty?: () => boolean;
 }
 
 const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+const FIELD_SELECTOR = 'input:not([disabled]), textarea:not([disabled]), select:not([disabled])';
+
+// Open modals, innermost last. Only the topmost one reacts to Escape/Tab, and
+// the page behind stays scroll-locked while any modal is open.
+const modalStack: symbol[] = [];
 
 export function Modal(props: ModalProps) {
   const titleId = createUniqueId();
+  const stackId = Symbol('modal');
   let containerRef: HTMLDivElement | undefined;
+  let contentRef: HTMLDivElement | undefined;
   let previouslyFocused: HTMLElement | null = null;
+
+  const isTopmost = () => modalStack[modalStack.length - 1] === stackId;
 
   const maxWidthClass = () => {
     switch (props.size) {
@@ -35,27 +44,35 @@ export function Modal(props: ModalProps) {
     }
   };
 
+  const visible = (el: HTMLElement) => el.offsetParent !== null;
   const getFocusable = () =>
     containerRef
-      ? Array.from(containerRef.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
-          (el) => el.offsetParent !== null
-        )
+      ? Array.from(containerRef.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(visible)
       : [];
 
-  const handleBackdropClick = () => {
-    if (props.confirmDiscardOnBackdrop && !window.confirm('Discard your changes?')) {
+  const dismiss = async () => {
+    if (
+      props.isDirty?.() &&
+      !(await confirmDialog({
+        title: 'Discard your changes?',
+        confirmLabel: 'Discard',
+        destructive: true,
+      }))
+    ) {
       return;
     }
     props.onClose();
   };
 
   const handleKeyDown = (e: KeyboardEvent) => {
+    if (!isTopmost()) return;
     if (e.key === 'Escape') {
       // Let an inner control that already handled Escape (e.g. a Combobox
       // closing its dropdown, which preventDefaults) suppress the modal close,
       // so Escape dismisses the topmost layer rather than both at once.
       if (e.defaultPrevented) return;
-      props.onClose();
+      e.preventDefault();
+      void dismiss();
       return;
     }
     if (e.key !== 'Tab') return;
@@ -78,12 +95,24 @@ export function Modal(props: ModalProps) {
 
   onMount(() => {
     previouslyFocused = document.activeElement as HTMLElement | null;
+    modalStack.push(stackId);
+    document.body.style.overflow = 'hidden';
     document.addEventListener('keydown', handleKeyDown);
-    (getFocusable()[0] ?? containerRef)?.focus();
+    // Prefer the first form field, then the first control in the body, so the
+    // header's close button never takes initial focus (Enter would close).
+    const field = Array.from(contentRef?.querySelectorAll<HTMLElement>(FIELD_SELECTOR) ?? []).find(
+      visible
+    );
+    const control = Array.from(
+      contentRef?.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR) ?? []
+    ).find(visible);
+    (field ?? control ?? containerRef)?.focus();
   });
 
   onCleanup(() => {
     document.removeEventListener('keydown', handleKeyDown);
+    modalStack.splice(modalStack.indexOf(stackId), 1);
+    if (modalStack.length === 0) document.body.style.overflow = '';
     if (previouslyFocused?.isConnected) {
       previouslyFocused.focus();
     }
@@ -93,7 +122,7 @@ export function Modal(props: ModalProps) {
     <Portal>
       <div class="fixed inset-0 z-50 overflow-y-auto">
         {/* Backdrop */}
-        <div class="fixed inset-0 bg-black/50 transition-opacity" onClick={handleBackdropClick} />
+        <div class="fixed inset-0 bg-black/50 transition-opacity" onClick={() => void dismiss()} />
 
         {/* Modal */}
         <div class="flex min-h-screen items-center justify-center p-4">
@@ -112,16 +141,19 @@ export function Modal(props: ModalProps) {
                 {props.title}
               </h2>
               <button
+                type="button"
                 onClick={props.onClose}
                 class="text-gray-400 transition-colors hover:text-gray-600"
-                aria-label="Close modal"
+                aria-label="Close"
               >
                 <CloseIcon class="h-6 w-6" />
               </button>
             </div>
 
             {/* Content */}
-            <div class="flex-1 overflow-y-auto px-6 pb-6">{props.children}</div>
+            <div ref={contentRef} class="flex-1 overflow-y-auto px-6 pb-6">
+              {props.children}
+            </div>
           </div>
         </div>
       </div>
