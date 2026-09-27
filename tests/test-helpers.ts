@@ -1,3 +1,6 @@
+import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createSQLiteDB } from '@miniflare/shared';
 import { D1Database, D1DatabaseAPI } from '@miniflare/d1';
 import { drizzle } from 'drizzle-orm/d1';
@@ -19,6 +22,7 @@ import {
 import type { FullBackup } from '../src/lib/yaml';
 import type { ApiResponse } from '../src/lib/types';
 import type { APIContext } from 'astro';
+import { D1_MAX_BOUND_PARAMS } from '../src/lib/d1';
 
 export interface Snapshot {
   categories: Category[];
@@ -42,108 +46,47 @@ export interface TripItemSummary {
   notes: string | null;
 }
 
-export const TEST_SCHEMA_STATEMENTS = [
-  `CREATE TABLE categories (
-    id TEXT PRIMARY KEY,
-    clerk_user_id TEXT NOT NULL,
-    name TEXT NOT NULL,
-    icon TEXT,
-    sort_order INTEGER NOT NULL DEFAULT 0,
-    created_at INTEGER NOT NULL
-  );`,
-  `CREATE TABLE master_items (
-    id TEXT PRIMARY KEY,
-    clerk_user_id TEXT NOT NULL,
-    category_id TEXT,
-    name TEXT NOT NULL,
-    description TEXT,
-    default_quantity INTEGER NOT NULL DEFAULT 1,
-    is_container INTEGER NOT NULL DEFAULT 0,
-    created_at INTEGER NOT NULL,
-    updated_at INTEGER NOT NULL,
-    FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL
-  );`,
-  `CREATE TABLE bag_templates (
-    id TEXT PRIMARY KEY,
-    clerk_user_id TEXT NOT NULL,
-    name TEXT NOT NULL,
-    type TEXT NOT NULL,
-    color TEXT,
-    sort_order INTEGER NOT NULL DEFAULT 0,
-    created_at INTEGER NOT NULL,
-    updated_at INTEGER NOT NULL
-  );`,
-  `CREATE TABLE trips (
-    id TEXT PRIMARY KEY,
-    clerk_user_id TEXT NOT NULL,
-    name TEXT NOT NULL,
-    destination TEXT,
-    start_date TEXT,
-    end_date TEXT,
-    notes TEXT,
-    created_at INTEGER NOT NULL,
-    updated_at INTEGER NOT NULL
-  );`,
-  `CREATE TABLE bags (
-    id TEXT PRIMARY KEY,
-    trip_id TEXT NOT NULL,
-    name TEXT NOT NULL,
-    type TEXT NOT NULL,
-    color TEXT,
-    sort_order INTEGER NOT NULL DEFAULT 0,
-    created_at INTEGER NOT NULL,
-    FOREIGN KEY (trip_id) REFERENCES trips(id) ON DELETE CASCADE
-  );`,
-  `CREATE TABLE trip_items (
-    id TEXT PRIMARY KEY,
-    trip_id TEXT NOT NULL,
-    bag_id TEXT,
-    master_item_id TEXT,
-    container_item_id TEXT,
-    is_container INTEGER NOT NULL DEFAULT 0,
-    name TEXT NOT NULL,
-    category_name TEXT,
-    quantity INTEGER NOT NULL DEFAULT 1,
-    is_packed INTEGER NOT NULL DEFAULT 0,
-    is_skipped INTEGER NOT NULL DEFAULT 0,
-    notes TEXT,
-    created_at INTEGER NOT NULL,
-    updated_at INTEGER NOT NULL,
-    FOREIGN KEY (trip_id) REFERENCES trips(id) ON DELETE CASCADE,
-    FOREIGN KEY (bag_id) REFERENCES bags(id) ON DELETE SET NULL,
-    FOREIGN KEY (master_item_id) REFERENCES master_items(id) ON DELETE SET NULL
-  );`,
-  `CREATE TABLE change_log (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    clerk_user_id TEXT NOT NULL,
-    entity_type TEXT NOT NULL,
-    entity_id TEXT NOT NULL,
-    parent_id TEXT,
-    action TEXT NOT NULL,
-    data TEXT,
-    source_id TEXT,
-    created_at INTEGER NOT NULL
-  );`,
-  `CREATE TABLE analytics_events (
-    id TEXT PRIMARY KEY,
-    clerk_user_id TEXT,
-    event TEXT NOT NULL,
-    props TEXT,
-    created_at INTEGER NOT NULL
-  );`,
-];
+const MIGRATIONS_DIR = fileURLToPath(new URL('../db/migrations/', import.meta.url));
 
-export async function applyMigrations(db: D1Database) {
-  for (const statement of TEST_SCHEMA_STATEMENTS) {
-    const normalized = statement.replace(/\s+/g, ' ').trim();
-    await db.exec(normalized);
+/** Apply db/migrations/*.sql in order, exactly as wrangler does for D1. */
+function applyMigrations(sqliteDb: Awaited<ReturnType<typeof createSQLiteDB>>) {
+  const files = readdirSync(MIGRATIONS_DIR)
+    .filter((file) => file.endsWith('.sql'))
+    .sort();
+  for (const file of files) {
+    sqliteDb.exec(readFileSync(join(MIGRATIONS_DIR, file), 'utf8'));
   }
+}
+
+/**
+ * Production D1 rejects any statement binding more than 100 parameters, while
+ * local SQLite allows 32766 — so an oversized batch insert or `inArray` passes
+ * here and 500s in production. Make it fail here too, and fail the whole run
+ * even if a route handler swallows the error into a 5xx.
+ */
+function enforceD1ParamLimit(d1: D1Database) {
+  const prepare = d1.prepare.bind(d1);
+  d1.prepare = (query: string) => {
+    const statement = prepare(query);
+    const bind = statement.bind.bind(statement);
+    statement.bind = (...values: unknown[]) => {
+      if (values.length > D1_MAX_BOUND_PARAMS) {
+        process.exitCode = 1;
+        throw new Error(
+          `D1 allows at most ${D1_MAX_BOUND_PARAMS} bound parameters; got ${values.length} in: ${query.slice(0, 120)}`
+        );
+      }
+      return bind(...values);
+    };
+    return statement;
+  };
 }
 
 export async function createTestDatabase() {
   const sqliteDb = await createSQLiteDB(':memory:');
+  applyMigrations(sqliteDb);
   const d1 = new D1Database(new D1DatabaseAPI(sqliteDb));
-  await applyMigrations(d1);
+  enforceD1ParamLimit(d1);
   return d1;
 }
 
