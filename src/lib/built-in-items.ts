@@ -10,20 +10,6 @@ import type { BuiltInItemsData, BuiltInItem } from './types';
 // Load and parse the YAML data
 export const builtInItems: BuiltInItemsData = yaml.load(builtInDataRaw) as BuiltInItemsData;
 
-/**
- * Get items by category name
- */
-export function getItemsByCategory(categoryName: string): BuiltInItem[] {
-  return builtInItems.items.filter((item) => item.category === categoryName);
-}
-
-/**
- * Get items by single trip type
- */
-export function getItemsByTripType(tripTypeId: string): BuiltInItem[] {
-  return builtInItems.items.filter((item) => item.trip_types.includes(tripTypeId));
-}
-
 // Categories excluded from generic starter lists: situational for a subset of
 // travelers, with no dedicated family trip type. Still browsable in the Built-in browser.
 const STARTER_EXCLUDED_CATEGORIES = new Set(['Baby', 'Children']);
@@ -32,7 +18,7 @@ const STARTER_EXCLUDED_CATEGORIES = new Set(['Baby', 'Children']);
 export type StarterModifier = 'international' | 'feminine' | 'masculine';
 
 /** Nominal nights for a trip type, used to scale per-day consumables. */
-export function getTripTypeNights(tripTypeId: string): number {
+function getTripTypeNights(tripTypeId: string): number {
   return builtInItems.trip_types.find((t) => t.id === tripTypeId)?.nights ?? 3;
 }
 
