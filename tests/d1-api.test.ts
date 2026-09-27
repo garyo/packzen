@@ -1263,6 +1263,31 @@ test('Analytics endpoint accepts only list_printed with a trip id (S2)', async (
   assert.deepEqual(JSON.parse(rows[0].props!), { tripId });
 });
 
+test('Creating a category that already exists returns it instead of a duplicate', async () => {
+  const d1 = await createTestDatabase();
+  const db = drizzle(d1);
+  const userId = 'category_dedup_user';
+  const { POST } = await import('../src/pages/api/categories/index');
+  const create = (name: string) => callApi(POST, d1, userId, { method: 'POST', body: { name } });
+
+  const first = await create('Toiletries');
+  assert.equal(first.status, 201);
+  const again = await create('  toiletries ');
+  assert.equal(again.status, 200);
+  assert.equal(
+    ((await again.json()) as { id: string }).id,
+    ((await first.json()) as { id: string }).id
+  );
+  assert.equal(await db.$count(categories, eq(categories.clerk_user_id, userId)), 1);
+
+  // Another user's category of the same name is separate.
+  const otherUser = await callApi(POST, d1, 'someone_else', {
+    method: 'POST',
+    body: { name: 'Toiletries' },
+  });
+  assert.equal(otherUser.status, 201);
+});
+
 test('An item is never both packed and skipped; trip counts ignore skipped items (C7)', async () => {
   const d1 = await createTestDatabase();
   const db = drizzle(d1);
