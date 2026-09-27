@@ -15,7 +15,7 @@
 // returns non-null). With the gate on but no fake user chosen, real Clerk login
 // keeps working normally — so this never gets in the way of ordinary dev.
 
-import type { BillingPlan, BillingStatus } from './billing';
+import type { BillingPlan } from './billing';
 
 // The `typeof` guard is for non-Vite runtimes (the tsx test runner) where
 // `import.meta.env` is undefined; under Vite (dev and build) it's a defined
@@ -57,14 +57,6 @@ export function parseFakeAuth(
   if (!match) return null;
   const plan: BillingPlan = match[2] === 'standard' ? 'standard' : 'free_user';
   return { userId: match[1], plan };
-}
-
-export function devFakeBillingStatus(plan: BillingPlan): BillingStatus {
-  return {
-    hasFreeUserPlan: plan === 'free_user',
-    hasStandardPlan: plan === 'standard',
-    activePlan: plan,
-  };
 }
 
 // --- client session (localStorage) ------------------------------------------

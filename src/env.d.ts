@@ -10,7 +10,7 @@ interface ImportMetaEnv {
 declare namespace App {
   interface Locals {
     userId: string;
-    billingStatus?: import('./lib/billing').BillingStatus;
+    billing?: import('./lib/billing').Billing;
     runtime: {
       env: {
         DB: D1Database;

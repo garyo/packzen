@@ -21,8 +21,9 @@ import {
 } from '../db/schema';
 import type { FullBackup } from '../src/lib/yaml';
 import type { ApiResponse } from '../src/lib/types';
-import type { APIContext } from 'astro';
+import type { APIContext, APIRoute } from 'astro';
 import { D1_MAX_BOUND_PARAMS } from '../src/lib/d1';
+import { createBilling, type Billing } from '../src/lib/billing';
 
 export interface Snapshot {
   categories: Category[];
@@ -93,13 +94,13 @@ export async function createTestDatabase() {
 export function buildApiContext({
   db,
   userId,
-  billingStatus,
+  billing = createBilling('free_user'),
   request,
   params,
 }: {
   db: D1Database;
   userId: string;
-  billingStatus?: import('../src/lib/billing').BillingStatus;
+  billing?: Billing;
   request?: Request;
   params?: Record<string, string>;
 }): APIContext {
@@ -111,11 +112,7 @@ export function buildApiContext({
     locals: {
       runtime: { env: { DB: db } },
       userId,
-      billingStatus: billingStatus || {
-        activePlan: 'free_user',
-        hasFreeUserPlan: true,
-        hasStandardPlan: false,
-      },
+      billing,
     },
     url: new URL(req.url),
     redirect: () => {
@@ -124,6 +121,26 @@ export function buildApiContext({
     site: new URL('http://localhost'),
     props: {},
   } as unknown as APIContext;
+}
+
+/** Call an API route handler with a JSON body (a string body is sent as-is). */
+export async function callApi(
+  handler: APIRoute | undefined,
+  db: D1Database,
+  userId: string,
+  {
+    method = 'GET',
+    body,
+    params,
+    billing,
+  }: { method?: string; body?: unknown; params?: Record<string, string>; billing?: Billing } = {}
+): Promise<Response> {
+  const request = new Request('http://localhost/api', {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: body === undefined || typeof body === 'string' ? body : JSON.stringify(body),
+  });
+  return handler!(buildApiContext({ db, userId, request, params, billing }));
 }
 
 export async function seedUserData(db: ReturnType<typeof drizzle>, userId: string) {

@@ -1,7 +1,7 @@
 import { clerkMiddleware, clerkClient } from '@clerk/astro/server';
 import { validateCsrfToken } from './lib/csrf';
-import { checkBillingStatus, logBillingStatus } from './lib/billing';
-import { DEV_FAKE_AUTH, parseFakeAuth, devFakeBillingStatus } from './lib/dev-auth';
+import { createBilling, planFromClaims } from './lib/billing';
+import { DEV_FAKE_AUTH, parseFakeAuth } from './lib/dev-auth';
 
 export const onRequest = clerkMiddleware(async (auth, context, next) => {
   // Only apply auth to API routes
@@ -24,7 +24,7 @@ export const onRequest = clerkMiddleware(async (auth, context, next) => {
     const fake = parseFakeAuth(context.request.headers.get('authorization'));
     if (fake) {
       context.locals.userId = fake.userId;
-      context.locals.billingStatus = devFakeBillingStatus(fake.plan);
+      context.locals.billing = createBilling(fake.plan);
       return next();
     }
   }
@@ -40,23 +40,15 @@ export const onRequest = clerkMiddleware(async (auth, context, next) => {
   }
 
   // Add user ID to locals for API routes to use
-  context.locals.userId = authObject.userId;
+  const userId = authObject.userId;
+  context.locals.userId = userId;
 
-  // Fast path for SSE sync endpoint — skip billing check to avoid
-  // a getUser() call on every ~3s poll
-  if (context.url.pathname === '/api/sync/events' && context.request.method === 'GET') {
-    return next();
-  }
-
-  const user = await clerkClient(context).users.getUser(authObject.userId);
-  const metadata = user.publicMetadata;
-
-  // Check and log billing status
-  const billingStatus = checkBillingStatus(authObject, metadata?.billingOverride as string);
-  logBillingStatus(authObject.userId, billingStatus);
-
-  // Store billing status in locals for API routes to use
-  context.locals.billingStatus = billingStatus;
+  // The plan comes from the session token; the billing override needs a
+  // Clerk API call, made only if a plan-limit check needs it.
+  context.locals.billing = createBilling(planFromClaims(authObject), async () => {
+    const user = await clerkClient(context).users.getUser(userId);
+    return user.publicMetadata?.billingOverride;
+  });
 
   // CSRF protection for state-changing requests.
   //

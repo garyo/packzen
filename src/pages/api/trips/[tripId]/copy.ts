@@ -1,24 +1,18 @@
 export const prerender = false;
 
 import type { APIRoute } from 'astro';
-import type { BatchItem } from 'drizzle-orm/batch';
-import { eq, and, count } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { trips, bags, tripItems } from '../../../../../db/schema';
 import {
   getDatabaseConnection,
   getUserId,
-  getBillingStatus,
-  errorResponse,
   successResponse,
-  handleApiError,
+  errorToResponse,
+  requireOwnedTrip,
+  enforceLimit,
 } from '../../../../lib/api-helpers';
-import { checkTripLimit, checkTripItemLimit } from '../../../../lib/resource-limits';
-import { chunkArray } from '../../../../lib/utils';
+import { chunkRowsForInsert } from '../../../../lib/d1';
 import { logChange, getSourceId } from '../../../../lib/sync';
-
-// D1 caps bound variables at 100 per query; keep each insert well under that.
-const BAG_INSERT_CHUNK_SIZE = 15;
-const ITEM_INSERT_CHUNK_SIZE = 6;
 
 /**
  * Server-side trip copy endpoint
@@ -29,53 +23,24 @@ export const POST: APIRoute = async (context) => {
   try {
     const db = getDatabaseConnection(context.locals);
     const userId = getUserId(context.locals);
-    const billingStatus = getBillingStatus(context.locals);
+    const originalTrip = await requireOwnedTrip(db, userId, context.params.tripId!);
 
-    const { tripId } = context.params;
-    if (!tripId) {
-      return errorResponse('Trip ID is required', 400);
-    }
+    // A copy consumes a trip slot and as many item slots as the source trip
+    // has, same as creating them from scratch would.
+    const tripCount = await db.$count(trips, eq(trips.clerk_user_id, userId));
+    await enforceLimit(context.locals, 'maxTrips', tripCount + 1);
 
-    // Verify trip ownership
-    const originalTrip = await db
+    const originalBags = await db
       .select()
-      .from(trips)
-      .where(and(eq(trips.id, tripId), eq(trips.clerk_user_id, userId)))
-      .get();
-
-    if (!originalTrip) {
-      return errorResponse('Trip not found', 404);
-    }
-
-    // Enforce plan limits before doing any work — a copy consumes a trip slot
-    // and as many item slots as the source trip has, same as creating them
-    // from scratch would.
-    const [{ tripCount }] = await db
-      .select({ tripCount: count() })
-      .from(trips)
-      .where(eq(trips.clerk_user_id, userId));
-
-    const tripLimitCheck = checkTripLimit(tripCount, billingStatus);
-    if (!tripLimitCheck.allowed) {
-      return errorResponse(tripLimitCheck.message!, 403);
-    }
-
-    const [{ itemCount }] = await db
-      .select({ itemCount: count() })
-      .from(tripItems)
-      .where(eq(tripItems.trip_id, tripId));
-
-    const itemLimitCheck = checkTripItemLimit(itemCount, billingStatus);
-    if (!itemLimitCheck.allowed) {
-      return errorResponse(itemLimitCheck.message!, 403);
-    }
-
-    const originalBags = await db.select().from(bags).where(eq(bags.trip_id, tripId)).all();
+      .from(bags)
+      .where(eq(bags.trip_id, originalTrip.id))
+      .all();
     const originalItems = await db
       .select()
       .from(tripItems)
-      .where(eq(tripItems.trip_id, tripId))
+      .where(eq(tripItems.trip_id, originalTrip.id))
       .all();
+    await enforceLimit(context.locals, 'maxItemsPerTrip', originalItems.length);
 
     // Pre-generate every new ID so bag/container relationships can be wired
     // up before any row is inserted, letting the whole copy run as one batch.
@@ -125,23 +90,20 @@ export const POST: APIRoute = async (context) => {
       updated_at: now,
     }));
 
-    // Build every insert as a batch item so the whole copy commits or rolls
-    // back atomically — no partial trip/bags/items left behind on failure.
-    const statements: BatchItem<'sqlite'>[] = [db.insert(trips).values(newTrip)];
-    for (const chunk of chunkArray(newBags, BAG_INSERT_CHUNK_SIZE)) {
-      statements.push(db.insert(bags).values(chunk));
-    }
-    for (const chunk of chunkArray(newItems, ITEM_INSERT_CHUNK_SIZE)) {
-      statements.push(db.insert(tripItems).values(chunk));
-    }
+    await db.batch([
+      db.insert(trips).values(newTrip),
+      ...chunkRowsForInsert(bags, newBags).map((chunk) => db.insert(bags).values(chunk)),
+      ...chunkRowsForInsert(tripItems, newItems).map((chunk) => db.insert(tripItems).values(chunk)),
+    ]);
 
-    await db.batch(statements as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]]);
-
-    const sourceId = getSourceId(context.request);
-    logChange(db, userId, 'trip', newTrip.id, null, 'create', newTrip, sourceId);
-
+    logChange(
+      db,
+      userId,
+      { entityType: 'trip', entityId: newTrip.id, parentId: null, action: 'create', data: newTrip },
+      getSourceId(context.request)
+    );
     return successResponse(newTrip, 201);
   } catch (error) {
-    return handleApiError(error, 'copy trip');
+    return errorToResponse(error, 'copy trip');
   }
 };

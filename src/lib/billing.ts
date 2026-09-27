@@ -1,76 +1,45 @@
 /**
- * Billing Utilities
- *
- * Back-end helper functions for checking Clerk Billing plans and features
+ * Billing plans (Clerk Billing), resolved without a Clerk API call per request.
  */
-
-import type { AuthObject } from '@clerk/backend';
 
 export type BillingPlan = 'free_user' | 'standard';
+export type PlanName = BillingPlan | 'none';
 
-/**
- * Billing status information for a user
- */
-export interface BillingStatus {
-  hasFreeUserPlan: boolean;
-  hasStandardPlan: boolean;
-  activePlan: BillingPlan | 'none';
-  billingOverride?: string;
+export interface Billing {
+  /** The plan in the session token's claims — known without any network call. */
+  plan: PlanName;
+  /**
+   * The plan including an admin-granted `billingOverride` (Clerk user
+   * publicMetadata). Fetches it at most once per request, and only when the
+   * token's plan isn't already standard.
+   */
+  effectivePlan(): Promise<PlanName>;
 }
 
-/**
- * Check user's billing plan status using Clerk's has() method
- * @param auth - Clerk auth object from middleware or API route
- * @returns Billing status with plan information
- */
-export function checkBillingStatus(auth: AuthObject, billingOverride?: string): BillingStatus {
-  const hasFreeUserPlan = auth.has({ plan: 'free_user' });
-  const hasStandardPlan = auth.has({ plan: 'standard' });
+/** The plan from Clerk's `has()`, which reads the session token's claims locally. */
+export function planFromClaims(auth: { has: (params: { plan: string }) => boolean }): PlanName {
+  if (auth.has({ plan: 'standard' })) return 'standard';
+  if (auth.has({ plan: 'free_user' })) return 'free_user';
+  return 'none';
+}
 
-  // Determine active plan (standard takes precedence if user has both)
-  let activePlan: BillingPlan | 'none' = 'none';
-  if (hasStandardPlan || billingOverride === 'standard') {
-    activePlan = 'standard';
-  } else if (hasFreeUserPlan) {
-    activePlan = 'free_user';
-  }
+export function createBilling(
+  plan: PlanName,
+  fetchBillingOverride: () => Promise<unknown> = async () => undefined
+): Billing {
+  let effective: Promise<PlanName> | undefined;
   return {
-    hasFreeUserPlan,
-    hasStandardPlan,
-    activePlan,
-    billingOverride,
+    plan,
+    effectivePlan() {
+      if (plan === 'standard') return Promise.resolve(plan);
+      effective ??= fetchBillingOverride().then(
+        (override) => (override === 'standard' ? 'standard' : plan),
+        (error) => {
+          console.error('Failed to fetch billing override; using the session plan:', error);
+          return plan;
+        }
+      );
+      return effective;
+    },
   };
-}
-
-/**
- * Log billing status for debugging
- */
-export function logBillingStatus(userId: string, status: BillingStatus): void {
-  console.log(`[Billing] User ${userId}:`, {
-    activePlan: status.activePlan,
-    hasFreeUserPlan: status.hasFreeUserPlan,
-    hasStandardPlan: status.hasStandardPlan,
-    billingOverride: status.billingOverride,
-  });
-}
-
-/**
- * Check if user has a specific plan
- */
-export function hasActivePlan(status: BillingStatus, plan: BillingPlan): boolean {
-  return status.activePlan === plan;
-}
-
-/**
- * Check if user has standard plan (paid)
- */
-export function hasStandardPlan(status: BillingStatus): boolean {
-  return status.hasStandardPlan;
-}
-
-/**
- * Check if user is on free plan
- */
-export function isFreePlan(status: BillingStatus): boolean {
-  return status.activePlan === 'free_user';
 }

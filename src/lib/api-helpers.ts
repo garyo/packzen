@@ -6,9 +6,13 @@
 
 import type { APIContext } from 'astro';
 import type { D1Database } from '@cloudflare/workers-types';
-import { drizzle } from 'drizzle-orm/d1';
-import type { DrizzleD1Database } from 'drizzle-orm/d1';
+import { and, eq } from 'drizzle-orm';
+import { drizzle, type DrizzleD1Database } from 'drizzle-orm/d1';
+import type { z } from 'zod';
+import { trips, type Trip } from '../../db/schema';
+import { planLimit, limitMessage, type LimitKey } from './resource-limits';
 import { logChange, getSourceId } from './sync';
+import { validateRequestSafe } from './validation';
 
 /**
  * Get database connection from Astro locals
@@ -45,157 +49,161 @@ export function successResponse<T>(data: T, status: number = 200): Response {
   });
 }
 
-/**
- * Handle API errors consistently
- */
-export function handleApiError(error: unknown, operation: string): Response {
-  console.error(`Error ${operation}:`, error);
-
-  // Return generic error message (don't leak internal details)
-  const message = `Failed to ${operation}`;
-  return errorResponse(message, 500);
-}
-
-/**
- * Create a standardized API route handler with consistent error handling
- *
- * @example
- * export const GET: APIRoute = createApiHandler(async ({ db, userId }) => {
- *   const items = await db.select().from(items).where(eq(items.userId, userId));
- *   return items;
- * }, 'fetch items');
- */
-export function createApiHandler<T>(
-  handler: (context: {
-    db: DrizzleD1Database;
-    userId: string;
-    request: Request;
-    params: Record<string, string | undefined>;
-    locals: APIContext['locals'];
-  }) => Promise<T>,
-  operationName: string
-) {
-  return async (context: APIContext): Promise<Response> => {
-    try {
-      const db = getDatabaseConnection(context.locals);
-      const userId = getUserId(context.locals);
-
-      const result = await handler({
-        db,
-        userId,
-        request: context.request,
-        params: context.params,
-        locals: context.locals,
-      });
-
-      return successResponse(result);
-    } catch (error) {
-      if (error instanceof NotFoundError) {
-        return errorResponse(error.message, 404);
-      }
-      if (error instanceof BadRequestError) {
-        return errorResponse(error.message, 400);
-      }
-      return handleApiError(error, operationName);
-    }
-  };
-}
-
-/**
- * Create a GET handler (convenience wrapper)
- */
-export function createGetHandler<T>(
-  handler: (context: {
-    db: DrizzleD1Database;
-    userId: string;
-    params: Record<string, string | undefined>;
-  }) => Promise<T>,
-  operationName: string
-) {
-  return createApiHandler(async ({ db, userId, params }) => {
-    return await handler({ db, userId, params });
-  }, operationName);
-}
-
-/** Sync configuration for auto-logging changes from handler factories */
-export interface SyncConfig {
-  entityType: string;
-  /** Extract entity ID from the result object (defaults to result.id) */
-  entityId?: (result: any) => string;
-  /** Extract parent ID from route params */
-  parentId?: (params: Record<string, string | undefined>) => string | null;
-}
-
-/** Sentinel error for "resource not found" in handler wrappers → maps to 404 */
+/** Thrown for a missing (or not-owned) resource → 404 */
 export class NotFoundError extends Error {
   constructor(message = 'Resource not found') {
     super(message);
   }
 }
 
-/** Sentinel error for a malformed request in handler wrappers → maps to 400 */
+/** Thrown for a malformed or invalid request → 400 */
 export class BadRequestError extends Error {}
 
+/** Thrown when a plan limit forbids the request → 403 */
+export class ForbiddenError extends Error {}
+
 /**
- * Shared implementation for POST/PATCH handlers that read a JSON body,
- * optionally validate it, and return a JSON response.
+ * Map a thrown error to a response. Unexpected errors are logged and get a
+ * generic 500 so internal details don't leak.
  */
-function createBodyHandler<TInput, TOutput>(
-  handler: (context: {
-    db: DrizzleD1Database;
-    userId: string;
-    validatedData: TInput;
-    params: Record<string, string | undefined>;
-  }) => Promise<TOutput>,
+export function errorToResponse(error: unknown, operation: string): Response {
+  if (error instanceof NotFoundError) return errorResponse(error.message, 404);
+  if (error instanceof BadRequestError) return errorResponse(error.message, 400);
+  if (error instanceof ForbiddenError) return errorResponse(error.message, 403);
+  console.error(`Error ${operation}:`, error);
+  return errorResponse(`Failed to ${operation}`, 500);
+}
+
+/** Parse a JSON request body, treating malformed JSON as a bad request. */
+export async function readJsonBody(request: Request): Promise<unknown> {
+  try {
+    return await request.json();
+  } catch {
+    throw new BadRequestError('Request body must be valid JSON');
+  }
+}
+
+/** Validate `data` against `schema`, throwing a BadRequestError describing any problems. */
+export function parseWith<T>(schema: z.ZodType<T>, data: unknown): T {
+  const validation = validateRequestSafe(schema, data);
+  if (!validation.success) throw new BadRequestError(validation.error);
+  return validation.data;
+}
+
+/** The trip, if it belongs to the user; otherwise NotFoundError. */
+export async function requireOwnedTrip(
+  db: DrizzleD1Database,
+  userId: string,
+  tripId: string
+): Promise<Trip> {
+  const trip = await db
+    .select()
+    .from(trips)
+    .where(and(eq(trips.id, tripId), eq(trips.clerk_user_id, userId)))
+    .get();
+  if (!trip) throw new NotFoundError('Trip not found');
+  return trip;
+}
+
+/** Throw ForbiddenError (403) unless the user's plan allows `total` of `key`. */
+export async function enforceLimit(
+  locals: APIContext['locals'],
+  key: LimitKey,
+  total: number
+): Promise<void> {
+  const max = await planLimit(locals.billing, key, total);
+  if (total > max) throw new ForbiddenError(limitMessage(key, max));
+}
+
+/**
+ * Route params. Every route using these wrappers has only required `[param]`
+ * segments, so each param is always present.
+ */
+type Params = Record<string, string>;
+
+interface HandlerContext {
+  db: DrizzleD1Database;
+  userId: string;
+  params: Params;
+  request: Request;
+  locals: APIContext['locals'];
+}
+
+function handlerContext(context: APIContext): HandlerContext {
+  return {
+    db: getDatabaseConnection(context.locals),
+    userId: getUserId(context.locals),
+    params: context.params as Params,
+    request: context.request,
+    locals: context.locals,
+  };
+}
+
+/**
+ * Create a GET handler that returns the handler's result as JSON.
+ *
+ * @example
+ * export const GET: APIRoute = createGetHandler(async ({ db, userId }) => {
+ *   return await db.select().from(items).where(eq(items.userId, userId));
+ * }, 'fetch items');
+ */
+export function createGetHandler<T>(
+  handler: (context: HandlerContext) => Promise<T>,
+  operationName: string
+) {
+  return async (context: APIContext): Promise<Response> => {
+    try {
+      return successResponse(await handler(handlerContext(context)));
+    } catch (error) {
+      return errorToResponse(error, operationName);
+    }
+  };
+}
+
+/** Sync configuration for auto-logging changes from handler factories */
+export interface SyncConfig {
+  entityType: string;
+  /** Extract parent ID from route params */
+  parentId?: (params: Params) => string | null;
+}
+
+/**
+ * Shared implementation for POST/PATCH handlers that validate a JSON body
+ * against `schema` and return the handler's result as JSON. A handler may
+ * return a Response instead to answer differently (it is then not synced).
+ */
+function createBodyHandler<TInput, TOutput extends { id: string }>(
+  handler: (context: HandlerContext & { validatedData: TInput }) => Promise<TOutput | Response>,
   operationName: string,
   successStatus: number,
-  validator?: (
-    data: unknown
-  ) => { success: true; data: TInput } | { success: false; error: string },
+  schema: z.ZodType<TInput>,
   sync?: SyncConfig
 ) {
   return async (context: APIContext): Promise<Response> => {
     try {
-      const db = getDatabaseConnection(context.locals);
-      const userId = getUserId(context.locals);
-      const body = await context.request.json();
+      const ctx = handlerContext(context);
+      const validatedData = parseWith(schema, await readJsonBody(context.request));
+      const result = await handler({ ...ctx, validatedData });
+      if (result instanceof Response) return result;
 
-      let validatedData: TInput;
-      if (validator) {
-        const validation = validator(body);
-        if (!validation.success) {
-          return errorResponse(validation.error, 400);
-        }
-        validatedData = validation.data;
-      } else {
-        validatedData = body as TInput;
-      }
-
-      const result = await handler({
-        db,
-        userId,
-        validatedData,
-        params: context.params,
-      });
-
-      // Log change for sync if configured
-      if (sync && result) {
-        const action = successStatus === 201 ? 'create' : 'update';
-        const entityId = sync.entityId ? sync.entityId(result) : (result as any).id;
-        const parentId = sync.parentId ? sync.parentId(context.params) : null;
-        const sourceId = getSourceId(context.request);
-        logChange(db, userId, sync.entityType, entityId, parentId, action, result, sourceId);
+      if (sync) {
+        logChange(
+          ctx.db,
+          ctx.userId,
+          {
+            entityType: sync.entityType,
+            entityId: result.id,
+            parentId: sync.parentId?.(ctx.params) ?? null,
+            action: successStatus === 201 ? 'create' : 'update',
+            data: result,
+          },
+          getSourceId(context.request)
+        );
       }
 
       return successResponse(result, successStatus);
     } catch (error) {
-      if (error instanceof NotFoundError) {
-        return errorResponse(error.message, 404);
-      }
-      if (error instanceof BadRequestError) {
-        return errorResponse(error.message, 400);
-      }
-      return handleApiError(error, operationName);
+      return errorToResponse(error, operationName);
     }
   };
 }
@@ -203,37 +211,23 @@ function createBodyHandler<TInput, TOutput>(
 /**
  * Create a POST handler with validation (convenience wrapper)
  */
-export function createPostHandler<TInput, TOutput>(
-  handler: (context: {
-    db: DrizzleD1Database;
-    userId: string;
-    validatedData: TInput;
-    params: Record<string, string | undefined>;
-  }) => Promise<TOutput>,
+export function createPostHandler<TInput, TOutput extends { id: string }>(
+  handler: (context: HandlerContext & { validatedData: TInput }) => Promise<TOutput | Response>,
   operationName: string,
-  validator?: (
-    data: unknown
-  ) => { success: true; data: TInput } | { success: false; error: string },
+  schema: z.ZodType<TInput>,
   sync?: SyncConfig
 ) {
-  return createBodyHandler(handler, operationName, 201, validator, sync);
+  return createBodyHandler(handler, operationName, 201, schema, sync);
 }
 
 /**
  * Create a PATCH handler with validation (convenience wrapper)
- * Returns 404 if handler returns null.
+ * Returns 404 if handler returns null or undefined.
  */
-export function createPatchHandler<TInput, TOutput>(
-  handler: (context: {
-    db: DrizzleD1Database;
-    userId: string;
-    validatedData: TInput;
-    params: Record<string, string | undefined>;
-  }) => Promise<TOutput | null>,
+export function createPatchHandler<TInput, TOutput extends { id: string }>(
+  handler: (context: HandlerContext & { validatedData: TInput }) => Promise<TOutput | undefined>,
   operationName: string,
-  validator?: (
-    data: unknown
-  ) => { success: true; data: TInput } | { success: false; error: string },
+  schema: z.ZodType<TInput>,
   sync?: SyncConfig
 ) {
   return createBodyHandler(
@@ -244,7 +238,7 @@ export function createPatchHandler<TInput, TOutput>(
     },
     operationName,
     200,
-    validator,
+    schema,
     sync
   );
 }
@@ -252,124 +246,35 @@ export function createPatchHandler<TInput, TOutput>(
 /**
  * Create a DELETE handler (convenience wrapper)
  *
- * When sync is configured, the handler should return the deleted entity ID
- * (string) instead of boolean, or false/null if not found.
+ * The handler returns the deleted entity's ID, or false if it wasn't found (→ 404).
  */
 export function createDeleteHandler(
-  handler: (context: {
-    db: DrizzleD1Database;
-    userId: string;
-    params: Record<string, string | undefined>;
-    request: Request;
-  }) => Promise<boolean | string>,
+  handler: (context: HandlerContext) => Promise<string | false>,
   operationName: string,
-  sync?: SyncConfig
+  sync: SyncConfig
 ) {
   return async (context: APIContext): Promise<Response> => {
     try {
-      const db = getDatabaseConnection(context.locals);
-      const userId = getUserId(context.locals);
+      const ctx = handlerContext(context);
+      const deletedId = await handler(ctx);
+      if (!deletedId) throw new NotFoundError();
 
-      const result = await handler({
-        db,
-        userId,
-        params: context.params,
-        request: context.request,
-      });
-
-      if (!result) {
-        return errorResponse('Resource not found', 404);
-      }
-
-      // Log change for sync if configured
-      if (sync) {
-        const entityId = typeof result === 'string' ? result : '';
-        const parentId = sync.parentId ? sync.parentId(context.params) : null;
-        const sourceId = getSourceId(context.request);
-        logChange(db, userId, sync.entityType, entityId, parentId, 'delete', null, sourceId);
-      }
+      logChange(
+        ctx.db,
+        ctx.userId,
+        {
+          entityType: sync.entityType,
+          entityId: deletedId,
+          parentId: sync.parentId?.(ctx.params) ?? null,
+          action: 'delete',
+          data: null,
+        },
+        getSourceId(context.request)
+      );
 
       return successResponse({ success: true });
     } catch (error) {
-      return handleApiError(error, operationName);
+      return errorToResponse(error, operationName);
     }
   };
-}
-
-/**
- * Billing helpers
- */
-import type { BillingPlan, BillingStatus } from './billing';
-import { hasStandardPlan } from './billing';
-
-/**
- * Get billing status from locals
- */
-export function getBillingStatus(locals: APIContext['locals']): BillingStatus | null {
-  return locals.billingStatus || null;
-}
-
-/**
- * Check if user has required plan (returns error response if not)
- *
- * @example
- * // In an API route:
- * export const GET: APIRoute = async ({ locals }) => {
- *   const billingCheck = requirePlan(locals, 'standard');
- *   if (billingCheck) return billingCheck; // Returns 403 error if plan not met
- *
- *   // User has required plan, continue...
- * };
- */
-export function requirePlan(
-  locals: APIContext['locals'],
-  requiredPlan: BillingPlan
-): Response | null {
-  const billingStatus = getBillingStatus(locals);
-
-  if (!billingStatus) {
-    console.error('Billing status not available in locals');
-    return errorResponse('Billing information unavailable', 500);
-  }
-
-  // Check if user has the required plan
-  if (billingStatus.activePlan !== requiredPlan) {
-    console.log(
-      `[Billing] User ${locals.userId} attempted to access ${requiredPlan} feature but has ${billingStatus.activePlan} plan`
-    );
-    return errorResponse(
-      `This feature requires the ${requiredPlan} plan. Your current plan is ${billingStatus.activePlan}.`,
-      403
-    );
-  }
-
-  // User has required plan
-  return null;
-}
-
-/**
- * Check if user has standard (paid) plan
- *
- * @example
- * export const GET: APIRoute = async ({ locals }) => {
- *   const billingCheck = requireStandardPlan(locals);
- *   if (billingCheck) return billingCheck;
- *   // User has standard plan...
- * };
- */
-export function requireStandardPlan(locals: APIContext['locals']): Response | null {
-  const billingStatus = getBillingStatus(locals);
-
-  if (!billingStatus) {
-    return errorResponse('Billing information unavailable', 500);
-  }
-
-  if (!hasStandardPlan(billingStatus)) {
-    console.log(
-      `[Billing] User ${locals.userId} needs standard plan but has ${billingStatus.activePlan}`
-    );
-    return errorResponse('This feature requires a standard plan subscription.', 403);
-  }
-
-  return null;
 }
