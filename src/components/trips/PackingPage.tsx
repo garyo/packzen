@@ -1,4 +1,13 @@
-import { createSignal, createResource, createEffect, Show, onMount, onCleanup } from 'solid-js';
+import {
+  createSignal,
+  createResource,
+  createEffect,
+  Show,
+  Switch,
+  Match,
+  onMount,
+  onCleanup,
+} from 'solid-js';
 import { api, endpoints } from '../../lib/api';
 import type { Trip, TripItem, Bag, Category, MasterItemWithCategory } from '../../lib/types';
 import { NO_BAG_LABEL } from '../../lib/vocabulary';
@@ -461,12 +470,40 @@ export function PackingPage(props: PackingPageProps) {
               <Show
                 when={!store.state.error}
                 fallback={
-                  <EmptyState
-                    icon="⚠️"
-                    title="Unable to connect"
-                    description="Cannot reach the server. Please check your connection and try again."
-                    action={<Button onClick={retryLoad}>Retry</Button>}
-                  />
+                  <Switch
+                    fallback={
+                      <EmptyState
+                        icon="⚠️"
+                        title="Couldn't load this trip"
+                        description="Something went wrong on our end. Please try again."
+                        action={<Button onClick={retryLoad}>Retry</Button>}
+                      />
+                    }
+                  >
+                    <Match when={store.state.errorStatus === 404}>
+                      <EmptyState
+                        icon="🧳"
+                        title="Trip not found"
+                        description="This trip doesn't exist, or it belongs to a different account."
+                        action={
+                          <a
+                            href="/trips"
+                            class="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700"
+                          >
+                            Go to My Trips
+                          </a>
+                        }
+                      />
+                    </Match>
+                    <Match when={store.state.errorStatus === undefined}>
+                      <EmptyState
+                        icon="⚠️"
+                        title="Unable to connect"
+                        description="Cannot reach the server. Please check your connection and try again."
+                        action={<Button onClick={retryLoad}>Retry</Button>}
+                      />
+                    </Match>
+                  </Switch>
                 }
               >
                 <Show

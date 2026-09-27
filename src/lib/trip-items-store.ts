@@ -64,6 +64,8 @@ export function createTripItemsStore(tripId: string) {
     data: [] as TripItem[],
     loading: true,
     error: null as string | null,
+    /** HTTP status of a failed load; undefined when the server never answered. */
+    errorStatus: undefined as number | undefined,
   });
 
   const items = () => (state.loading ? undefined : state.data);
@@ -147,17 +149,22 @@ export function createTripItemsStore(tripId: string) {
 
   /** Load with a visible loading state (initial load and Retry). */
   async function load() {
-    setState({ loading: true, error: null });
+    setState({ loading: true, error: null, errorStatus: undefined });
     loadGate.startLoad();
     const response = await api.get<TripItem[]>(endpoints.tripItems(tripId));
     if (response.success) {
       setState({ data: response.data ?? [], loading: false });
       lastFetchTime = Date.now();
     } else {
-      if (response.statusCode !== 401) {
+      // The page explains a missing trip itself; a toast would repeat it.
+      if (response.statusCode !== 401 && response.statusCode !== 404) {
         showToast('error', response.error || 'Failed to load trip items');
       }
-      setState({ loading: false, error: response.error || 'Failed to load items' });
+      setState({
+        loading: false,
+        error: response.error || 'Failed to load items',
+        errorStatus: response.statusCode,
+      });
     }
     loadGate.endLoad(applyRemoteChange);
   }

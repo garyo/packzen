@@ -175,51 +175,56 @@ export function PackingListBagView(props: PackingListBagViewProps) {
     ])
   );
 
-  // Track which section is scrolled into view, for the nav bar.
+  // The section at the top of the list, just under the nav bar. Containers
+  // sit inside their bag's section; the innermost one wins, so the bar shows
+  // the container you're looking at rather than the bag around it.
   const [currentSection, setCurrentSection] = createSignal<string | null>(null);
-  const visibleSections = new Set<string>();
-  let observer: IntersectionObserver | undefined;
 
   const updateCurrentSection = () => {
-    const sections = document.querySelectorAll('[id^="bag-section-"], [id^="container-section-"]');
-    const first = Array.from(sections).find((section) => visibleSections.has(section.id));
-    if (first) setCurrentSection(first.id);
+    const navBar = document.getElementById(NAV_BAR_ID);
+    const scroller = document.querySelector('main.overflow-y-auto');
+    if (!navBar || !scroller) return;
+    const probeY = navBar.getBoundingClientRect().bottom + SCROLL_GAP;
+    const sections = navItems()
+      .map((navItem) => document.getElementById(navSectionId(navItem)))
+      .filter((section): section is HTMLElement => section !== null);
+    const containing = sections.filter((section) => {
+      const { top, bottom } = section.getBoundingClientRect();
+      return top <= probeY && bottom > probeY;
+    });
+    // At the bottom of the list, the last sections can never reach the top;
+    // show the last one on screen. Between sections, the next one down.
+    const atBottom = scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 2;
+    const viewBottom = scroller.getBoundingClientRect().bottom;
+    const lastOnScreen = atBottom
+      ? sections.filter((section) => section.getBoundingClientRect().top < viewBottom).at(-1)
+      : undefined;
+    const current =
+      lastOnScreen ??
+      containing.find((section) => section.id.startsWith('container-section-')) ??
+      containing[0] ??
+      sections.find((section) => section.getBoundingClientRect().top > probeY);
+    if (current) setCurrentSection(current.id);
   };
 
   onMount(() => {
-    const navBarHeight = document.getElementById(NAV_BAR_ID)?.offsetHeight ?? 0;
-    observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) visibleSections.add(entry.target.id);
-          else visibleSections.delete(entry.target.id);
-        }
-        updateCurrentSection();
-      },
-      {
-        root: document.querySelector('main.overflow-y-auto'),
-        rootMargin: `-${navBarHeight}px 0px 0px 0px`,
-        threshold: 0,
-      }
-    );
-    onCleanup(() => observer?.disconnect());
+    const scroller = document.querySelector('main.overflow-y-auto');
+    let frame = 0;
+    const onScroll = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(updateCurrentSection);
+    };
+    scroller?.addEventListener('scroll', onScroll, { passive: true });
+    onCleanup(() => {
+      cancelAnimationFrame(frame);
+      scroller?.removeEventListener('scroll', onScroll);
+    });
   });
 
-  // (Re-)observe sections whenever the set of bags and containers changes.
-  // Observing an element twice is a no-op.
+  // Recompute once the sections render or change.
   createEffect(() => {
-    const sectionIds = navItems().map(navSectionId);
-    // Wait for layout to settle before observing
-    requestAnimationFrame(() => {
-      setTimeout(() => {
-        for (const id of sectionIds) {
-          const section = document.getElementById(id);
-          if (section) observer?.observe(section);
-        }
-        if (!currentSection()) setCurrentSection(sectionIds[0] ?? null);
-        setTimeout(updateCurrentSection, 50);
-      }, 150);
-    });
+    navItems();
+    requestAnimationFrame(updateCurrentSection);
   });
 
   return (
