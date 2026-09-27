@@ -51,9 +51,7 @@ Then update the `database_id` in `wrangler.jsonc`.
 
 **Already completed!** All migrations have been applied to the production database.
 
-All 5 tables created: `bags`, `categories`, `master_items`, `trip_items`, `trips`
-
-To run migrations again (if schema changes):
+To apply new migrations (after a schema change):
 
 ```bash
 bun run db:migrate:prod
@@ -149,7 +147,7 @@ After deployment, test the following:
 
 ### "Authentication not configured" error
 
-- Check that CLERK_SECRET_KEY is set in Cloudflare Pages environment variables
+- Check that CLERK_SECRET_KEY is set as a Worker secret (`npx wrangler secret list`)
 - Verify it's the production secret key (sk*live*\*)
 
 ### "Database not found" error
@@ -181,11 +179,13 @@ After deployment, test the following:
 
 ### Updating the Database Schema
 
-1. Modify `db/schema.ts`
-2. Generate migration: `bun run db:generate`
-3. Test locally: `bun run db:migrate`
-4. Deploy to production: `bun run db:migrate:prod`
-5. Redeploy Worker: `npx wrangler deploy`
+Migrations are hand-written SQL (there is no generate step):
+
+1. Add the next numbered `.sql` file to `db/migrations/` (additive or
+   data-preserving only)
+2. Mirror the change in `db/schema.ts`
+3. Test locally: `bun run db:migrate`, then `bun run test`
+4. Apply to production: `bun run db:migrate:prod` — before the code that needs it deploys
 
 ### Monitoring
 
