@@ -10,6 +10,9 @@ import { EditIcon, CopyIcon, TrashIcon, MoreVerticalIcon } from '../ui/Icons';
 import { TripForm } from './TripForm';
 import { TripFormWithBags } from './TripFormWithBags';
 import { NewTripImportModal } from './NewTripImportModal';
+import { TripTypeGrid } from './StarterListPanel';
+import { OnboardingModal } from '../nav/OnboardingModal';
+import { builtInItems } from '../../lib/built-in-items';
 import { formatDateRange, getTripStatus } from '../../lib/utils';
 import { fetchWithErrorHandling } from '../../lib/resource-helpers';
 import { deleteTripWithConfirm } from '../../lib/trip-actions';
@@ -146,14 +149,7 @@ export function TripsPage() {
           >
             <Show
               when={(trips()?.length || 0) > 0}
-              fallback={
-                <EmptyState
-                  icon="🧳"
-                  title="No trips yet"
-                  description="Create your first trip and start planning your packing list"
-                  action={<Button onClick={() => setShowForm(true)}>Create Your First Trip</Button>}
-                />
-              }
+              fallback={<FirstTripHero onCustomTrip={() => setShowForm(true)} />}
             >
               <div class="space-y-8">
                 {/* Active Trips */}
@@ -249,6 +245,70 @@ export function TripsPage() {
             refetch();
           }}
         />
+      </Show>
+    </div>
+  );
+}
+
+/**
+ * A new user's home: one tap on a trip type creates the trip (named after the
+ * type, with a carry-on) and opens it with that starter list applied.
+ */
+function FirstTripHero(props: { onCustomTrip: () => void }) {
+  const [busy, setBusy] = createSignal<string | null>(null);
+  const [showHowItWorks, setShowHowItWorks] = createSignal(false);
+
+  const startTrip = async (tripTypeId: string) => {
+    const tripType = builtInItems.trip_types.find((t) => t.id === tripTypeId);
+    if (!tripType || busy()) return;
+    setBusy(tripTypeId);
+    const response = await api.post<Trip>(endpoints.trips, { name: tripType.trip_name });
+    if (!response.success || !response.data) {
+      showToast('error', response.error || 'Failed to create trip');
+      setBusy(null);
+      return;
+    }
+    const tripId = response.data.id;
+    // Without the bag the list still works (items go in no bag), so carry on regardless.
+    await api.post(endpoints.tripBags(tripId), {
+      name: 'Carry-on',
+      type: 'carry_on',
+      color: 'blue',
+      sort_order: 0,
+    });
+    window.location.href = `/trips/${tripId}/pack?starter=${tripTypeId}`;
+  };
+
+  return (
+    <div class="mx-auto max-w-xl py-4 text-center md:py-10">
+      <h2 class="mb-1 text-2xl font-bold text-gray-900">What kind of trip?</h2>
+      <p class="mb-5 text-gray-600">
+        Tap one to start a packing list. You can rename it and add dates and bags any time.
+      </p>
+      <TripTypeGrid onPick={startTrip} busy={busy()} />
+      <Show when={busy()}>
+        <p class="mt-4 text-sm text-gray-500" role="status">
+          Setting up your trip…
+        </p>
+      </Show>
+      <div class="mt-6 flex flex-wrap items-center justify-center gap-x-4 text-sm">
+        <button
+          type="button"
+          onClick={props.onCustomTrip}
+          class="text-blue-700 underline-offset-2 hover:underline"
+        >
+          Set up a trip yourself
+        </button>
+        <button
+          type="button"
+          onClick={() => setShowHowItWorks(true)}
+          class="text-gray-600 underline-offset-2 hover:underline"
+        >
+          How PackZen works
+        </button>
+      </div>
+      <Show when={showHowItWorks()}>
+        <OnboardingModal onClose={() => setShowHowItWorks(false)} />
       </Show>
     </div>
   );
