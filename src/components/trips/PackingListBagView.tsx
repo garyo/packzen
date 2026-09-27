@@ -36,8 +36,10 @@ import {
   type PackingListProps,
 } from './PackingListParts';
 
-// Height of the sticky nav bar, so scrolled-to sections land below it.
-const NAV_BAR_OFFSET = 28;
+// The sticky nav bar wraps to several lines on narrow screens, so scrolled-to
+// sections land below its measured height, with a little breathing room.
+const NAV_BAR_ID = 'bag-nav-bar';
+const SCROLL_GAP = 8;
 
 const bagSectionId = (bagId: string | null) =>
   bagId ? `bag-section-${bagId}` : 'bag-section-none';
@@ -48,8 +50,13 @@ function scrollToElement(elementId: string) {
   const scrollContainer = document.querySelector('main.overflow-y-auto');
   if (!element || !scrollContainer) return;
   const containerTop = scrollContainer.getBoundingClientRect().top;
+  const navBarHeight = document.getElementById(NAV_BAR_ID)?.offsetHeight ?? 0;
   const offset =
-    element.getBoundingClientRect().top - containerTop + scrollContainer.scrollTop - NAV_BAR_OFFSET;
+    element.getBoundingClientRect().top -
+    containerTop +
+    scrollContainer.scrollTop -
+    navBarHeight -
+    SCROLL_GAP;
   scrollContainer.scrollTo({ top: offset, behavior: 'smooth' });
 }
 
@@ -79,15 +86,34 @@ function WayfindingNavBar(props: {
     return props.currentSection();
   };
 
+  // On phones the chips form one swipeable row; keep the current one in view.
+  let row: HTMLDivElement | undefined;
+  createEffect(() => {
+    const chip = row?.querySelector<HTMLElement>(`[data-section="${highlighted()}"]`);
+    if (!row || !chip) return;
+    const { left, right } = chip.getBoundingClientRect();
+    const bounds = row.getBoundingClientRect();
+    if (left < bounds.left || right > bounds.right) {
+      row.scrollTo({ left: chip.offsetLeft - row.offsetLeft - 8, behavior: 'smooth' });
+    }
+  });
+
   return (
-    <div class="sticky top-0 z-10 -mx-4 bg-gray-50/95 px-4 py-1.5 backdrop-blur-sm md:-mx-3 md:px-3 [@media(max-height:500px)]:py-0.5">
-      <div class="flex items-center gap-x-1 gap-y-0">
-        <div class="flex min-h-8 flex-1 flex-wrap gap-x-1 gap-y-0 [@media(max-height:500px)]:flex-nowrap [@media(max-height:500px)]:overflow-x-auto [@media(max-height:500px)]:whitespace-nowrap">
+    <div
+      id={NAV_BAR_ID}
+      class="sticky top-0 z-10 -mx-4 bg-gray-50/95 px-4 py-1.5 backdrop-blur-sm md:-mx-3 md:px-3 [@media(max-height:500px)]:py-0.5"
+    >
+      <div class="flex items-center gap-x-1">
+        <div
+          ref={row}
+          class="flex min-h-8 min-w-0 flex-1 [scrollbar-width:none] flex-nowrap gap-x-1 overflow-x-auto whitespace-nowrap md:flex-wrap md:overflow-visible md:whitespace-normal [@media(max-height:500px)]:flex-nowrap [@media(max-height:500px)]:overflow-x-auto [@media(max-height:500px)]:whitespace-nowrap"
+        >
           <For each={props.navItems}>
             {(navItem) => (
               <button
+                data-section={navSectionId(navItem)}
                 onClick={() => props.onScrollToSection(navSectionId(navItem))}
-                class={`btn-compact flex items-center gap-1 px-1.5 py-0.5 text-xs [@media(max-height:500px)]:shrink-0 ${
+                class={`btn-compact flex shrink-0 items-center gap-1 px-1.5 py-0.5 text-xs ${
                   highlighted() === navSectionId(navItem)
                     ? 'text-gray-900 underline decoration-2 underline-offset-2'
                     : 'text-gray-500 hover:text-gray-900'
@@ -104,14 +130,14 @@ function WayfindingNavBar(props: {
               </button>
             )}
           </For>
-          <button
-            type="button"
-            onClick={props.onAddBag}
-            class="btn-compact rounded-full border border-dashed border-gray-300 px-2 py-0.5 text-xs font-medium text-gray-600 hover:border-blue-400 hover:text-blue-700 [@media(max-height:500px)]:shrink-0"
-          >
-            + Bag
-          </button>
         </div>
+        <button
+          type="button"
+          onClick={props.onAddBag}
+          class="btn-compact shrink-0 rounded-full border border-dashed border-gray-300 px-2 py-0.5 text-xs font-medium text-gray-600 hover:border-blue-400 hover:text-blue-700"
+        >
+          + Bag
+        </button>
       </div>
     </div>
   );
@@ -161,6 +187,7 @@ export function PackingListBagView(props: PackingListBagViewProps) {
   };
 
   onMount(() => {
+    const navBarHeight = document.getElementById(NAV_BAR_ID)?.offsetHeight ?? 0;
     observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
@@ -171,7 +198,7 @@ export function PackingListBagView(props: PackingListBagViewProps) {
       },
       {
         root: document.querySelector('main.overflow-y-auto'),
-        rootMargin: `-${NAV_BAR_OFFSET}px 0px 0px 0px`,
+        rootMargin: `-${navBarHeight}px 0px 0px 0px`,
         threshold: 0,
       }
     );
