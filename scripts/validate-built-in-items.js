@@ -4,7 +4,7 @@
  */
 
 import fs from 'fs';
-import yaml from 'js-yaml';
+import { load } from 'js-yaml';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
@@ -34,7 +34,7 @@ function validateBuiltInItems() {
   let data;
   try {
     const yamlContent = fs.readFileSync(YAML_PATH, 'utf8');
-    data = yaml.load(yamlContent);
+    data = load(yamlContent);
   } catch (error) {
     log(`✗ Failed to load YAML file: ${error.message}`, 'red');
     process.exit(1);

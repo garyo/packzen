@@ -253,6 +253,15 @@ test('Empty collections round-trip through full backup', () => {
   assert.equal(parsed.trips.length, 0);
 });
 
+test('Hand-written YAML with unquoted dates imports them as date strings', () => {
+  const parsed = yamlToTrip(
+    'trip:\n  name: Beach Trip\n  start_date: 2026-06-01\n  end_date: 2026-06-07\n'
+  );
+
+  assert.equal(parsed.trip.start_date, '2026-06-01');
+  assert.equal(parsed.trip.end_date, '2026-06-07');
+});
+
 test('Field fidelity: is_packed, is_container, notes, quantity preserved', () => {
   const { trip, bags: bagList, items } = makeTripFixture();
   const yamlStr = tripToYAML(trip, bagList, items);

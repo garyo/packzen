@@ -1,4 +1,4 @@
-import yaml from 'js-yaml';
+import { dump, load, type DumpOptions } from 'js-yaml';
 import type { z } from 'zod';
 import type { Trip, Bag, TripItem, Category, MasterItem, BagTemplate } from './types';
 import {
@@ -25,7 +25,7 @@ type YamlItem = NonNullable<YamlTripInput['items']>[number];
 // The database stores bag types as plain text; the schema validates them on import.
 type BagTypeName = YamlBag['type'];
 
-const DUMP_OPTIONS: yaml.DumpOptions = {
+const DUMP_OPTIONS: DumpOptions = {
   indent: 2,
   lineWidth: -1, // Don't wrap lines
   noRefs: true,
@@ -85,7 +85,7 @@ export function tripToYAML(trip: Trip, bags: Bag[], items: TripItem[]): string {
     bags: bags.map(bagToYaml),
     items: itemsToYaml(bags, items),
   };
-  return yaml.dump(exportData, DUMP_OPTIONS);
+  return dump(exportData, DUMP_OPTIONS);
 }
 
 /**
@@ -129,35 +129,17 @@ export function fullBackupToYAML(
       items: itemsToYaml(bags, items),
     })),
   };
-  return yaml.dump(backup, DUMP_OPTIONS);
+  return dump(backup, DUMP_OPTIONS);
 }
 
 /**
- * DEFAULT_SCHEMA parses unquoted dates like `2026-06-01` into JS `Date` objects
- * (that's also what gives us yes/no/on/off -> boolean, which we want to keep).
- * The Zod schemas expect plain 'YYYY-MM-DD' strings, so walk the parsed tree and
- * convert any Date back to that format before validation.
+ * Parse YAML and validate/sanitize it against `schema`; throws a readable error.
+ * js-yaml's default YAML 1.2 core schema leaves unquoted dates like `2026-06-01`
+ * as the plain strings the Zod schemas expect.
  */
-function coerceDatesToStrings(value: unknown): unknown {
-  if (value instanceof Date) {
-    return value.toISOString().slice(0, 10);
-  }
-  if (Array.isArray(value)) {
-    return value.map(coerceDatesToStrings);
-  }
-  if (value && typeof value === 'object') {
-    return Object.fromEntries(
-      Object.entries(value).map(([key, val]) => [key, coerceDatesToStrings(val)])
-    );
-  }
-  return value;
-}
-
-/** Parse YAML and validate/sanitize it against `schema`; throws a readable error. */
 function parseYaml<T>(text: string, schema: z.ZodType<T>, label: string): T {
   try {
-    const parsed = coerceDatesToStrings(yaml.load(text, { schema: yaml.DEFAULT_SCHEMA }));
-    const validation = validateRequestSafe(schema, parsed);
+    const validation = validateRequestSafe(schema, load(text));
     if (!validation.success) {
       throw new Error(`Invalid ${label} YAML structure: ${validation.error}`);
     }
