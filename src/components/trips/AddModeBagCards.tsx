@@ -7,155 +7,86 @@
 
 import { Show, For, createMemo, createSignal, type Accessor } from 'solid-js';
 import { createDroppable } from '@thisbeyond/solid-dnd';
-import type { TripItem, Bag, Category } from '../../lib/types';
+import type { TripItem, Bag } from '../../lib/types';
 import type { AddModeBagDropData, SelectedTarget } from './AddModeView';
+import { NO_BAG_LABEL } from '../../lib/vocabulary';
+import { packingStats } from '../../lib/packing-stats';
+import { byName, categoryOf, groupSorted, placeItems } from '../../lib/item-placement';
 import { SwitchBagIcon } from '../ui/Icons';
-import { ReplaceBagModal } from './ReplaceBagModal';
 
 interface AddModeBagCardsProps {
-  tripId: string;
   items: Accessor<TripItem[] | undefined>;
   bags: Accessor<Bag[] | undefined>;
-  categories: Accessor<Category[] | undefined>;
-  onBagReplaced?: () => void;
+  onReplaceBag: (bag: Bag) => void;
   // For click-to-add: selected target (bag or container) gets highlighted border
-  selectedTarget?: Accessor<SelectedTarget | undefined>;
-  onSelectTarget?: (target: SelectedTarget | undefined) => void;
+  selectedTarget: Accessor<SelectedTarget | undefined>;
+  onSelectTarget: (target: SelectedTarget | undefined) => void;
 }
 
 interface BagCardProps {
-  tripId: string;
-  bag: Bag | null; // null for "No Bag"
-  bagId: string | null;
-  items: Accessor<TripItem[]>; // Use accessor for reactivity
+  bag: Bag | null; // null for "not in a bag"
+  /** The container this card represents, if it's a container card. */
+  container?: TripItem;
+  /** Items shown in this card (a bag's loose items, or a container's contents). */
+  items: TripItem[];
   containers: TripItem[];
-  isContainer?: boolean;
-  containerId?: string;
+  contentsOf: (containerId: string) => TripItem[];
   isExpanded: boolean;
   onToggleExpand: () => void;
-  onBagReplaced?: () => void;
-  allBags?: Accessor<Bag[] | undefined>;
-  // For passing accordion state to nested containers
-  expandedCardId?: Accessor<string | null>;
-  onSetExpandedCardId?: (id: string) => void;
-  // For click-to-add selection (bags and containers)
-  selectedTarget?: Accessor<SelectedTarget | undefined>;
-  onSelectTarget?: (target: SelectedTarget | undefined) => void;
+  // Accordion state, passed down to nested container cards
+  expandedCardId: Accessor<string | null>;
+  onToggleExpandCard: (id: string) => void;
+  onReplaceBag: (bag: Bag) => void;
+  selectedTarget: Accessor<SelectedTarget | undefined>;
+  onSelectTarget: (target: SelectedTarget | undefined) => void;
 }
 
+const bagCardId = (bagId: string | null) => `add-mode-bag-${bagId ?? 'none'}`;
+const containerCardId = (containerId: string) => `add-mode-container-${containerId}`;
+
 function DroppableBagCard(props: BagCardProps) {
-  const [showReplace, setShowReplace] = createSignal(false);
-
-  const dropId = props.isContainer
-    ? `add-mode-container-${props.containerId}`
-    : `add-mode-bag-${props.bagId || 'none'}`;
-
-  const droppable = createDroppable(dropId, {
-    type: props.isContainer ? 'add-mode-container' : 'add-mode-bag',
-    bagId: props.bagId,
-    containerId: props.containerId,
-  } as AddModeBagDropData);
-
-  // Filter items for this bag/container
-  const bagItems = createMemo(() => {
-    const allItems = props.items();
-    if (props.isContainer && props.containerId) {
-      // Container: items where container_item_id matches
-      return allItems.filter((i) => i.container_item_id === props.containerId);
-    } else {
-      // Bag: items where bag_id matches AND not in any container
-      // For "No Bag" (bagId === null), match items with bag_id === null
-      return allItems.filter((i) => i.bag_id === props.bagId && !i.container_item_id);
-    }
+  const bagId = () => props.bag?.id ?? null;
+  const target = (): SelectedTarget => ({
+    bagId: bagId(),
+    containerId: props.container?.id ?? null,
   });
 
-  const bagName = () => {
-    if (props.isContainer && props.containerId) {
-      const container = props.items().find((i) => i.id === props.containerId);
-      return container?.name || 'Container';
-    }
-    return props.bag?.name || 'No Bag';
+  const droppable = createDroppable(
+    props.container ? containerCardId(props.container.id) : bagCardId(bagId()),
+    {
+      type: props.container ? 'add-mode-container' : 'add-mode-bag',
+      bagId: bagId(),
+      containerId: props.container?.id,
+    } satisfies AddModeBagDropData
+  );
+
+  const name = () => props.container?.name ?? props.bag?.name ?? NO_BAG_LABEL;
+  const stats = createMemo(() => packingStats(props.items));
+
+  // Items (not quantities) per category, alphabetical so the order stays stable
+  const groupedByCategory = createMemo(() =>
+    groupSorted(props.items, categoryOf).map(
+      ([category, items]) => [category, [...items].sort(byName)] as const
+    )
+  );
+
+  const isSelected = () => {
+    const selected = props.selectedTarget();
+    return (
+      !!selected &&
+      selected.bagId === target().bagId &&
+      selected.containerId === target().containerId
+    );
   };
 
-  // Calculate category summary (count items, not quantities)
-  const categorySummary = createMemo(() => {
-    const items = bagItems();
-    const counts = new Map<string, number>();
-    items.forEach((item) => {
-      const cat = item.category_name || 'Uncategorized';
-      counts.set(cat, (counts.get(cat) || 0) + 1); // Count items, not quantities
-    });
-
-    // Sort alphabetically so the order stays stable as counts change (and
-    // matches the expanded view). Sorting by count made categories jump around
-    // every time an item was added.
-    return Array.from(counts.entries()).sort((a, b) => a[0].localeCompare(b[0]));
-  });
-
-  // Count items (not quantities)
-  const totalItems = createMemo(() => {
-    return bagItems().length;
-  });
-
-  // Count packed items (not quantities)
-  const packedItems = createMemo(() => {
-    return bagItems().filter((i) => i.is_packed).length;
-  });
-
-  // Group items by category for expanded view
-  const groupedByCategory = createMemo(() => {
-    const items = bagItems();
-    const groups = new Map<string, TripItem[]>();
-    items.forEach((item) => {
-      const cat = item.category_name || 'Uncategorized';
-      if (!groups.has(cat)) {
-        groups.set(cat, []);
-      }
-      groups.get(cat)!.push(item);
-    });
-    // Sort categories alphabetically, items within each category by name
-    return Array.from(groups.entries())
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([cat, items]) => [cat, items.sort((a, b) => a.name.localeCompare(b.name))] as const);
-  });
-
-  const bagColor = () => props.bag?.color || '#6b7280';
-
-  // Compute if this card is selected
-  const isSelected = createMemo(() => {
-    const target = props.selectedTarget?.();
-    if (!target) return false;
-    if (props.isContainer && props.containerId) {
-      // Container: selected when containerId matches
-      return target.containerId === props.containerId;
-    } else {
-      // Bag: selected when bagId matches and no containerId
-      return target.bagId === props.bagId && target.containerId === null;
-    }
-  });
-
-  const handleSelect = () => {
-    if (!props.onSelectTarget) return;
-    // Toggle off if already selected
-    if (isSelected()) {
-      props.onSelectTarget(undefined);
-      return;
-    }
-    if (props.isContainer && props.containerId) {
-      // Container: set containerId, bagId is the parent bag
-      props.onSelectTarget({ bagId: props.bagId, containerId: props.containerId });
-    } else {
-      // Bag: set bagId, containerId is null
-      props.onSelectTarget({ bagId: props.bagId, containerId: null });
-    }
-  };
+  const toggleSelected = () => props.onSelectTarget(isSelected() ? undefined : target());
 
   return (
     <div
       ref={droppable.ref}
       role="button"
       tabindex={0}
-      aria-label={`Select ${bagName()} as target ${props.isContainer ? 'container' : 'bag'}`}
+      aria-label={`Select ${name()} as target ${props.container ? 'container' : 'bag'}`}
       aria-pressed={isSelected()}
       class="cursor-pointer rounded-lg border-2 px-1 py-2 transition-all md:p-3"
       classList={{
@@ -164,16 +95,18 @@ function DroppableBagCard(props: BagCardProps) {
           !droppable.isActiveDroppable && isSelected(),
         'border-gray-200 bg-white hover:border-gray-300':
           !droppable.isActiveDroppable && !isSelected(),
-        'ml-2 md:ml-6': props.isContainer,
+        'ml-2 md:ml-6': !!props.container,
       }}
       onClick={(e) => {
         e.stopPropagation();
-        handleSelect();
+        toggleSelected();
       }}
       onKeyDown={(e) => {
+        // Only keys aimed at the card itself, not at controls inside it.
+        if (e.target !== e.currentTarget) return;
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
-          handleSelect();
+          toggleSelected();
         }
       }}
     >
@@ -197,67 +130,63 @@ function DroppableBagCard(props: BagCardProps) {
               ▶
             </span>
           </button>
-          {props.isContainer ? (
+          {props.container ? (
             <span class="flex-shrink-0 text-sm md:text-lg">📦</span>
           ) : props.bag ? (
             <div
               class="h-2.5 w-2.5 flex-shrink-0 rounded-full md:h-4 md:w-4"
-              style={{ 'background-color': bagColor() }}
+              style={{ 'background-color': props.bag.color || '#6b7280' }}
             />
           ) : (
             <span class="flex-shrink-0 text-sm md:text-lg">📋</span>
           )}
           {/* Desktop: bag name inline with icons */}
           <span class="hidden min-w-0 flex-1 truncate text-base leading-normal font-semibold text-gray-900 md:inline">
-            {bagName()}
+            {name()}
           </span>
-          <Show when={props.bag && !props.isContainer}>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowReplace(true);
-              }}
-              class="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full text-gray-400 hover:bg-gray-200 hover:text-gray-600 md:h-6 md:w-6"
-              title="Replace this bag"
-            >
-              <SwitchBagIcon class="h-3 w-3 md:h-3.5 md:w-3.5" />
-            </button>
-            <Show when={showReplace()}>
-              <ReplaceBagModal
-                tripId={props.tripId}
-                currentBag={props.bag!}
-                tripBags={props.allBags?.()}
-                onClose={() => setShowReplace(false)}
-                onReplaced={() => props.onBagReplaced?.()}
-              />
-            </Show>
+          <Show when={!props.container && props.bag}>
+            {(bag) => (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  props.onReplaceBag(bag());
+                }}
+                class="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full text-gray-400 hover:bg-gray-200 hover:text-gray-600 md:h-6 md:w-6"
+                title="Replace this bag"
+              >
+                <SwitchBagIcon class="h-3 w-3 md:h-3.5 md:w-3.5" />
+              </button>
+            )}
           </Show>
         </div>
         <span class="flex-shrink-0 text-[10px] text-gray-500 md:text-sm">
-          {packedItems()}/{totalItems()}
+          {stats().packed}/{stats().total}
         </span>
       </div>
 
       {/* Mobile: bag name on its own full-width row below the icons */}
       <div class="mt-0.5 text-sm leading-tight font-semibold break-words text-gray-900 md:hidden">
-        {bagName()}
+        {name()}
       </div>
 
       {/* Category Summary - hidden on mobile */}
-      <Show when={categorySummary().length > 0}>
+      <Show
+        when={groupedByCategory().length > 0}
+        fallback={
+          <div class="mt-1 text-center text-xs text-gray-400 italic md:text-sm">
+            Drop items here
+          </div>
+        }
+      >
         <div class="mt-1 hidden flex-wrap gap-x-3 gap-y-1 text-sm text-gray-600 md:flex">
-          <For each={categorySummary()}>
-            {([category, count]) => (
+          <For each={groupedByCategory()}>
+            {([category, items]) => (
               <span>
-                {category}: <span class="font-medium">{count}</span>
+                {category}: <span class="font-medium">{items.length}</span>
               </span>
             )}
           </For>
         </div>
-      </Show>
-      {/* Simpler fallback for mobile */}
-      <Show when={categorySummary().length === 0}>
-        <div class="mt-1 text-center text-xs text-gray-400 italic md:text-sm">Drop items here</div>
       </Show>
 
       {/* Expanded Contents */}
@@ -287,27 +216,25 @@ function DroppableBagCard(props: BagCardProps) {
       </Show>
 
       {/* Containers within this bag */}
-      <Show when={!props.isContainer && props.containers.length > 0}>
+      <Show when={props.containers.length > 0}>
         <div class="mt-1 space-y-1 md:mt-3 md:space-y-2">
           <For each={props.containers}>
-            {(container) => {
-              const containerId = `add-mode-container-${container.id}`;
-              return (
-                <DroppableBagCard
-                  tripId={props.tripId}
-                  bag={props.bag}
-                  bagId={props.bagId}
-                  items={props.items}
-                  containers={[]}
-                  isContainer
-                  containerId={container.id}
-                  isExpanded={props.expandedCardId?.() === containerId}
-                  onToggleExpand={() => props.onSetExpandedCardId?.(containerId)}
-                  selectedTarget={props.selectedTarget}
-                  onSelectTarget={props.onSelectTarget}
-                />
-              );
-            }}
+            {(container) => (
+              <DroppableBagCard
+                bag={props.bag}
+                container={container}
+                items={props.contentsOf(container.id)}
+                containers={[]}
+                contentsOf={props.contentsOf}
+                isExpanded={props.expandedCardId() === containerCardId(container.id)}
+                onToggleExpand={() => props.onToggleExpandCard(containerCardId(container.id))}
+                expandedCardId={props.expandedCardId}
+                onToggleExpandCard={props.onToggleExpandCard}
+                onReplaceBag={props.onReplaceBag}
+                selectedTarget={props.selectedTarget}
+                onSelectTarget={props.onSelectTarget}
+              />
+            )}
           </For>
         </div>
       </Show>
@@ -316,39 +243,16 @@ function DroppableBagCard(props: BagCardProps) {
 }
 
 export function AddModeBagCards(props: AddModeBagCardsProps) {
-  // Track which bag/container is expanded (accordion behavior)
+  // Accordion: at most one bag or container card is expanded
   const [expandedCardId, setExpandedCardId] = createSignal<string | null>(null);
-
-  const toggleExpand = (cardId: string) => {
+  const toggleExpand = (cardId: string) =>
     setExpandedCardId((prev) => (prev === cardId ? null : cardId));
-  };
 
-  // Get containers for each bag
-  const containersByBag = createMemo(() => {
-    const items = props.items() || [];
-    const map = new Map<string | null, TripItem[]>();
+  const placement = createMemo(() => placeItems(props.items() ?? [], props.bags() ?? []));
+  const contentsOf = (containerId: string) => placement().byContainer.get(containerId) ?? [];
 
-    items
-      .filter((item) => item.is_container)
-      .forEach((container) => {
-        const bagId = container.bag_id;
-        if (!map.has(bagId)) {
-          map.set(bagId, []);
-        }
-        map.get(bagId)!.push(container);
-      });
-
-    return map;
-  });
-
-  // Sort bags alphabetically, "No Bag" at end
-  const sortedBags = createMemo(() => {
-    const bags = props.bags() || [];
-    return [...bags].sort((a, b) => a.name.localeCompare(b.name));
-  });
-
-  // Create a stable accessor for items
-  const allItems = () => props.items() || [];
+  // Bags alphabetically, then "not in a bag"
+  const cards = createMemo((): (Bag | null)[] => [...[...(props.bags() ?? [])].sort(byName), null]);
 
   return (
     <div class="space-y-1.5 md:space-y-3">
@@ -356,49 +260,28 @@ export function AddModeBagCards(props: AddModeBagCardsProps) {
         Drop items into bags, or click bag then +
       </h3>
 
-      {/* Regular bags */}
-      <For each={sortedBags()}>
+      <For each={cards()}>
         {(bag) => {
-          const cardId = `add-mode-bag-${bag.id}`;
+          const bagItems = () => placement().byBag.get(bag?.id ?? null) ?? [];
           return (
             <DroppableBagCard
-              tripId={props.tripId}
               bag={bag}
-              bagId={bag.id}
-              items={allItems}
-              containers={containersByBag().get(bag.id) || []}
-              isExpanded={expandedCardId() === cardId}
-              onToggleExpand={() => toggleExpand(cardId)}
-              onBagReplaced={props.onBagReplaced}
-              allBags={props.bags}
+              items={bagItems()}
+              containers={bagItems()
+                .filter((item) => item.is_container)
+                .sort(byName)}
+              contentsOf={contentsOf}
+              isExpanded={expandedCardId() === bagCardId(bag?.id ?? null)}
+              onToggleExpand={() => toggleExpand(bagCardId(bag?.id ?? null))}
               expandedCardId={expandedCardId}
-              onSetExpandedCardId={(id) => toggleExpand(id)}
+              onToggleExpandCard={toggleExpand}
+              onReplaceBag={props.onReplaceBag}
               selectedTarget={props.selectedTarget}
               onSelectTarget={props.onSelectTarget}
             />
           );
         }}
       </For>
-
-      {/* No Bag section */}
-      {(() => {
-        const cardId = 'add-mode-bag-none';
-        return (
-          <DroppableBagCard
-            tripId={props.tripId}
-            bag={null}
-            bagId={null}
-            items={allItems}
-            containers={containersByBag().get(null) || []}
-            isExpanded={expandedCardId() === cardId}
-            onToggleExpand={() => toggleExpand(cardId)}
-            expandedCardId={expandedCardId}
-            onSetExpandedCardId={(id) => toggleExpand(id)}
-            selectedTarget={props.selectedTarget}
-            onSelectTarget={props.onSelectTarget}
-          />
-        );
-      })()}
     </div>
   );
 }

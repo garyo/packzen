@@ -5,9 +5,10 @@
  * Extracted from PackingPage for better separation of concerns
  */
 
-import { For, Show, createSignal, createMemo, type Accessor } from 'solid-js';
+import { For, Show, createMemo, type Accessor } from 'solid-js';
 import type { Bag, Category, TripItem } from '../../lib/types';
-import { Button } from '../ui/Button';
+import { NO_BAG_LABEL } from '../../lib/vocabulary';
+import { confirmDialog } from '../ui/ConfirmDialog';
 
 // Distinct sentinel for the "Choose..." placeholder so it never collides with the
 // "No bag"/"No container"/"No category" clear option, which uses value="".
@@ -27,7 +28,17 @@ interface SelectModeActionBarProps {
 }
 
 export function SelectModeActionBar(props: SelectModeActionBarProps) {
-  const [showDeleteConfirm, setShowDeleteConfirm] = createSignal(false);
+  const itemsLabel = () => `${props.selectedCount()} item${props.selectedCount() !== 1 ? 's' : ''}`;
+
+  const confirmDelete = async () => {
+    const confirmed = await confirmDialog({
+      title: `Delete ${itemsLabel()}?`,
+      message: 'Containers are deleted with their contents. You can undo this afterward.',
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (confirmed) props.onDeleteAll();
+  };
 
   // Sort categories alphabetically
   const sortedCategories = createMemo(() => {
@@ -39,9 +50,7 @@ export function SelectModeActionBar(props: SelectModeActionBarProps) {
     <div class="fixed right-0 bottom-0 left-0 z-20 border-t-2 border-gray-200 bg-white shadow-lg">
       <div class="container mx-auto px-4 py-3">
         <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <span class="font-medium text-gray-900">
-            {props.selectedCount()} item{props.selectedCount() !== 1 ? 's' : ''} selected
-          </span>
+          <span class="font-medium text-gray-900">{itemsLabel()} selected</span>
 
           <div class="flex flex-wrap items-center gap-2 md:gap-3">
             {/* Assign to Bag */}
@@ -55,7 +64,7 @@ export function SelectModeActionBar(props: SelectModeActionBarProps) {
                 class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
               >
                 <option value={PLACEHOLDER}>Choose...</option>
-                <option value="">No bag</option>
+                <option value="">{NO_BAG_LABEL}</option>
                 <For each={props.bags()}>{(bag) => <option value={bag.id}>{bag.name}</option>}</For>
               </select>
             </div>
@@ -114,7 +123,7 @@ export function SelectModeActionBar(props: SelectModeActionBarProps) {
 
             {/* Delete All Button */}
             <button
-              onClick={() => setShowDeleteConfirm(true)}
+              onClick={confirmDelete}
               class="rounded-lg border border-red-300 bg-red-50 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-100"
             >
               Delete All
@@ -122,38 +131,6 @@ export function SelectModeActionBar(props: SelectModeActionBarProps) {
           </div>
         </div>
       </div>
-
-      {/* Delete confirmation dialog */}
-      <Show when={showDeleteConfirm()}>
-        <div class="bg-opacity-50 fixed inset-0 z-50 flex items-center justify-center bg-black p-4">
-          <div class="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
-            <h3 class="mb-4 text-lg font-semibold text-gray-900">Delete Selected Items?</h3>
-            <p class="mb-6 text-sm text-gray-600">
-              Are you sure you want to delete {props.selectedCount()} selected item
-              {props.selectedCount() !== 1 ? 's' : ''}? This action cannot be undone.
-            </p>
-            <div class="flex gap-3">
-              <Button
-                onClick={() => {
-                  props.onDeleteAll();
-                  setShowDeleteConfirm(false);
-                }}
-                variant="secondary"
-                class="flex-1 justify-center bg-red-50 text-red-600 hover:bg-red-100"
-              >
-                Delete All
-              </Button>
-              <Button
-                onClick={() => setShowDeleteConfirm(false)}
-                variant="secondary"
-                class="flex-1 justify-center"
-              >
-                Cancel
-              </Button>
-            </div>
-          </div>
-        </div>
-      </Show>
     </div>
   );
 }

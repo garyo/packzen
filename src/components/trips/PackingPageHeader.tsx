@@ -7,25 +7,17 @@
 
 import { Show, type Accessor, onMount, onCleanup, createEffect, createSignal } from 'solid-js';
 import type { Trip } from '../../lib/types';
+import { packingProgress, type PackingStats } from '../../lib/packing-stats';
 import { Button } from '../ui/Button';
-import {
-  HomeIcon,
-  ChevronLeftIcon,
-  EditIcon,
-  SearchIcon,
-  MoreVerticalIcon,
-  PrinterIcon,
-} from '../ui/Icons';
+import { ChevronLeftIcon, EditIcon, SearchIcon, MoreVerticalIcon, PrinterIcon } from '../ui/Icons';
 import { formatDateRange } from '../../lib/utils';
 
 interface PackingPageHeaderProps {
   trip: Accessor<Trip | null | undefined>;
-  packedCount: Accessor<number>;
-  skippedCount: Accessor<number>;
-  totalCount: Accessor<number>;
-  unpackedCount: Accessor<number>;
+  stats: Accessor<PackingStats>;
+  /** All items on the list, for the search result count. */
+  itemCount: Accessor<number>;
   visibleItemCount: Accessor<number>;
-  progress: Accessor<number>;
   selectMode: Accessor<boolean>;
   sortBy: Accessor<'bag' | 'category'>;
   viewMode: Accessor<'pack' | 'add'>;
@@ -147,18 +139,11 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
           {/* Title row */}
           <div class="flex min-w-0 flex-1 items-center gap-2 [@media(max-height:500px)]:min-w-[16rem]">
             <a
-              href="/dashboard"
-              class="flex flex-shrink-0 items-center text-gray-600 hover:text-gray-900"
-              title="Home"
-            >
-              <HomeIcon class="h-6 w-6 lg:h-5 lg:w-5" />
-            </a>
-            <a
               href="/trips"
               class="flex flex-shrink-0 items-center text-gray-600 hover:text-gray-900"
               title="Back to Trips"
             >
-              <ChevronLeftIcon class="h-5 w-5 lg:h-4 lg:w-4" />
+              <ChevronLeftIcon class="h-6 w-6 lg:h-5 lg:w-5" />
             </a>
             <div class="min-w-0 flex-1">
               <div class="flex items-center">
@@ -183,11 +168,11 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
                 when={props.showUnpackedOnly() && props.viewMode() === 'pack'}
                 fallback={
                   <p class="text-xs text-gray-600">
-                    {props.packedCount()} of {props.totalCount() - props.skippedCount()} packed
-                    <Show when={props.skippedCount() > 0}>
-                      <span class="text-gray-500"> · {props.skippedCount()} skipped</span>
+                    {props.stats().packed} of {props.stats().total} packed
+                    <Show when={props.stats().skipped > 0}>
+                      <span class="text-gray-500"> · {props.stats().skipped} skipped</span>
                     </Show>
-                    <Show when={props.unpackedCount() > 0 && props.viewMode() === 'pack'}>
+                    <Show when={props.stats().remaining > 0 && props.viewMode() === 'pack'}>
                       {' · '}
                       <button
                         type="button"
@@ -195,7 +180,7 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
                         class="btn-compact text-blue-600 hover:text-blue-800 hover:underline"
                         title="Click to show only unpacked items"
                       >
-                        {props.unpackedCount()} left to pack
+                        {props.stats().remaining} left to pack
                       </button>
                     </Show>
                   </p>
@@ -207,7 +192,7 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
                     class="rounded bg-blue-100 px-1.5 py-0.5 text-blue-700 hover:bg-blue-200"
                     title="Click to show all items"
                   >
-                    Showing {props.unpackedCount()} unpacked ✕
+                    Showing {props.stats().remaining} unpacked ✕
                   </button>
                 </p>
               </Show>
@@ -263,7 +248,7 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
                         </div>
                         <p class="mt-1 min-h-[1rem] text-[11px] text-gray-500">
                           {props.searchQuery().trim().length > 0
-                            ? `${props.visibleItemCount()} of ${props.totalCount()}`
+                            ? `${props.visibleItemCount()} of ${props.itemCount()}`
                             : '\u00A0'}
                         </p>
                       </div>
@@ -421,7 +406,7 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
         <div class="h-3 w-full rounded-full bg-gray-200">
           <div
             class="h-3 rounded-full bg-green-600 transition-all duration-300"
-            style={{ width: `${props.progress()}%` }}
+            style={{ width: `${packingProgress(props.stats())}%` }}
           />
         </div>
       </div>

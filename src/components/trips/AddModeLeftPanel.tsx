@@ -8,13 +8,13 @@
 import { createSignal, Show, For, createMemo, type Accessor } from 'solid-js';
 import { createDraggable } from '@thisbeyond/solid-dnd';
 import type {
+  BuiltInItem,
   TripItem,
-  Category,
   MasterItemWithCategory,
   SelectedBuiltInItem,
 } from '../../lib/types';
 import { builtInItems, getItemsByTripTypes } from '../../lib/built-in-items';
-import type { SourceItemDragData, SelectedTarget } from './AddModeView';
+import type { SourceItemDragData } from './AddModeView';
 import { TrashIcon, PlusIcon } from '../ui/Icons';
 
 interface AddModeLeftPanelProps {
@@ -22,16 +22,31 @@ interface AddModeLeftPanelProps {
   onTabChange: (tab: 'my-items' | 'built-in') => void;
   items: Accessor<TripItem[] | undefined>;
   masterItems: Accessor<MasterItemWithCategory[] | undefined>;
-  categories: Accessor<Category[] | undefined>;
-  onRemoveFromTrip?: (tripItemId: string) => void;
-  onAddNewItem?: () => void;
-  isDragging?: Accessor<boolean>;
-  // For click-to-add (bag or container selection)
-  selectedTarget?: Accessor<SelectedTarget | undefined>;
-  onAddToSelectedBag?: (dragData: SourceItemDragData) => void;
+  onRemoveFromTrip: (tripItemId: string) => void;
+  onAddNewItem: () => void;
+  isDragging: Accessor<boolean>;
+  // Click-to-add needs a selected bag or container
+  hasTarget: Accessor<boolean>;
+  onAdd: (item: SelectedBuiltInItem) => void;
   // Bulk-add a category of suggestions (items not yet in the trip)
-  onAddAllBuiltIn?: (items: SelectedBuiltInItem[]) => void;
+  onAddAll: (items: SelectedBuiltInItem[]) => void;
 }
+
+const fromMasterItem = (item: MasterItemWithCategory): SelectedBuiltInItem => ({
+  name: item.name,
+  description: item.description,
+  category: item.category_name ?? '',
+  quantity: item.default_quantity,
+  is_container: item.is_container,
+});
+
+const fromBuiltInItem = (item: BuiltInItem): SelectedBuiltInItem => ({
+  name: item.name,
+  description: item.description,
+  category: item.category,
+  quantity: item.default_quantity,
+  is_container: item.is_container,
+});
 
 interface DraggableItemProps {
   id: string;
@@ -44,10 +59,10 @@ interface DraggableItemProps {
   isContainer?: boolean;
   tripItemId?: string; // ID of the trip item (for removal)
   dragData: SourceItemDragData;
-  onRemove?: (tripItemId: string) => void;
+  onRemove: (tripItemId: string) => void;
   // For click-to-add
-  canClickToAdd?: boolean;
-  onClickAdd?: () => void;
+  canClickToAdd: boolean;
+  onClickAdd: () => void;
 }
 
 function DraggableSourceItem(props: DraggableItemProps) {
@@ -67,11 +82,11 @@ function DraggableSourceItem(props: DraggableItemProps) {
       <Show
         when={!props.isInTrip}
         fallback={
-          props.onRemove && props.tripItemId ? (
+          props.tripItemId ? (
             <button
               type="button"
               class="btn-compact flex h-5 w-7 cursor-pointer items-center justify-center rounded text-gray-400 hover:bg-red-100 hover:text-red-600"
-              onClick={() => props.onRemove!(props.tripItemId!)}
+              onClick={() => props.onRemove(props.tripItemId!)}
               title="Remove from trip"
             >
               <TrashIcon class="h-4 w-4" />
@@ -135,7 +150,7 @@ function DraggableSourceItem(props: DraggableItemProps) {
           class="ml-1 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-green-500 text-white hover:bg-green-600 md:h-6 md:w-6"
           onClick={(e) => {
             e.stopPropagation();
-            props.onClickAdd?.();
+            props.onClickAdd();
           }}
           title="Add to selected bag"
         >
@@ -161,83 +176,29 @@ export function AddModeLeftPanel(props: AddModeLeftPanelProps) {
   };
   const [manuallyExpanded, setManuallyExpanded] = createSignal<Set<string>>(loadExpanded());
 
-  // Get set of master item IDs already in trip
-  const tripMasterItemIds = createMemo(() => {
-    const items = props.items() || [];
-    const ids = new Set<string>();
-    items.forEach((item) => {
-      if (item.master_item_id) {
-        ids.add(item.master_item_id);
+  // First trip item for each master_item_id and for each lowercased name
+  // (first match wins, like items.find()).
+  const tripItemLookups = createMemo(() => {
+    const byMasterItemId = new Map<string, TripItem>();
+    const byName = new Map<string, TripItem>();
+    for (const item of props.items() ?? []) {
+      if (item.master_item_id && !byMasterItemId.has(item.master_item_id)) {
+        byMasterItemId.set(item.master_item_id, item);
       }
-    });
-    return ids;
-  });
-
-  // Get set of item names already in trip (for matching by name)
-  const tripItemNames = createMemo(() => {
-    const items = props.items() || [];
-    return new Set(items.map((item) => item.name.toLowerCase()));
-  });
-
-  // First trip item for each master_item_id (mirrors items.find() first-match order)
-  const tripItemsByMasterItemId = createMemo(() => {
-    const items = props.items() || [];
-    const map = new Map<string, TripItem>();
-    for (const item of items) {
-      if (item.master_item_id && !map.has(item.master_item_id)) {
-        map.set(item.master_item_id, item);
-      }
-    }
-    return map;
-  });
-
-  // First trip item for each normalized name (mirrors items.find() first-match order)
-  const tripItemsByName = createMemo(() => {
-    const items = props.items() || [];
-    const map = new Map<string, TripItem>();
-    for (const item of items) {
       const key = item.name.toLowerCase();
-      if (!map.has(key)) {
-        map.set(key, item);
-      }
+      if (!byName.has(key)) byName.set(key, item);
     }
-    return map;
+    return { byMasterItemId, byName };
   });
 
-  // Check if an item is already in trip
-  // For master items: check by master_item_id first, then fallback to name match
-  // For built-in items: check by name
-  const isItemInTrip = (itemId: string, itemName: string, sourceType: 'master' | 'built-in') => {
-    // First check by master_item_id if provided
-    if (sourceType === 'master' && itemId && tripMasterItemIds().has(itemId)) {
-      return true;
-    }
-    // Fallback: check by name (handles items added without master_item_id link)
-    return tripItemNames().has(itemName.toLowerCase());
-  };
-
-  // Get packed status for an item
-  const isItemPacked = (itemId: string, itemName: string, sourceType: 'master' | 'built-in') => {
-    if (sourceType === 'master') {
-      const tripItem = tripItemsByMasterItemId().get(itemId);
-      return tripItem?.is_packed ?? false;
-    } else {
-      const tripItem = tripItemsByName().get(itemName.toLowerCase());
-      return tripItem?.is_packed ?? false;
-    }
-  };
-
-  // Get the trip item ID for an item (to enable removal)
-  // Check by master_item_id first, then fall back to name matching
-  const getTripItemId = (itemId: string, itemName: string, sourceType: 'master' | 'built-in') => {
-    if (sourceType === 'master' && itemId) {
-      // First try by master_item_id
-      const tripItemById = tripItemsByMasterItemId().get(itemId);
-      if (tripItemById) return tripItemById.id;
-    }
-    // Fallback: find by name (handles items added without master_item_id link)
-    const tripItemByName = tripItemsByName().get(itemName.toLowerCase());
-    return tripItemByName?.id;
+  // The trip item for a source item: by master item id when there is one,
+  // else by name (which also catches items added without a master item link).
+  const findTripItem = (name: string, masterItemId?: string) => {
+    const { byMasterItemId, byName } = tripItemLookups();
+    return (
+      (masterItemId ? byMasterItemId.get(masterItemId) : undefined) ??
+      byName.get(name.toLowerCase())
+    );
   };
 
   // Group master items by category
@@ -326,18 +287,6 @@ export function AddModeLeftPanel(props: AddModeLeftPanelProps) {
     return manuallyExpanded().has(category);
   };
 
-  // Trip types from built-in-items.yaml
-  const tripTypes = [
-    { id: 'overnight', label: 'Overnight' },
-    { id: 'weekend', label: 'Weekend' },
-    { id: 'week', label: 'Week-long' },
-    { id: 'business', label: 'Business' },
-    { id: 'beach', label: 'Beach' },
-    { id: 'hiking', label: 'Hiking' },
-    { id: 'ski', label: 'Ski' },
-    { id: 'international', label: 'International' },
-  ];
-
   const toggleTripType = (type: string) => {
     setSelectedTripTypes((prev) => {
       const next = new Set(prev);
@@ -385,22 +334,20 @@ export function AddModeLeftPanel(props: AddModeLeftPanelProps) {
           onInput={(e) => setSearchQuery(e.currentTarget.value)}
           class="flex-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none md:px-3 md:py-2"
         />
-        <Show when={props.onAddNewItem}>
-          <button
-            type="button"
-            onClick={props.onAddNewItem}
-            class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-blue-600 text-white hover:bg-blue-700 md:h-9 md:w-9"
-            title="Add new item"
-          >
-            <PlusIcon class="h-4 w-4 md:h-5 md:w-5" />
-          </button>
-        </Show>
+        <button
+          type="button"
+          onClick={props.onAddNewItem}
+          class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-blue-600 text-white hover:bg-blue-700 md:h-9 md:w-9"
+          title="Add new item"
+        >
+          <PlusIcon class="h-4 w-4 md:h-5 md:w-5" />
+        </button>
       </div>
 
       {/* Trip Type Filters (built-in tab only) */}
       <Show when={props.activeTab() === 'built-in'}>
         <div class="flex flex-wrap gap-1 border-b border-gray-200 p-2 md:p-3">
-          <For each={tripTypes}>
+          <For each={builtInItems.trip_types}>
             {(type) => (
               <button
                 class="rounded-full px-2 py-1 text-xs transition-colors"
@@ -410,7 +357,7 @@ export function AddModeLeftPanel(props: AddModeLeftPanelProps) {
                 }}
                 onClick={() => toggleTripType(type.id)}
               >
-                {type.label}
+                {type.name}
               </button>
             )}
           </For>
@@ -421,8 +368,8 @@ export function AddModeLeftPanel(props: AddModeLeftPanelProps) {
       <div
         class="flex-1 p-1 md:p-2"
         classList={{
-          'overflow-y-auto': !props.isDragging?.(),
-          'overflow-hidden': props.isDragging?.(),
+          'overflow-y-auto': !props.isDragging(),
+          'overflow-hidden': props.isDragging(),
         }}
       >
         <Show when={props.activeTab() === 'my-items'}>
@@ -455,11 +402,8 @@ export function AddModeLeftPanel(props: AddModeLeftPanelProps) {
                     <div class="ml-1">
                       <For each={items}>
                         {(item) => {
-                          const dragData: SourceItemDragData = {
-                            type: 'source-item',
-                            sourceType: 'master',
-                            masterItem: item,
-                          };
+                          const source = fromMasterItem(item);
+                          const tripItem = () => findTripItem(item.name, item.id);
                           return (
                             <DraggableSourceItem
                               id={`master-${item.id}`}
@@ -467,14 +411,14 @@ export function AddModeLeftPanel(props: AddModeLeftPanelProps) {
                               category={item.category_name || 'Uncategorized'}
                               quantity={item.default_quantity}
                               description={item.description}
-                              isInTrip={isItemInTrip(item.id, item.name, 'master')}
-                              isPacked={isItemPacked(item.id, item.name, 'master')}
+                              isInTrip={!!tripItem()}
+                              isPacked={tripItem()?.is_packed ?? false}
                               isContainer={item.is_container}
-                              tripItemId={getTripItemId(item.id, item.name, 'master')}
+                              tripItemId={tripItem()?.id}
                               onRemove={props.onRemoveFromTrip}
-                              dragData={dragData}
-                              canClickToAdd={props.selectedTarget?.() !== undefined}
-                              onClickAdd={() => props.onAddToSelectedBag?.(dragData)}
+                              dragData={{ type: 'source-item', item: source }}
+                              canClickToAdd={props.hasTarget()}
+                              onClickAdd={() => props.onAdd(source)}
                             />
                           );
                         }}
@@ -499,8 +443,7 @@ export function AddModeLeftPanel(props: AddModeLeftPanelProps) {
           >
             <For each={filteredBuiltInItems()}>
               {([category, items]) => {
-                const addableItems = () =>
-                  items.filter((item) => !isItemInTrip('', item.name, 'built-in'));
+                const addableItems = () => items.filter((item) => !findTripItem(item.name));
                 return (
                   <div class="mb-2">
                     <div class="flex items-center gap-1">
@@ -517,21 +460,11 @@ export function AddModeLeftPanel(props: AddModeLeftPanelProps) {
                         {category}
                         <span class="text-xs font-normal text-gray-500">({items.length})</span>
                       </button>
-                      <Show when={props.onAddAllBuiltIn && addableItems().length > 0}>
+                      <Show when={addableItems().length > 0}>
                         <button
                           type="button"
                           class="flex-shrink-0 rounded-md px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50"
-                          onClick={() =>
-                            props.onAddAllBuiltIn!(
-                              addableItems().map((item) => ({
-                                name: item.name,
-                                description: item.description,
-                                category: item.category,
-                                quantity: item.default_quantity,
-                                is_container: item.is_container,
-                              }))
-                            )
-                          }
+                          onClick={() => props.onAddAll(addableItems().map(fromBuiltInItem))}
                           title={`Add all ${category} items not yet on this trip`}
                         >
                           Add all ({addableItems().length})
@@ -542,17 +475,8 @@ export function AddModeLeftPanel(props: AddModeLeftPanelProps) {
                       <div class="ml-2">
                         <For each={items}>
                           {(item) => {
-                            const dragData: SourceItemDragData = {
-                              type: 'source-item',
-                              sourceType: 'built-in',
-                              builtInItem: {
-                                name: item.name,
-                                description: item.description,
-                                category: item.category,
-                                quantity: item.default_quantity,
-                                is_container: item.is_container,
-                              },
-                            };
+                            const source = fromBuiltInItem(item);
+                            const tripItem = () => findTripItem(item.name);
                             return (
                               <DraggableSourceItem
                                 id={`built-in-${item.name}`}
@@ -560,14 +484,14 @@ export function AddModeLeftPanel(props: AddModeLeftPanelProps) {
                                 category={item.category}
                                 quantity={item.default_quantity}
                                 description={item.description}
-                                isInTrip={isItemInTrip('', item.name, 'built-in')}
-                                isPacked={isItemPacked('', item.name, 'built-in')}
+                                isInTrip={!!tripItem()}
+                                isPacked={tripItem()?.is_packed ?? false}
                                 isContainer={item.is_container}
-                                tripItemId={getTripItemId('', item.name, 'built-in')}
+                                tripItemId={tripItem()?.id}
                                 onRemove={props.onRemoveFromTrip}
-                                dragData={dragData}
-                                canClickToAdd={props.selectedTarget?.() !== undefined}
-                                onClickAdd={() => props.onAddToSelectedBag?.(dragData)}
+                                dragData={{ type: 'source-item', item: source }}
+                                canClickToAdd={props.hasTarget()}
+                                onClickAdd={() => props.onAdd(source)}
                               />
                             );
                           }}
