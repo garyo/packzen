@@ -90,7 +90,7 @@ export function Toast() {
       {/* Wrapper stays mounted (even with no toasts) so each toast's live region
           is present in the DOM at the moment it's inserted, rather than the
           whole region appearing and disappearing with the toast list. */}
-      <div class="fixed right-4 bottom-4 z-[60] flex max-w-[calc(100vw-2rem)] flex-col items-stretch md:max-w-sm">
+      <div class="fixed right-4 bottom-[calc(1rem+var(--app-nav-height,0px))] z-[60] flex max-w-[calc(100vw-2rem)] flex-col items-stretch md:max-w-sm">
         <For each={toasts().slice(-3)}>
           {(toast) => (
             <div

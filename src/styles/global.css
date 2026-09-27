@@ -16,6 +16,18 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Room for the fixed app nav (AppNav) on pages that mount it. Toasts read
+   --app-nav-height too, to stay above the nav. */
+body:has(#app-nav) {
+  --app-nav-height: calc(4rem + env(safe-area-inset-bottom));
+  padding-bottom: var(--app-nav-height);
+}
+@media (min-width: 48rem) {
+  body:has(#app-nav) {
+    --app-nav-height: 5rem;
+  }
+}
+
 /* Ensure minimum touch target size (44x44px) */
 /* Add class="btn-compact" to opt out */
 button:not(.btn-compact),

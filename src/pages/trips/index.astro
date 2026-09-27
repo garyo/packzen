@@ -1,28 +1,12 @@
 ---
-import BaseLayout from '../../layouts/BaseLayout.astro';
+import AppLayout from '../../layouts/AppLayout.astro';
 ---
 
-<BaseLayout title="Trips - PackZen">
-  <div id="app-root"></div>
-</BaseLayout>
+<AppLayout title="Trips - PackZen" nav />
 
 <script>
-  import { render } from 'solid-js/web';
   import { TripsPage } from '../../components/trips/TripsPage';
-  import { isSignedIn } from '../../lib/clerk';
+  import { mountApp } from '../../components/nav/mountApp';
 
-  // Client-side auth gate (static output, so no server guard). Waits for Clerk
-  // to load, then either redirects to sign-in or mounts the app.
-  (async () => {
-    if (!(await isSignedIn())) {
-      const path = window.location.pathname + window.location.search;
-      window.location.replace(`/sign-in?redirect_url=${encodeURIComponent(path)}`);
-      return;
-    }
-
-    const root = document.getElementById('app-root');
-    if (root) {
-      render(TripsPage, root);
-    }
-  })();
+  mountApp(TripsPage);
 </script>

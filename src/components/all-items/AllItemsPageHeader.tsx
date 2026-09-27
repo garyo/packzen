@@ -153,38 +153,13 @@ export function AllItemsPageHeader(props: AllItemsPageHeaderProps) {
         {/* Two-row layout on mobile, single row on desktop */}
         <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           {/* Title row */}
-          <div class="flex min-w-0 flex-1 items-center gap-2">
-            <a
-              href="/dashboard"
-              class="flex flex-shrink-0 items-center text-gray-600 hover:text-gray-900"
-              title="Home"
-            >
-              <svg
-                class="h-6 w-6 md:h-5 md:w-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
-                />
-              </svg>
-            </a>
-            <div class="min-w-0 flex-1">
-              <h1 class="truncate text-xl font-bold text-gray-900 md:text-lg">My Items</h1>
-              <p class="text-xs text-gray-600">My reusable packing essentials, for all trips</p>
-            </div>
+          <div class="min-w-0 flex-1">
+            <h1 class="truncate text-xl font-bold text-gray-900 md:text-lg">My Items</h1>
+            <p class="text-xs text-gray-600">My reusable packing essentials, for all trips</p>
           </div>
 
           {/* Buttons row */}
           <div class="flex flex-shrink-0 gap-2">
-            <Button variant="secondary" size="sm" onClick={() => (window.location.href = '/trips')}>
-              Create/View Trips
-            </Button>
-
             {/* Browse Item Templates button */}
             <Button variant="secondary" size="sm" onClick={props.onBrowseTemplates}>
               Browse Suggestions

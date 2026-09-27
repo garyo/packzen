@@ -1,0 +1,41 @@
+---
+/**
+ * Layout for signed-in app pages. The page's script calls `mountApp()`
+ * (components/nav/mountApp.ts), which replaces the spinner in #app-root with
+ * the app once Clerk confirms a session, or reveals #app-load-error if Clerk
+ * never loads. Slot content, if any, replaces the spinner and is kept as is.
+ */
+import type { HTMLAttributes } from 'astro/types';
+import BaseLayout from './BaseLayout.astro';
+
+interface Props extends HTMLAttributes<'div'> {
+  title: string;
+  /** Mount the app nav (Trips · My Items · Account). */
+  nav?: boolean;
+}
+
+const { title, nav = false, ...rootAttrs } = Astro.props;
+---
+
+<BaseLayout title={title}>
+  <div id="app-root" {...rootAttrs}>
+    <slot>
+      <div role="status" class="flex justify-center py-24">
+        <div class="h-12 w-12 animate-spin rounded-full border-b-2 border-blue-600"></div>
+        <span class="sr-only">Loading…</span>
+      </div>
+    </slot>
+  </div>
+  <div id="app-load-error" hidden class="px-4 py-24 text-center">
+    <h1 class="mb-2 text-xl font-semibold text-gray-900">Couldn't load sign-in</h1>
+    <p class="mb-6 text-gray-600">Check your connection (or any content blocker) and try again.</p>
+    <button
+      type="button"
+      onclick="location.reload()"
+      class="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700"
+    >
+      Retry
+    </button>
+  </div>
+  {nav && <div id="app-nav" />}
+</BaseLayout>

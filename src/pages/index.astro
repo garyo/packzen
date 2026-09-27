@@ -2,11 +2,11 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 ---
 
-<BaseLayout title="PackZen - Travel Packing Made Easy">
+<BaseLayout title="PackZen - Travel Packing Made Easy" analytics>
   <!--
     The landing page renders immediately for everyone (good for SEO and for
     visitors where Clerk is slow/blocked — it fails open). Once Clerk loads,
-    signed-in users are redirected to the dashboard.
+    signed-in users are redirected to their trips.
   -->
   <script>
     import { isSignedIn } from '../lib/clerk';
@@ -15,7 +15,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
       try {
         // Use replace to avoid the back button returning to the landing page.
         if (await isSignedIn()) {
-          window.location.replace('/dashboard');
+          window.location.replace('/trips');
         }
       } catch (error) {
         // Fail open — leave the landing page visible.
