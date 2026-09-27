@@ -1,6 +1,7 @@
 /**
- * Adds items from My Items, Suggestions or a starter list to a trip, creating
- * the My Items and categories they need along the way.
+ * Adds items from My Items, Suggestions or a starter list to a trip, saving
+ * every accepted row as a My Item (or linking the existing one) and creating
+ * the categories they need along the way.
  */
 import { api, endpoints } from './api';
 import type {
@@ -207,6 +208,31 @@ export function createTripItemAdder(
     }
     const count = added.length + (createdKit ? 1 : 0);
     showToast('success', `Added ${itemCount(count)}`);
+
+    // Starter items become My Items too, so later trips can reuse them. They
+    // keep their standard quantity; the trip's is scaled to its length.
+    const sources = new Map<string, SelectedBuiltInItem>(
+      starter.map((item) => [
+        item.name.toLowerCase(),
+        {
+          name: item.name,
+          description: item.description,
+          category: item.category,
+          quantity: item.default_quantity,
+          is_container: item.is_container ?? false,
+        },
+      ])
+    );
+    if (createdKit) {
+      sources.set(TOILET_KIT.toLowerCase(), {
+        name: TOILET_KIT,
+        description: null,
+        category: TOILETRY_CATEGORY,
+        quantity: 1,
+        is_container: true,
+      });
+    }
+    await saveAsMyItems(createdKit ? [createdKit, ...added] : added, sources);
     return count;
   }
 
