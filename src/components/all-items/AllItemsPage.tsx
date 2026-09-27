@@ -17,19 +17,7 @@ import { AllItemsPageTabs } from './AllItemsPageTabs';
 import { BuiltInItemsBrowser } from '../built-in-items/BuiltInItemsBrowser';
 import { fetchWithErrorHandling, fetchWithFallback } from '../../lib/resource-helpers';
 import { resolveMasterItems } from '../../lib/item-helpers';
-import { syncManager } from '../../lib/sync-manager';
-
-// Remote changes often arrive in bursts (an import on another device sends
-// one event per row); collapse each burst into a single refetch.
-const SYNC_REFETCH_DELAY_MS = 250;
-
-function coalesced(fn: () => void): () => void {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  return () => {
-    clearTimeout(timer);
-    timer = setTimeout(fn, SYNC_REFETCH_DELAY_MS);
-  };
-}
+import { coalesced, syncManager } from '../../lib/sync-manager';
 
 export function AllItemsPage() {
   const [showBuiltInItems, setShowBuiltInItems] = createSignal(false);

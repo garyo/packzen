@@ -16,6 +16,7 @@ import { builtInItems } from '../../lib/built-in-items';
 import { formatDateRange, getTripStatus } from '../../lib/utils';
 import { fetchWithErrorHandling } from '../../lib/resource-helpers';
 import { deleteTripWithConfirm } from '../../lib/trip-actions';
+import { coalesced, syncManager } from '../../lib/sync-manager';
 
 export function TripsPage() {
   const [showForm, setShowForm] = createSignal(false);
@@ -44,6 +45,16 @@ export function TripsPage() {
     };
     window.addEventListener('pageshow', refetchIfRestored);
     onCleanup(() => window.removeEventListener('pageshow', refetchIfRestored));
+
+    // Trip cards show names, dates, bag counts and packing progress, so any of
+    // these changing on another device refreshes the list. Subscribe before
+    // any await so onCleanup still has an owner.
+    syncManager.connect();
+    onCleanup(() => syncManager.disconnect());
+    const refresh = coalesced(refetch);
+    for (const entity of ['trip', 'bag', 'tripItem']) {
+      onCleanup(syncManager.on(entity, refresh));
+    }
 
     await authStore.initAuth();
 
