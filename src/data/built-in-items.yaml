@@ -1287,13 +1287,13 @@ items:
     description: 'Activity coloring books'
     category: 'Children'
     default_quantity: 2
-    trip_types: ['overnight', 'weekend', 'week', 'business']
+    trip_types: ['overnight', 'weekend', 'week']
 
   - name: 'Crayons/Markers'
     description: 'Coloring supplies'
     category: 'Children'
     default_quantity: 1
-    trip_types: ['overnight', 'weekend', 'week', 'business']
+    trip_types: ['overnight', 'weekend', 'week']
 
   - name: 'Sippy cup'
     description: 'Spill-proof drinking cup'
@@ -1323,13 +1323,13 @@ items:
     description: 'Entertainment for kids'
     category: 'Children'
     default_quantity: 1
-    trip_types: ['overnight', 'weekend', 'week', 'business']
+    trip_types: ['overnight', 'weekend', 'week']
 
   - name: "Kids' headphones"
     description: 'Volume-limited headphones for children'
     category: 'Children'
     default_quantity: 1
-    trip_types: ['overnight', 'weekend', 'week', 'business']
+    trip_types: ['overnight', 'weekend', 'week']
 
   - name: 'Booster seat'
     description: 'Portable booster seat for dining'
