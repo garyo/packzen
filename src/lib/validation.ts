@@ -182,6 +182,7 @@ export const tripItemUpdateSchema = z.object({
   category_name: sanitizeString(MAX_NAME_LENGTH).nullable().optional(),
   quantity: z.number().int().min(MIN_QUANTITY).max(MAX_QUANTITY).optional(),
   bag_id: z.string().uuid().nullable().optional(),
+  master_item_id: z.string().uuid().nullable().optional(),
   is_packed: z.boolean().optional(),
   is_skipped: z.boolean().optional(),
   container_item_id: z.string().uuid().nullable().optional(),
