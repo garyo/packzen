@@ -12,35 +12,40 @@ import { Webhook } from 'svix';
 import { drizzle } from 'drizzle-orm/d1';
 import type { D1Database } from '@cloudflare/workers-types';
 import { deleteAllUserData } from '../../../lib/user-data-cleanup';
+import { runInBackground } from '../../../lib/background';
 
-// Same self-hosted Matomo site as the client snippet in BaseLayout.astro.
-const MATOMO_ENDPOINT = 'https://analytics.oberbrunner.com/matomo.php';
-const MATOMO_SITE_ID = '6';
+// The same featherstat site and collect endpoint as the client tracker in
+// BaseLayout.astro, speaking its native protocol (see its tracker.js).
+const FEATHERSTAT_COLLECT_URL = 'https://analytics.oberbrunner.com/api/collect';
+const FEATHERSTAT_SITE_ID = 6;
+const SIGNUP_PING_TIMEOUT_MS = 5000;
 
 /**
- * Report an account creation to Matomo so signups appear in the same
- * dashboard as the marketing-page funnel. Best-effort: analytics must
- * never fail the webhook. Recorded as an event rather than a pageview,
- * and attributed to this server's IP, not the user's.
+ * Report an account creation to featherstat so signups appear in the same
+ * dashboard as the marketing-page funnel. Recorded as an event rather than a
+ * pageview, and attributed to this server's IP, not the user's. Runs in the
+ * background with a timeout: analytics must never delay or fail the webhook
+ * (a failed webhook is retried by Svix, which would double-count).
  */
-async function reportSignupToMatomo(): Promise<void> {
-  try {
-    const params = new URLSearchParams({
-      idsite: MATOMO_SITE_ID,
-      rec: '1',
-      apiv: '1',
-      url: 'https://packzen.org/sign-up',
-      e_c: 'signup',
-      e_a: 'account-created',
-      send_image: '0',
-    });
-    await fetch(`${MATOMO_ENDPOINT}?${params}`, {
-      method: 'GET',
-      headers: { 'User-Agent': 'PackZen-server/1.0' },
-    });
-  } catch (error) {
-    console.error('Failed to report signup to Matomo:', error);
-  }
+function reportSignup(): void {
+  runInBackground(
+    fetch(FEATHERSTAT_COLLECT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'User-Agent': 'PackZen-server/1.0' },
+      body: JSON.stringify({
+        site: FEATHERSTAT_SITE_ID,
+        hits: [
+          {
+            type: 'event',
+            url: 'https://packzen.org/sign-up',
+            category: 'signup',
+            action: 'account-created',
+          },
+        ],
+      }),
+      signal: AbortSignal.timeout(SIGNUP_PING_TIMEOUT_MS),
+    }).catch((error) => console.error('Failed to report signup to featherstat:', error))
+  );
 }
 
 interface ClerkWebhookEvent {
@@ -126,7 +131,7 @@ export const POST: APIRoute = async (context) => {
     }
 
     if (type === 'user.created') {
-      await reportSignupToMatomo();
+      reportSignup();
       return new Response(JSON.stringify({ success: true, message: 'Signup recorded' }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
