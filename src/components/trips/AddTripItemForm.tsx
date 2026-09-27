@@ -48,7 +48,10 @@ interface AddTripItemFormProps {
 export function AddTripItemForm(props: AddTripItemFormProps) {
   const [name, setName] = createSignal(props.initialName ?? '');
   const [quantity, setQuantity] = createSignal(1);
+  const nameId = createUniqueId();
+  const categoryId = createUniqueId();
   const quantityId = createUniqueId();
+  const locationId = createUniqueId();
   const [category, setCategory] = createSignal<CategoryChoice>('');
   const [location, setLocation] = createSignal<string>('');
   const [isContainer, setIsContainer] = createSignal(false);
@@ -355,6 +358,7 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
 
         // Reset fields (including location to trigger reactivity on restore)
         setName('');
+        setQuantity(1);
         setIsContainer(false);
         setSkipMasterAddition(false);
         setLocation(''); // Clear location so restoration triggers a signal change
@@ -391,8 +395,11 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
     <Modal title="Add Item" onClose={props.onClose} isDirty={() => !!name().trim()}>
       <form ref={formRef} onSubmit={handleAddAnother} class="space-y-4">
         <div>
-          <label class="mb-1 block text-sm font-medium text-gray-700">Item Name</label>
+          <label for={nameId} class="mb-1 block text-sm font-medium text-gray-700">
+            Item Name
+          </label>
           <Combobox
+            id={nameId}
             value={name()}
             onInput={setName}
             onSelect={handleItemSelect}
@@ -406,8 +413,15 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
         </div>
 
         <div>
-          <label class="mb-1 block text-sm font-medium text-gray-700">Category</label>
-          <CategoryPicker categories={categories()} value={category()} onChange={setCategory} />
+          <label for={categoryId} class="mb-1 block text-sm font-medium text-gray-700">
+            Category
+          </label>
+          <CategoryPicker
+            id={categoryId}
+            categories={categories()}
+            value={category()}
+            onChange={setCategory}
+          />
         </div>
 
         <div>
@@ -425,8 +439,11 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
         {/* Combined Bag/Container location (only show if not a container itself) */}
         <Show when={!isContainer()}>
           <div>
-            <label class="mb-1 block text-sm font-medium text-gray-700">Inside Bag/Container</label>
+            <label for={locationId} class="mb-1 block text-sm font-medium text-gray-700">
+              Inside Bag/Container
+            </label>
             <select
+              id={locationId}
               value={location()}
               onChange={(e) => setLocation(e.target.value)}
               class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
@@ -446,33 +463,28 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
           </div>
         </Show>
 
-        {/* Container checkbox */}
-        <div class="flex items-center gap-3">
-          <input
-            type="checkbox"
-            id="is-container-add"
-            checked={isContainer()}
-            onChange={(e) => {
-              setIsContainer(e.currentTarget.checked);
-              if (e.currentTarget.checked && location().startsWith('container:')) {
-                setLocation(''); // Containers can't be inside containers
-              }
-            }}
-            class="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
-          />
-          <label for="is-container-add" class="text-sm font-medium text-gray-700">
+        <div>
+          <label class="flex min-h-11 items-center gap-3 text-sm font-medium text-gray-700">
+            <input
+              type="checkbox"
+              checked={isContainer()}
+              onChange={(e) => {
+                setIsContainer(e.currentTarget.checked);
+                if (e.currentTarget.checked && location().startsWith('container:')) {
+                  setLocation(''); // Containers can't be inside containers
+                }
+              }}
+              class="btn-compact h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
+            />
             This is a container (sub-bag like a toilet kit)
           </label>
-        </div>
-        <div class="flex items-center gap-2">
-          <input
-            type="checkbox"
-            id="skip-master-add"
-            checked={skipMasterAddition()}
-            onChange={(e) => setSkipMasterAddition(e.currentTarget.checked)}
-            class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
-          />
-          <label for="skip-master-add" class="text-sm text-gray-600">
+          <label class="flex min-h-11 items-center gap-3 text-sm text-gray-600">
+            <input
+              type="checkbox"
+              checked={skipMasterAddition()}
+              onChange={(e) => setSkipMasterAddition(e.currentTarget.checked)}
+              class="btn-compact h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
+            />
             Don't add to My Items
           </label>
         </div>
@@ -488,7 +500,9 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
             disabled={saving()}
           >
             <span>Add More</span>
-            <span class="rounded bg-gray-900/10 px-1.5 py-0.5 font-mono text-xs">↵</span>
+            <span class="hidden rounded bg-gray-900/10 px-1.5 py-0.5 font-mono text-xs md:inline">
+              ↵
+            </span>
           </Button>
         </div>
       </form>
