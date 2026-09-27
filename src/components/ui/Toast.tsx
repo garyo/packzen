@@ -41,6 +41,12 @@ const [toasts, setToasts] = createSignal<ToastMessage[]>([]);
  * });
  */
 export function showToast(type: ToastMessage['type'], message: string, options?: ToastOptions) {
+  // Several failures at once (e.g. parallel page loads) show one message.
+  const duplicate = toasts().find(
+    (t) => t.type === type && t.message === message && !t.action && !options?.action
+  );
+  if (duplicate) return duplicate.id;
+
   const id = Math.random().toString(36).slice(2, 11);
   // Error text takes longer to read than a short success/info confirmation.
   const defaultDuration = type === 'error' ? 6000 : options?.action ? 5000 : 3000;
