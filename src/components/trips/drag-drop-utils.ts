@@ -61,8 +61,10 @@ export function stopPointerTracking() {
  * Prioritizes nested zones: if the point is inside multiple droppables,
  * picks the smallest one (most specific/nested zone).
  *
- * Important: Only returns a droppable if the point is actually inside it.
- * No distance-based fallback to prevent highlighting targets in other panels.
+ * If the point is inside no droppable, Pack Mode falls back to the nearest one
+ * within PACK_MODE_FALLBACK_MAX_DISTANCE (the draggable's position can lag the
+ * pointer while scrolling). Add Mode has no fallback, so a drop never lands on
+ * a target in the other panel.
  */
 export const liveRectCollision = (
   draggable: DraggableType,
@@ -251,33 +253,27 @@ export function usePanelAutoScroll(getPanelRef: () => HTMLElement | undefined) {
  * Dispatches a synthetic pointerup event to fully end the drag in solid-dnd.
  */
 export function EscapeCancelHandler(props: { onCancel: () => void }) {
-  // We need the context to exist, but don't use it directly
-  useDragDropContext();
+  const [dndState] = useDragDropContext()!;
 
   onMount(() => {
-    let mounted = true;
-
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && mounted) {
-        // First call the cancel handler to set our state
-        props.onCancel();
+      if (e.key !== 'Escape' || !dndState.active.draggable) return;
 
-        // Then dispatch a synthetic pointerup to end the drag in solid-dnd
-        // This stops the library from continuing to track the drag
-        const pointerUpEvent = new PointerEvent('pointerup', {
-          bubbles: true,
-          cancelable: true,
-          pointerId: 1,
-          pointerType: 'mouse',
-        });
-        document.dispatchEvent(pointerUpEvent);
-      }
+      // First call the cancel handler to set our state
+      props.onCancel();
+
+      // Then dispatch a synthetic pointerup to end the drag in solid-dnd
+      // This stops the library from continuing to track the drag
+      const pointerUpEvent = new PointerEvent('pointerup', {
+        bubbles: true,
+        cancelable: true,
+        pointerId: 1,
+        pointerType: 'mouse',
+      });
+      document.dispatchEvent(pointerUpEvent);
     };
     document.addEventListener('keydown', handleKeyDown);
-    onCleanup(() => {
-      mounted = false;
-      document.removeEventListener('keydown', handleKeyDown);
-    });
+    onCleanup(() => document.removeEventListener('keydown', handleKeyDown));
   });
 
   return null;

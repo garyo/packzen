@@ -5,7 +5,8 @@
  */
 
 import { Show } from 'solid-js';
-import type { TripItem, Bag } from '../../lib/types';
+import type { TripItem } from '../../lib/types';
+import type { PackingStats } from '../../lib/packing-stats';
 import { DragHandleIcon, EditIcon, SkipIcon } from '../ui/Icons';
 
 // Type for drag activators from solid-dnd
@@ -15,20 +16,14 @@ interface PackingItemCardProps {
   item: TripItem;
   selectMode: boolean;
   isSelected: boolean;
-  bag?: Bag | null;
-  showBagInfo?: boolean;
-  showCategoryInfo?: boolean;
   categoryIcon?: string; // Icon for the item's category (used for containers)
   onTogglePacked: () => void;
   onToggleSkipped: () => void;
   onEdit: () => void;
   onMoveToBag?: () => void; // Open the mobile move-to-bag picker
   onToggleSelection: () => void;
-  // Quantity update
-  onUpdateQuantity?: (quantity: number) => void;
   // Container-specific props
-  containerContentsCount?: number; // Number of items inside (if this is a container)
-  containerPackedCount?: number; // Number of packed items inside (if this is a container)
+  containerStats?: PackingStats; // Progress of the items inside (if this is a container)
   onContainerClick?: () => void; // Click handler for navigating to container section
   // Drag-and-drop props
   dragActivators?: DragActivators; // Event handlers for drag handle
@@ -38,7 +33,7 @@ interface PackingItemCardProps {
 export function PackingItemCard(props: PackingItemCardProps) {
   const isContainer = () => props.item.is_container;
   const hasContents = () =>
-    isContainer() && props.containerContentsCount !== undefined && props.containerContentsCount > 0;
+    !!props.containerStats && props.containerStats.total + props.containerStats.skipped > 0;
 
   // Action buttons (always visible on both mobile and desktop)
   const ActionButtons = () => (
@@ -123,7 +118,7 @@ export function PackingItemCard(props: PackingItemCardProps) {
               {props.categoryIcon || '📦'}
             </span>
           </Show>
-          <Show when={props.onUpdateQuantity || props.item.quantity > 1}>
+          <Show when={props.item.quantity > 1}>
             <span class="flex-shrink-0 rounded bg-gray-100 px-1 text-xs font-medium text-gray-500">
               {props.item.quantity}×
             </span>
@@ -133,28 +128,26 @@ export function PackingItemCard(props: PackingItemCardProps) {
           >
             {props.item.name}
             <Show when={props.item.is_skipped}>
-              <span class="ml-2 rounded bg-gray-200 px-1.5 py-0.5 text-xs font-normal text-gray-500 not-italic">
+              <span class="ml-2 inline-block rounded bg-gray-200 px-1.5 py-0.5 text-xs font-normal whitespace-nowrap text-gray-500 not-italic">
                 Skipped
               </span>
             </Show>
           </div>
-          <Show when={hasContents()}>
-            <span
-              class={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                props.containerPackedCount === props.containerContentsCount
-                  ? 'bg-green-100 text-green-700'
-                  : 'bg-blue-100 text-blue-700'
-              }`}
-            >
-              {props.containerPackedCount}/{props.containerContentsCount}
-            </span>
+          <Show when={hasContents() && props.containerStats}>
+            {(stats) => (
+              <span
+                class={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                  stats().remaining === 0
+                    ? 'bg-green-100 text-green-700'
+                    : 'bg-blue-100 text-blue-700'
+                }`}
+              >
+                {stats().packed}/{stats().total}
+              </span>
+            )}
           </Show>
         </div>
         <div class="mt-1 flex gap-3 text-sm text-gray-500 md:mt-0.5 md:gap-2 md:text-xs">
-          {props.showBagInfo && props.bag && <span>👜 {props.bag.name}</span>}
-          {props.showCategoryInfo && props.item.category_name && (
-            <span>📁 {props.item.category_name}</span>
-          )}
           {props.item.notes && <span class="text-gray-400">{props.item.notes}</span>}
           <Show when={hasContents() && props.onContainerClick}>
             <span class="text-blue-600">view contents →</span>

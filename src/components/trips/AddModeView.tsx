@@ -13,13 +13,8 @@ import {
   DragOverlay,
   type DragEvent,
 } from '@thisbeyond/solid-dnd';
-import type {
-  TripItem,
-  Bag,
-  Category,
-  MasterItemWithCategory,
-  SelectedBuiltInItem,
-} from '../../lib/types';
+import type { TripItem, Bag, MasterItemWithCategory, SelectedBuiltInItem } from '../../lib/types';
+import { NO_BAG_LABEL } from '../../lib/vocabulary';
 import { AddModeLeftPanel } from './AddModeLeftPanel';
 import { AddModeBagCards } from './AddModeBagCards';
 import {
@@ -31,44 +26,24 @@ import {
 } from './drag-drop-utils';
 
 interface AddModeViewProps {
-  tripId: string;
   items: Accessor<TripItem[] | undefined>;
   bags: Accessor<Bag[] | undefined>;
-  categories: Accessor<Category[] | undefined>;
   masterItems: Accessor<MasterItemWithCategory[] | undefined>;
-  onAddMasterItem: (
-    item: MasterItemWithCategory,
-    bagId: string | null,
-    containerId: string | null
-  ) => Promise<void>;
-  onAddBuiltInItem: (
-    item: { name: string; description: string | null; category: string; quantity: number },
-    bagId: string | null,
-    containerId: string | null
-  ) => Promise<void>;
-  onAddBuiltInItems: (
+  onAddItems: (
     items: SelectedBuiltInItem[],
     bagId: string | null,
     containerId: string | null
   ) => Promise<void>;
-  onRemoveFromTrip?: (tripItemId: string) => Promise<void>;
-  onAddNewItem?: () => void;
-  onManageBags?: () => void;
-  onBagReplaced?: () => void;
+  onRemoveFromTrip: (tripItemId: string) => void;
+  onAddNewItem: () => void;
+  onManageBags: () => void;
+  onReplaceBag: (bag: Bag) => void;
 }
 
-// Drag data types for Add Mode
+// A My Items entry or a suggestion, dragged from the left panel.
 export interface SourceItemDragData {
   type: 'source-item';
-  sourceType: 'master' | 'built-in';
-  masterItem?: MasterItemWithCategory;
-  builtInItem?: {
-    name: string;
-    description: string | null;
-    category: string;
-    quantity: number;
-    is_container?: boolean;
-  };
+  item: SelectedBuiltInItem;
 }
 
 export interface AddModeBagDropData {
@@ -101,14 +76,23 @@ export function AddModeView(props: AddModeViewProps) {
   const [draggedItem, setDraggedItem] = createSignal<SourceItemDragData | null>(null);
   const [dragCancelled, setDragCancelled] = createSignal(false);
   // Selected target for click-to-add (undefined means no selection)
-  const [selectedTarget, setSelectedTarget] = createSignal<SelectedTarget | undefined>(undefined);
+  const [chosenTarget, setChosenTarget] = createSignal<SelectedTarget | undefined>(undefined);
+  // A target deleted since it was chosen (here or on another device) no longer counts.
+  const selectedTarget = createMemo(() => {
+    const target = chosenTarget();
+    if (!target) return undefined;
+    const exists = target.containerId
+      ? props.items()?.some((item) => item.id === target.containerId)
+      : target.bagId === null || props.bags()?.some((bag) => bag.id === target.bagId);
+    return exists ? target : undefined;
+  });
   // Which pane is visible on mobile (<md). At md+ both panes show side-by-side.
   const [mobilePane, setMobilePane] = createSignal<'items' | 'bags'>('bags');
   let rightPanelRef: HTMLDivElement | undefined;
 
   // Choose a target and, on mobile, jump to the Items pane so the user can tap "+".
   const handleSelectTarget = (target: SelectedTarget | undefined) => {
-    setSelectedTarget(target);
+    setChosenTarget(target);
     if (target) setMobilePane('items');
   };
 
@@ -120,7 +104,7 @@ export function AddModeView(props: AddModeViewProps) {
       const container = props.items()?.find((i) => i.id === target.containerId);
       return container?.name ?? 'Container';
     }
-    if (target.bagId === null) return 'No Bag';
+    if (target.bagId === null) return NO_BAG_LABEL;
     return props.bags()?.find((b) => b.id === target.bagId)?.name ?? 'Bag';
   });
 
@@ -172,23 +156,7 @@ export function AddModeView(props: AddModeViewProps) {
     const containerId =
       dropData.type === 'add-mode-container' ? (dropData.containerId ?? null) : null;
 
-    if (dragData.sourceType === 'master' && dragData.masterItem) {
-      await props.onAddMasterItem(dragData.masterItem, bagId, containerId);
-    } else if (dragData.sourceType === 'built-in' && dragData.builtInItem) {
-      await props.onAddBuiltInItem(dragData.builtInItem, bagId, containerId);
-    }
-  };
-
-  const getDraggedItemName = () => {
-    const data = draggedItem();
-    if (!data) return '';
-    if (data.sourceType === 'master' && data.masterItem) {
-      return data.masterItem.name;
-    }
-    if (data.sourceType === 'built-in' && data.builtInItem) {
-      return data.builtInItem.name;
-    }
-    return '';
+    await props.onAddItems([dragData.item], bagId, containerId);
   };
 
   const handleCancel = () => {
@@ -198,22 +166,10 @@ export function AddModeView(props: AddModeViewProps) {
     autoScroll.stop();
   };
 
-  // Bulk-add a category's suggestions to the selected target (or No Bag if none)
-  const handleAddAllBuiltIn = async (items: SelectedBuiltInItem[]) => {
+  // Add to the selected target; "Add all" works without one (not in a bag).
+  const addToTarget = (items: SelectedBuiltInItem[]) => {
     const target = selectedTarget();
-    await props.onAddBuiltInItems(items, target?.bagId ?? null, target?.containerId ?? null);
-  };
-
-  // Handle click-to-add for items
-  const handleAddToSelectedBag = async (dragData: SourceItemDragData) => {
-    const target = selectedTarget();
-    if (!target) return; // No target selected
-
-    if (dragData.sourceType === 'master' && dragData.masterItem) {
-      await props.onAddMasterItem(dragData.masterItem, target.bagId, target.containerId);
-    } else if (dragData.sourceType === 'built-in' && dragData.builtInItem) {
-      await props.onAddBuiltInItem(dragData.builtInItem, target.bagId, target.containerId);
-    }
+    return props.onAddItems(items, target?.bagId ?? null, target?.containerId ?? null);
   };
 
   return (
@@ -283,13 +239,12 @@ export function AddModeView(props: AddModeViewProps) {
               onTabChange={setActiveTab}
               items={props.items}
               masterItems={props.masterItems}
-              categories={props.categories}
               onRemoveFromTrip={props.onRemoveFromTrip}
               onAddNewItem={props.onAddNewItem}
               isDragging={() => draggedItem() !== null}
-              selectedTarget={selectedTarget}
-              onAddToSelectedBag={handleAddToSelectedBag}
-              onAddAllBuiltIn={handleAddAllBuiltIn}
+              hasTarget={() => selectedTarget() !== undefined}
+              onAdd={(item) => addToTarget([item])}
+              onAddAll={addToTarget}
             />
           </div>
 
@@ -303,38 +258,34 @@ export function AddModeView(props: AddModeViewProps) {
               class="h-full overflow-y-auto rounded-lg border border-gray-200 bg-white p-1 shadow-sm md:p-4"
             >
               <AddModeBagCards
-                tripId={props.tripId}
                 items={props.items}
                 bags={props.bags}
-                categories={props.categories}
-                onBagReplaced={props.onBagReplaced}
+                onReplaceBag={props.onReplaceBag}
                 selectedTarget={selectedTarget}
                 onSelectTarget={handleSelectTarget}
               />
             </div>
             {/* Manage Bags FAB */}
-            {props.onManageBags && (
-              <button
-                type="button"
-                onClick={props.onManageBags}
-                class="absolute right-2 bottom-2 flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg hover:bg-blue-700 md:right-3 md:bottom-3 md:h-12 md:w-12"
-                title="Manage bags"
+            <button
+              type="button"
+              onClick={props.onManageBags}
+              class="absolute right-2 bottom-2 flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg hover:bg-blue-700 md:right-3 md:bottom-3 md:h-12 md:w-12"
+              title="Manage bags"
+            >
+              <svg
+                class="h-5 w-5 md:h-6 md:w-6"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
               >
-                <svg
-                  class="h-5 w-5 md:h-6 md:w-6"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M12 4v16m8-8H4"
-                  />
-                </svg>
-              </button>
-            )}
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M12 4v16m8-8H4"
+                />
+              </svg>
+            </button>
           </div>
         </div>
       </div>
@@ -343,7 +294,7 @@ export function AddModeView(props: AddModeViewProps) {
       <DragOverlay>
         {draggedItem() && (
           <div class="pointer-events-none rounded-lg border border-blue-300 bg-white px-4 py-2 shadow-xl">
-            <span class="font-medium text-gray-900">{getDraggedItemName()}</span>
+            <span class="font-medium text-gray-900">{draggedItem()!.item.name}</span>
           </div>
         )}
       </DragOverlay>

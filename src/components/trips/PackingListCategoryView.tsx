@@ -1,630 +1,182 @@
 /**
  * PackingListCategoryView Component
  *
- * Displays packing list grouped by categories, then by bags
- * Extracted from PackingPage for better separation of concerns
- * Supports drag-and-drop to move items between bags within the same category
+ * Packing list grouped by category, then by bag or container. Items can be
+ * dragged between bags and containers within their category.
  */
 
-import { For, Show, type Accessor, createSignal, createMemo } from 'solid-js';
-import {
-  DragDropProvider,
-  DragDropSensors,
-  DragOverlay,
-  createDraggable,
-  createDroppable,
-  type DragEvent,
-} from '@thisbeyond/solid-dnd';
-import type { TripItem, Bag, Category } from '../../lib/types';
-import { PackingItemCard } from './PackingItemCard';
+import { For, Show, createMemo } from 'solid-js';
+import type { TripItem } from '../../lib/types';
+import { packingStats } from '../../lib/packing-stats';
+import { byName, categoryOf, placeItems } from '../../lib/item-placement';
 import { getBagColorClass, getBagColorStyle } from '../../lib/color-utils';
-import { liveRectCollision, useAutoScroll, EscapeCancelHandler } from './drag-drop-utils';
-import { CheckIcon } from '../ui/Icons';
+import {
+  AllPackedNote,
+  ItemGroup,
+  NO_BAG,
+  PackDnd,
+  createCardRenderer,
+  createCategoryIcons,
+  dropInto,
+  type PackingListProps,
+} from './PackingListParts';
 
-// Virtual "Wearing / No Bag" entry, module-level so it keeps a stable identity
-// across recomputes — otherwise <For> tears down and rebuilds the section on
-// every structural change. See U12.
-const WEARING_BAG: Bag = {
-  id: null as any,
-  trip_id: '',
-  name: 'Wearing / No Bag',
-  type: 'wearing' as any,
-  color: null,
-  sort_order: 999,
-  created_at: new Date(0),
-};
-
-// Drop zone types - bag sections and container sections
-const DROP_ZONE_TYPES = {
-  BAG: 'bag-section',
-  CONTAINER: 'container-section',
-} as const;
-
-interface DragData {
-  itemId: string;
-  item: TripItem;
-  categoryName: string;
+interface CategorySection {
+  items: TripItem[];
+  byBag: Map<string | null, TripItem[]>;
+  byContainer: Map<string, TripItem[]>;
 }
 
-interface DropData {
-  type: (typeof DROP_ZONE_TYPES)[keyof typeof DROP_ZONE_TYPES];
-  bagId?: string | null;
-  containerId?: string;
-  categoryName: string;
-}
+const GROUP_TITLE_CLASS =
+  'mb-2 flex items-center gap-1.5 px-1 text-sm font-medium md:mb-1 md:text-xs';
 
-// Droppable wrapper for bag sections within a category
-function DroppableBagSection(props: {
-  bagId: string | null;
-  categoryName: string;
-  isValidDrop: () => boolean;
-  children: any;
-}) {
-  const droppable = createDroppable(`bag-section-${props.categoryName}-${props.bagId ?? 'none'}`, {
-    type: DROP_ZONE_TYPES.BAG,
-    bagId: props.bagId,
-    categoryName: props.categoryName,
-  } as DropData);
+export function PackingListCategoryView(props: PackingListProps) {
+  const placement = createMemo(() => placeItems(props.items() ?? [], props.bags() ?? []));
+  const iconFor = createCategoryIcons(props.categories);
+  const contentsOf = (containerId: string) => placement().byContainer.get(containerId) ?? [];
+  const renderCard = createCardRenderer(props, iconFor, contentsOf);
 
-  return (
-    <div
-      ref={droppable.ref}
-      class={`mb-4 rounded-lg transition-all duration-150 md:mb-2 ${
-        droppable.isActiveDroppable && props.isValidDrop()
-          ? 'bg-blue-50 ring-2 ring-blue-400'
-          : droppable.isActiveDroppable
-            ? 'bg-red-50 ring-2 ring-red-300'
-            : ''
-      }`}
-    >
-      {props.children}
-    </div>
-  );
-}
-
-// Droppable wrapper for container sections within a category
-function DroppableContainerSection(props: {
-  containerId: string;
-  categoryName: string;
-  isValidDrop: () => boolean;
-  children: any;
-}) {
-  const droppable = createDroppable(
-    `container-section-${props.categoryName}-${props.containerId}`,
-    {
-      type: DROP_ZONE_TYPES.CONTAINER,
-      containerId: props.containerId,
-      categoryName: props.categoryName,
-    } as DropData
+  const bagsById = createMemo(() => new Map((props.bags() ?? []).map((bag) => [bag.id, bag])));
+  const containersById = createMemo(
+    () => new Map((props.items() ?? []).filter((i) => i.is_container).map((i) => [i.id, i]))
   );
 
-  return (
-    <div
-      ref={droppable.ref}
-      class={`mb-4 rounded-lg transition-all duration-150 md:mb-2 ${
-        droppable.isActiveDroppable && props.isValidDrop()
-          ? 'bg-purple-50 ring-2 ring-purple-400'
-          : droppable.isActiveDroppable
-            ? 'bg-red-50 ring-2 ring-red-300'
-            : ''
-      }`}
-    >
-      {props.children}
-    </div>
-  );
-}
+  // Keyed by category, in category order.
+  const sections = createMemo(() => {
+    const byCategory = new Map<string, CategorySection>();
+    const section = (item: TripItem) => {
+      const category = categoryOf(item);
+      let entry = byCategory.get(category);
+      if (!entry) {
+        entry = { items: [], byBag: new Map(), byContainer: new Map() };
+        byCategory.set(category, entry);
+      }
+      entry.items.push(item);
+      return entry;
+    };
+    const add = <K,>(map: Map<K, TripItem[]>, key: K, item: TripItem) =>
+      map.set(key, [...(map.get(key) ?? []), item]);
 
-// Draggable wrapper for items - passes drag handle props to children
-function DraggableItem(props: {
-  item: TripItem;
-  categoryName: string;
-  enabled: boolean;
-  children: (dragProps: { dragActivators?: Record<string, any>; isDragging: boolean }) => any;
-}) {
-  const draggable = createDraggable(props.item.id, {
-    itemId: props.item.id,
-    item: props.item,
-    categoryName: props.categoryName,
-  } as DragData);
-
-  return (
-    <Show when={props.enabled} fallback={<div>{props.children({ isDragging: false })}</div>}>
-      <div
-        ref={draggable.ref}
-        aria-label={`Drag handle: ${props.item.name}`}
-        aria-roledescription="draggable item"
-      >
-        {props.children({
-          dragActivators: draggable.dragActivators,
-          isDragging: draggable.isActiveDraggable,
-        })}
-      </div>
-    </Show>
-  );
-}
-
-interface PackingListCategoryViewProps {
-  items: Accessor<TripItem[] | undefined>;
-  bags: Accessor<Bag[] | undefined>;
-  categories: Accessor<Category[] | undefined>;
-  selectMode: Accessor<boolean>;
-  selectedItems: Accessor<Set<string>>;
-  showUnpackedOnly?: Accessor<boolean>;
-  onTogglePacked: (item: TripItem) => void;
-  onToggleSkipped: (item: TripItem) => void;
-  onEditItem: (item: TripItem) => void;
-  onToggleItemSelection: (itemId: string) => void;
-  // Quantity update
-  onUpdateQuantity?: (item: TripItem, quantity: number) => void;
-  // Drag-and-drop handlers - only moves between locations, keeps category
-  onMoveItemToBag?: (itemId: string, bagId: string | null) => void;
-  onRequestMoveItem?: (item: TripItem) => void;
-  onMoveItemToContainer?: (itemId: string, containerId: string) => void;
-}
-
-// Inner component that uses swipe context
-function PackingListCategoryViewInner(props: PackingListCategoryViewProps) {
-  const [activeItem, setActiveItem] = createSignal<TripItem | null>(null);
-  const [activeCategoryName, setActiveCategoryName] = createSignal<string | null>(null);
-  const [dragCancelled, setDragCancelled] = createSignal(false);
-  const autoScroll = useAutoScroll();
-
-  // Handle drag end - only move if dropping in same category
-  const handleDragEnd = (event: DragEvent) => {
-    const { draggable, droppable } = event;
-    const wasCancelled = dragCancelled();
-    setActiveItem(null);
-    setActiveCategoryName(null);
-    setDragCancelled(false);
-    autoScroll.stop();
-
-    // User pressed ESC to cancel - don't commit the drop
-    if (wasCancelled) return;
-
-    if (!droppable) return;
-
-    const dragData = draggable.data as DragData;
-    const dropData = droppable.data as DropData;
-
-    // Only allow drops within the same category
-    if (dragData.categoryName !== dropData.categoryName) return;
-
-    if (dropData.type === DROP_ZONE_TYPES.BAG) {
-      // Move item to the target bag (keeps category)
-      props.onMoveItemToBag?.(dragData.itemId, dropData.bagId ?? null);
-    } else if (dropData.type === DROP_ZONE_TYPES.CONTAINER && dropData.containerId) {
-      // Move item into container
-      props.onMoveItemToContainer?.(dragData.itemId, dropData.containerId);
+    for (const [bagId, items] of placement().byBag) {
+      for (const item of items) add(section(item).byBag, bagId, item);
     }
-  };
-
-  const handleDragStart = (event: DragEvent) => {
-    const dragData = event.draggable.data as DragData;
-    setActiveItem(dragData.item);
-    setActiveCategoryName(dragData.categoryName);
-    setDragCancelled(false);
-    autoScroll.start();
-  };
-
-  const handleDragCancel = () => {
-    setDragCancelled(true);
-    setActiveItem(null);
-    setActiveCategoryName(null);
-    autoScroll.stop();
-  };
-
-  // Check if current drop target is valid (same category as dragged item)
-  const isValidDropTarget = (categoryName: string) => {
-    return activeCategoryName() === categoryName;
-  };
-
-  const itemsByCategory = createMemo(() => {
-    const allItems = props.items() || [];
-    const allBags = props.bags() || [];
-
-    // Separate containers from regular items
-    const containers = allItems.filter((item) => item.is_container);
-    const regularItems = allItems.filter((item) => !item.is_container);
-
-    // Group regular items (not in containers) by category, then by bag_id
-    const bagGrouped = new Map<string, Map<string | null, TripItem[]>>();
-    regularItems
-      .filter((item) => !item.container_item_id) // Exclude items in containers
-      .forEach((item) => {
-        const category = item.category_name || 'Uncategorized';
-        const bagId = item.bag_id || null;
-
-        if (!bagGrouped.has(category)) {
-          bagGrouped.set(category, new Map());
-        }
-
-        const categoryBags = bagGrouped.get(category)!;
-        if (!categoryBags.has(bagId)) {
-          categoryBags.set(bagId, []);
-        }
-
-        categoryBags.get(bagId)!.push(item);
-      });
-
-    // Group contained items by category, then by container
-    // Filter out zombie containers (items pointing to deleted containers)
-    const containerIds = new Set(containers.map((c) => c.id));
-    const containerGrouped = new Map<string, Map<string, TripItem[]>>();
-    regularItems
-      .filter((item) => item.container_item_id && containerIds.has(item.container_item_id)) // Only items in valid containers
-      .forEach((item) => {
-        const category = item.category_name || 'Uncategorized';
-        const containerId = item.container_item_id!;
-
-        if (!containerGrouped.has(category)) {
-          containerGrouped.set(category, new Map());
-        }
-
-        const categoryContainers = containerGrouped.get(category)!;
-        if (!categoryContainers.has(containerId)) {
-          categoryContainers.set(containerId, []);
-        }
-
-        categoryContainers.get(containerId)!.push(item);
-      });
-
-    // Add virtual "Wearing" bag to the list (stable identity — see WEARING_BAG)
-    const bagsWithWearing = [...allBags, WEARING_BAG];
-
-    return { bagGrouped, containerGrouped, allBags: bagsWithWearing, containers };
+    for (const [containerId, items] of placement().byContainer) {
+      for (const item of items) add(section(item).byContainer, containerId, item);
+    }
+    return new Map([...byCategory].sort(([a], [b]) => a.localeCompare(b)));
   });
 
-  // Create lookup maps for O(1) access
-  const categoryLookup = createMemo(() => {
-    const categories = props.categories() || [];
-    return new Map(categories.map((c) => [c.name, c]));
-  });
+  // Bags by name, with "not in a bag" last; containers by name.
+  const sortedBagIds = (byBag: Map<string | null, TripItem[]>) =>
+    [...byBag.keys()].sort((a, b) =>
+      a === null ? 1 : b === null ? -1 : byName(bagsById().get(a)!, bagsById().get(b)!)
+    );
+  const sortedContainerIds = (byContainer: Map<string, TripItem[]>) =>
+    [...byContainer.keys()].sort((a, b) =>
+      byName(containersById().get(a)!, containersById().get(b)!)
+    );
 
-  // Get category icon by name - using lookup map for O(1) access
-  const getCategoryIcon = (categoryName: string) => {
-    return categoryLookup().get(categoryName)?.icon || '📦';
-  };
-
-  // Sort categories alphabetically - combine categories from both bags and containers
-  const sortedCategories = createMemo(() => {
-    const allCategories = new Set<string>();
-    itemsByCategory().bagGrouped.forEach((_, category) => allCategories.add(category));
-    itemsByCategory().containerGrouped.forEach((_, category) => allCategories.add(category));
-    return Array.from(allCategories).sort((a, b) => a.localeCompare(b));
-  });
+  const sortedItems = (items: TripItem[] | undefined) => [...(items ?? [])].sort(byName);
 
   return (
-    <DragDropProvider
-      onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
-      collisionDetector={liveRectCollision}
+    <PackDnd
+      onDrop={(item, target) => {
+        // Only moves within the item's own category are allowed here.
+        if (target.category === categoryOf(item)) dropInto(props, item, target);
+      }}
     >
-      <DragDropSensors />
-      <EscapeCancelHandler onCancel={handleDragCancel} />
       <div class="space-y-6 md:space-y-3">
-        <For each={sortedCategories()}>
+        <For each={[...sections().keys()]}>
           {(category) => {
-            const categoryBags = () => itemsByCategory().bagGrouped.get(category) || new Map();
-            const categoryContainers = () =>
-              itemsByCategory().containerGrouped.get(category) || new Map();
-
-            const allCategoryItems = () => [
-              ...Array.from(categoryBags().values()).flat(),
-              ...Array.from(categoryContainers().values()).flat(),
-            ];
-            const totalItems = () => allCategoryItems().length;
-            const packedItemsCount = () =>
-              allCategoryItems().filter((item) => item.is_packed).length;
-
-            // Sort bags alphabetically within category
-            const sortedBags = () => {
-              return Array.from(categoryBags().entries()).sort(([bagIdA], [bagIdB]) => {
-                const bagA = itemsByCategory().allBags.find((b) => b.id === bagIdA);
-                const bagB = itemsByCategory().allBags.find((b) => b.id === bagIdB);
-                return (bagA?.name || '').localeCompare(bagB?.name || '');
-              });
-            };
-
-            // Sort containers alphabetically within category
-            const sortedContainers = () => {
-              return Array.from(categoryContainers().entries()).sort(
-                ([containerIdA], [containerIdB]) => {
-                  const containerA = itemsByCategory().containers.find(
-                    (c) => c.id === containerIdA
-                  );
-                  const containerB = itemsByCategory().containers.find(
-                    (c) => c.id === containerIdB
-                  );
-                  return (containerA?.name || '').localeCompare(containerB?.name || '');
-                }
-              );
-            };
-
-            // Check if dragging is enabled (not in select mode)
-            const isDragEnabled = () => !props.selectMode();
-
+            const section = () => sections().get(category)!;
+            const stats = () => packingStats(section().items);
+            const allPacked = () =>
+              props.showUnpackedOnly() && stats().remaining === 0 && stats().packed > 0;
+            const accepts = (item: TripItem) => categoryOf(item) === category;
             return (
-              <Show when={totalItems() > 0}>
-                <div>
-                  <div class="mb-3 flex items-center gap-2 md:mb-1.5">
-                    <span class="text-xl md:text-lg">{getCategoryIcon(category)}</span>
-                    <h2 class="text-lg font-semibold text-gray-900 md:text-base">{category}</h2>
-                    <span class="text-sm text-gray-500 md:text-xs">({totalItems()})</span>
-                  </div>
-
-                  {/* Show "All packed" summary if filtering and everything is packed */}
-                  <Show
-                    when={
-                      props.showUnpackedOnly?.() &&
-                      packedItemsCount() === totalItems() &&
-                      totalItems() > 0
-                    }
-                  >
-                    <div class="flex items-center gap-2 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">
-                      <CheckIcon class="h-4 w-4" />
-                      All {totalItems()} items packed
-                    </div>
-                  </Show>
-
-                  {/* Bag and container sections (filtered if showUnpackedOnly) */}
-                  <Show when={!props.showUnpackedOnly?.() || packedItemsCount() < totalItems()}>
-                    {/* Bag sections */}
-                    <For each={sortedBags()}>
-                      {([bagId, bagItems]) => {
-                        const bag = () => itemsByCategory().allBags.find((b) => b.id === bagId);
-                        // Sort items alphabetically by name
-                        const sortedItems = [...bagItems].sort((a, b) =>
-                          a.name.localeCompare(b.name)
-                        );
-                        const unpackedItems = () =>
-                          sortedItems.filter((item) => !item.is_packed && !item.is_skipped);
-                        const packedCount = () =>
-                          sortedItems.filter((item) => item.is_packed).length;
-                        const itemsToShow = () =>
-                          props.showUnpackedOnly?.() ? unpackedItems() : sortedItems;
-                        const allBagPacked = () =>
-                          props.showUnpackedOnly?.() &&
-                          itemsToShow().length === 0 &&
-                          packedCount() > 0;
-
-                        // Skip bag section if filtering and no items at all
-                        return (
-                          <Show
-                            when={
-                              itemsToShow().length > 0 ||
-                              (props.showUnpackedOnly?.() && packedCount() > 0)
-                            }
-                          >
-                            <DroppableBagSection
-                              bagId={bagId}
-                              categoryName={category}
-                              isValidDrop={() => isValidDropTarget(category)}
-                            >
-                              <h3 class="mb-2 flex items-center gap-1.5 px-1 text-sm font-medium text-gray-600 md:mb-1 md:text-xs">
-                                <Show
-                                  when={bag()?.id !== null}
-                                  fallback={<span class="text-base md:text-sm">👕</span>}
-                                >
-                                  <div
-                                    class={`h-2.5 w-2.5 rounded-full border border-gray-300 md:h-2 md:w-2 ${getBagColorClass(bag()?.color)}`}
-                                    style={getBagColorStyle(bag()?.color)}
-                                  />
-                                </Show>
-                                {bag()?.name || 'No bag'}
-                                {/* Inline packed count when all items in bag are packed */}
-                                <Show when={allBagPacked()}>
-                                  <span class="ml-1 flex items-center gap-1 text-gray-500">
-                                    ·
-                                    <CheckIcon class="h-3 w-3 text-green-600" />
-                                    <span class="text-gray-500">{packedCount()} packed</span>
-                                  </span>
-                                </Show>
-                              </h3>
-                              <Show when={!allBagPacked()}>
-                                <div
-                                  class="grid gap-2 md:gap-1.5"
-                                  style="grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr))"
-                                >
-                                  <For each={itemsToShow()}>
-                                    {(item) => {
-                                      const canDrag = () => isDragEnabled();
-                                      return (
-                                        <DraggableItem
-                                          item={item}
-                                          categoryName={category}
-                                          enabled={canDrag()}
-                                        >
-                                          {(dragProps) => (
-                                            <PackingItemCard
-                                              item={item}
-                                              selectMode={props.selectMode()}
-                                              isSelected={props.selectedItems().has(item.id)}
-                                              onTogglePacked={() => props.onTogglePacked(item)}
-                                              onToggleSkipped={() => props.onToggleSkipped(item)}
-                                              onEdit={() => props.onEditItem(item)}
-                                              onMoveToBag={
-                                                props.onRequestMoveItem
-                                                  ? () => props.onRequestMoveItem!(item)
-                                                  : undefined
-                                              }
-                                              onToggleSelection={() =>
-                                                props.onToggleItemSelection(item.id)
-                                              }
-                                              onUpdateQuantity={
-                                                props.onUpdateQuantity
-                                                  ? (qty) => props.onUpdateQuantity!(item, qty)
-                                                  : undefined
-                                              }
-                                              dragActivators={dragProps.dragActivators}
-                                              isDragging={dragProps.isDragging}
-                                            />
-                                          )}
-                                        </DraggableItem>
-                                      );
-                                    }}
-                                  </For>
-                                  {/* Collapsed packed items row - only when there are also unpacked items */}
-                                  <Show
-                                    when={
-                                      props.showUnpackedOnly?.() &&
-                                      packedCount() > 0 &&
-                                      itemsToShow().length > 0
-                                    }
-                                  >
-                                    <div class="flex items-center gap-2 rounded-lg bg-gray-100 px-3 py-2 text-sm text-gray-500">
-                                      <CheckIcon class="h-4 w-4 text-green-600" />
-                                      {packedCount()} packed
-                                    </div>
-                                  </Show>
-                                </div>
-                              </Show>
-                            </DroppableBagSection>
-                          </Show>
-                        );
-                      }}
-                    </For>
-
-                    {/* Container sections */}
-                    <For each={sortedContainers()}>
-                      {([containerId, containerItems]) => {
-                        const container = () =>
-                          itemsByCategory().containers.find((c) => c.id === containerId);
-                        const containerBag = () => {
-                          const cont = container();
-                          if (!cont?.bag_id) return null;
-                          return itemsByCategory().allBags.find((b) => b.id === cont.bag_id);
-                        };
-                        const containerIcon = () => {
-                          const cont = container();
-                          return cont?.category_name ? getCategoryIcon(cont.category_name) : '📦';
-                        };
-                        // Sort items alphabetically by name
-                        const sortedItems = [...containerItems].sort((a, b) =>
-                          a.name.localeCompare(b.name)
-                        );
-                        const unpackedItems = () =>
-                          sortedItems.filter((item) => !item.is_packed && !item.is_skipped);
-                        const packedCount = () =>
-                          sortedItems.filter((item) => item.is_packed).length;
-                        const itemsToShow = () =>
-                          props.showUnpackedOnly?.() ? unpackedItems() : sortedItems;
-                        const allContainerPacked = () =>
-                          props.showUnpackedOnly?.() &&
-                          itemsToShow().length === 0 &&
-                          packedCount() > 0;
-
-                        return (
-                          <Show
-                            when={
-                              itemsToShow().length > 0 ||
-                              (props.showUnpackedOnly?.() && packedCount() > 0)
-                            }
-                          >
-                            <DroppableContainerSection
-                              containerId={containerId}
-                              categoryName={category}
-                              isValidDrop={() => isValidDropTarget(category)}
-                            >
-                              <h3 class="mb-2 flex items-center gap-1.5 px-1 text-sm font-medium text-blue-700 md:mb-1 md:text-xs">
-                                <span class="text-base md:text-sm">{containerIcon()}</span>
-                                {container()?.name || 'Container'}
-                                <Show when={containerBag()}>
-                                  <span class="text-xs text-gray-500">
-                                    in {containerBag()!.name}
-                                  </span>
-                                </Show>
-                                {/* Inline packed count when all items in container are packed */}
-                                <Show when={allContainerPacked()}>
-                                  <span class="ml-1 flex items-center gap-1 text-gray-500">
-                                    ·
-                                    <CheckIcon class="h-3 w-3 text-green-600" />
-                                    <span class="text-gray-500">{packedCount()} packed</span>
-                                  </span>
-                                </Show>
-                              </h3>
-                              <Show when={!allContainerPacked()}>
-                                <div
-                                  class="grid gap-2 md:gap-1.5"
-                                  style="grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr))"
-                                >
-                                  <For each={itemsToShow()}>
-                                    {(item) => (
-                                      <DraggableItem
-                                        item={item}
-                                        categoryName={category}
-                                        enabled={isDragEnabled()}
-                                      >
-                                        {(dragProps) => (
-                                          <PackingItemCard
-                                            item={item}
-                                            selectMode={props.selectMode()}
-                                            isSelected={props.selectedItems().has(item.id)}
-                                            onTogglePacked={() => props.onTogglePacked(item)}
-                                            onToggleSkipped={() => props.onToggleSkipped(item)}
-                                            onEdit={() => props.onEditItem(item)}
-                                            onMoveToBag={
-                                              props.onRequestMoveItem
-                                                ? () => props.onRequestMoveItem!(item)
-                                                : undefined
-                                            }
-                                            onToggleSelection={() =>
-                                              props.onToggleItemSelection(item.id)
-                                            }
-                                            onUpdateQuantity={
-                                              props.onUpdateQuantity
-                                                ? (qty) => props.onUpdateQuantity!(item, qty)
-                                                : undefined
-                                            }
-                                            dragActivators={dragProps.dragActivators}
-                                            isDragging={dragProps.isDragging}
-                                          />
-                                        )}
-                                      </DraggableItem>
-                                    )}
-                                  </For>
-                                  {/* Collapsed packed items row - only when there are also unpacked items */}
-                                  <Show
-                                    when={
-                                      props.showUnpackedOnly?.() &&
-                                      packedCount() > 0 &&
-                                      itemsToShow().length > 0
-                                    }
-                                  >
-                                    <div class="flex items-center gap-2 rounded-lg bg-gray-100 px-3 py-2 text-sm text-gray-500">
-                                      <CheckIcon class="h-4 w-4 text-green-600" />
-                                      {packedCount()} packed
-                                    </div>
-                                  </Show>
-                                </div>
-                              </Show>
-                            </DroppableContainerSection>
-                          </Show>
-                        );
-                      }}
-                    </For>
-                  </Show>
+              <div>
+                <div class="mb-3 flex items-center gap-2 md:mb-1.5">
+                  <span class="text-xl md:text-lg">{iconFor(category)}</span>
+                  <h2 class="text-lg font-semibold text-gray-900 md:text-base">{category}</h2>
+                  <span class="text-sm text-gray-500 md:text-xs">({section().items.length})</span>
                 </div>
-              </Show>
+
+                <Show when={!allPacked()} fallback={<AllPackedNote count={stats().total} />}>
+                  <For each={sortedBagIds(section().byBag)}>
+                    {(bagId) => {
+                      const bag = () => (bagId ? bagsById().get(bagId)! : NO_BAG);
+                      return (
+                        <ItemGroup
+                          items={sortedItems(section().byBag.get(bagId))}
+                          showUnpackedOnly={props.showUnpackedOnly()}
+                          renderCard={renderCard}
+                          class="mb-4 md:mb-2"
+                          titleClass={`${GROUP_TITLE_CLASS} text-gray-600`}
+                          dropZone={{
+                            id: `category-${category}-bag-${bagId ?? 'none'}`,
+                            data: { type: 'bag', bagId, category },
+                            activeClass: 'bg-blue-50 ring-2 ring-blue-400',
+                            accepts,
+                          }}
+                          title={
+                            <>
+                              <Show
+                                when={bagId !== null}
+                                fallback={<span class="text-base md:text-sm">👕</span>}
+                              >
+                                <div
+                                  class={`h-2.5 w-2.5 rounded-full border border-gray-300 md:h-2 md:w-2 ${getBagColorClass(bag().color)}`}
+                                  style={getBagColorStyle(bag().color)}
+                                />
+                              </Show>
+                              {bag().name}
+                            </>
+                          }
+                        />
+                      );
+                    }}
+                  </For>
+
+                  <For each={sortedContainerIds(section().byContainer)}>
+                    {(containerId) => {
+                      const container = () => containersById().get(containerId)!;
+                      const containerBag = () => bagsById().get(container().bag_id ?? '');
+                      return (
+                        <ItemGroup
+                          items={sortedItems(section().byContainer.get(containerId))}
+                          showUnpackedOnly={props.showUnpackedOnly()}
+                          renderCard={renderCard}
+                          class="mb-4 md:mb-2"
+                          titleClass={`${GROUP_TITLE_CLASS} text-blue-700`}
+                          dropZone={{
+                            id: `category-${category}-container-${containerId}`,
+                            data: { type: 'container', containerId, category },
+                            activeClass: 'bg-purple-50 ring-2 ring-purple-400',
+                            accepts,
+                          }}
+                          title={
+                            <>
+                              <span class="text-base md:text-sm">
+                                {iconFor(container().category_name)}
+                              </span>
+                              {container().name}
+                              <Show when={containerBag()}>
+                                {(bag) => (
+                                  <span class="text-xs text-gray-500">in {bag().name}</span>
+                                )}
+                              </Show>
+                            </>
+                          }
+                        />
+                      );
+                    }}
+                  </For>
+                </Show>
+              </div>
             );
           }}
         </For>
       </div>
-
-      {/* Drag Overlay - shows preview of item being dragged */}
-      <DragOverlay>
-        <Show when={activeItem()}>
-          <div class="rounded-lg border border-blue-300 bg-white p-3 shadow-xl ring-2 ring-blue-500">
-            <p class="font-medium text-gray-900">{activeItem()!.name}</p>
-            <Show when={activeCategoryName()}>
-              <p class="text-sm text-gray-500">{activeCategoryName()}</p>
-            </Show>
-          </div>
-        </Show>
-      </DragOverlay>
-    </DragDropProvider>
+    </PackDnd>
   );
-}
-
-export function PackingListCategoryView(props: PackingListCategoryViewProps) {
-  return <PackingListCategoryViewInner {...props} />;
 }
