@@ -8,8 +8,9 @@ import { AppNav } from './AppNav';
  * Client-side auth gate for pages built on AppLayout (static output, so there
  * is no server guard). While Clerk loads, #app-root shows the layout's static
  * spinner; then this redirects signed-out visitors to sign-in, or replaces the
- * spinner with `page` and mounts the nav if the layout has a slot for it. If
- * Clerk never loads, it shows the layout's "Retry" message instead.
+ * spinner with `page` and mounts the toast host and the nav (if the layout has
+ * a slot for it). If Clerk never loads, it shows the layout's "Retry" message
+ * instead.
  *
  * Without `page`, #app-root keeps its server-rendered content.
  */
@@ -33,13 +34,11 @@ export async function mountApp(page?: () => JSX.Element): Promise<void> {
     return;
   }
 
+  // The one toast host for the page (it portals itself to <body>).
+  render(Toast, document.body.appendChild(document.createElement('div')));
   if (page) {
     root.replaceChildren();
     render(page, root);
-  } else {
-    // Pages render their own <Toast />; one without a Solid root still needs
-    // it for the nav's messages.
-    render(Toast, root);
   }
   const nav = document.getElementById('app-nav');
   if (nav) render(AppNav, nav);

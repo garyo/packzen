@@ -5,7 +5,7 @@ import { NO_BAG_LABEL } from '../../lib/vocabulary';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
 import { EmptyState } from '../ui/EmptyState';
 import { Button } from '../ui/Button';
-import { Toast, showToast } from '../ui/Toast';
+import { showToast } from '../ui/Toast';
 import { confirmDialog } from '../ui/ConfirmDialog';
 import { isSmallScreen } from '../../lib/utils';
 import { BagManager } from './BagManager';
@@ -304,6 +304,11 @@ export function PackingPage(props: PackingPageProps) {
   const [applyingStarter, setApplyingStarter] = createSignal(!!pendingStarter);
   createEffect(() => {
     if (!pendingStarter || store.state.loading || bags.loading) return;
+    // Unknown contents: show the error, and apply the list after a successful Retry.
+    if (store.state.error) {
+      setApplyingStarter(false);
+      return;
+    }
     const tripTypeId = pendingStarter;
     pendingStarter = null;
     if (store.renderableItems().length > 0) {
@@ -363,8 +368,6 @@ export function PackingPage(props: PackingPageProps) {
 
   return (
     <div class="flex h-screen flex-col bg-gray-50">
-      <Toast />
-
       <PackingPageHeader
         trip={trip}
         stats={store.stats}
@@ -376,7 +379,10 @@ export function PackingPage(props: PackingPageProps) {
         onToggleSelectMode={toggleSelectMode}
         onToggleSortBy={() => setSortBy(sortBy() === 'bag' ? 'category' : 'bag')}
         onManageBags={() => setShowBagManager(true)}
-        onShowNotes={() => setShowNotesPanel(true)}
+        onShowNotes={() => {
+          setViewMode('pack');
+          setShowNotesPanel(true);
+        }}
         onExport={handleExport}
         onImport={() => setShowImport(true)}
         onClearAll={handleClearAll}

@@ -5,7 +5,7 @@ import type { Trip, TripWithStats } from '../../lib/types';
 import { Button } from '../ui/Button';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
 import { EmptyState } from '../ui/EmptyState';
-import { Toast, showToast } from '../ui/Toast';
+import { showToast } from '../ui/Toast';
 import { EditIcon, CopyIcon, TrashIcon, MoreVerticalIcon } from '../ui/Icons';
 import { TripForm } from './TripForm';
 import { TripFormWithBags } from './TripFormWithBags';
@@ -37,6 +37,13 @@ export function TripsPage() {
     };
     document.addEventListener('mousedown', closeMenuOnOutsideClick);
     onCleanup(() => document.removeEventListener('mousedown', closeMenuOnOutsideClick));
+
+    // A page restored from the bfcache shows the trips as they were when the user left.
+    const refetchIfRestored = (e: PageTransitionEvent) => {
+      if (e.persisted) refetch();
+    };
+    window.addEventListener('pageshow', refetchIfRestored);
+    onCleanup(() => window.removeEventListener('pageshow', refetchIfRestored));
 
     await authStore.initAuth();
 
@@ -92,8 +99,6 @@ export function TripsPage() {
 
   return (
     <div class="min-h-screen bg-gray-50">
-      <Toast />
-
       <header class="sticky top-0 z-10 border-b border-gray-200 bg-white">
         <div class="container mx-auto px-4 py-4">
           <div class="flex items-center justify-between">
@@ -135,7 +140,10 @@ export function TripsPage() {
       </header>
 
       <main class="container mx-auto px-4 py-6">
-        <Show when={!trips.loading} fallback={<LoadingSpinner text="Loading trips..." />}>
+        <Show
+          when={trips.state !== 'pending'}
+          fallback={<LoadingSpinner text="Loading trips..." />}
+        >
           <Show
             when={!trips.error}
             fallback={
@@ -257,6 +265,15 @@ export function TripsPage() {
 function FirstTripHero(props: { onCustomTrip: () => void }) {
   const [busy, setBusy] = createSignal<string | null>(null);
   const [showHowItWorks, setShowHowItWorks] = createSignal(false);
+
+  // Going back from the new trip can restore this page from the bfcache, still busy.
+  onMount(() => {
+    const onPageShow = (e: PageTransitionEvent) => {
+      if (e.persisted) setBusy(null);
+    };
+    window.addEventListener('pageshow', onPageShow);
+    onCleanup(() => window.removeEventListener('pageshow', onPageShow));
+  });
 
   const startTrip = async (tripTypeId: string) => {
     const tripType = builtInItems.trip_types.find((t) => t.id === tripTypeId);

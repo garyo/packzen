@@ -93,7 +93,7 @@ export function Toast() {
       <div
         role="status"
         aria-live="polite"
-        class="fixed right-4 bottom-[calc(1rem+var(--app-nav-height,0px))] z-[60] flex max-w-[calc(100vw-2rem)] flex-col items-stretch md:max-w-sm"
+        class="fixed right-4 bottom-[calc(1rem+var(--app-nav-height,0px))] z-[60] flex max-w-[calc(100vw-2rem)] flex-col items-stretch md:max-w-sm print:hidden"
       >
         <For each={toasts().slice(-3)}>
           {(toast) => (

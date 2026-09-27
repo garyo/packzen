@@ -6,7 +6,7 @@ import { api, endpoints } from '../../lib/api';
 import type { BagTemplate, Trip } from '../../lib/types';
 import { TripDetailsForm, type TripDetailsData } from './TripDetailsForm';
 import { BagSelectionForm, type CustomBagData } from './BagSelectionForm';
-import { fetchWithErrorHandling } from '../../lib/resource-helpers';
+import { fetchWithFallback } from '../../lib/resource-helpers';
 
 interface TripFormWithBagsProps {
   onClose: () => void;
@@ -28,12 +28,15 @@ export function TripFormWithBags(props: TripFormWithBagsProps) {
   const [creating, setCreating] = createSignal(false);
   const [createError, setCreateError] = createSignal<CreateError | null>(null);
 
-  const [bagTemplates] = createResource<BagTemplate[]>(async () => {
-    return fetchWithErrorHandling(
+  // Never errors, so reading it can't throw mid-submit; on failure the user
+  // can still add bags by hand.
+  const [bagTemplates] = createResource(() =>
+    fetchWithFallback(
       () => api.get<BagTemplate[]>(endpoints.bagTemplates),
+      [],
       'Failed to load bags'
-    );
-  });
+    )
+  );
 
   const isDirty = () => tripData() !== null || detailsDirty();
 

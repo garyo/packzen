@@ -10,7 +10,7 @@ import type {
 import { Button } from '../ui/Button';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
 import { EmptyState } from '../ui/EmptyState';
-import { Toast, showToast } from '../ui/Toast';
+import { showToast } from '../ui/Toast';
 import { confirmDialog } from '../ui/ConfirmDialog';
 import { AllItemsPageHeader } from './AllItemsPageHeader';
 import { AllItemsPageTabs } from './AllItemsPageTabs';
@@ -124,8 +124,6 @@ export function AllItemsPage() {
 
   return (
     <div class="min-h-screen bg-gray-50">
-      <Toast />
-
       <AllItemsPageHeader
         items={items}
         categories={categories}

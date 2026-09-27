@@ -128,7 +128,8 @@ export function downloadFile(filename: string, content: string, mimeType: string
   document.body.appendChild(link);
   link.click();
   link.remove();
-  URL.revokeObjectURL(url);
+  // Revoking at once can cancel the download in iOS Safari, which starts it asynchronously.
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 /** Split an array into chunks of at most `size` elements each. */
