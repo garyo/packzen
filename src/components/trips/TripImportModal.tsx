@@ -3,7 +3,6 @@ import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { showToast } from '../ui/Toast';
 import { yamlToTrip } from '../../lib/yaml';
-import { api, endpoints } from '../../lib/api';
 import { describeTripRestore, restoreTripContents } from '../../lib/backup';
 
 interface TripImportModalProps {
@@ -38,19 +37,9 @@ export function TripImportModal(props: TripImportModalProps) {
     setImporting(true);
 
     try {
+      // Merging brings in bags and items; this trip keeps its own name,
+      // dates and notes.
       const tripData = yamlToTrip(fileContent());
-
-      const tripResponse = await api.patch(endpoints.trip(props.tripId), {
-        name: tripData.trip.name,
-        destination: tripData.trip.destination,
-        start_date: tripData.trip.start_date,
-        end_date: tripData.trip.end_date,
-        notes: tripData.trip.notes,
-      });
-      if (!tripResponse.success) {
-        throw new Error(`Could not update trip details: ${tripResponse.error}`);
-      }
-
       const result = await restoreTripContents(props.tripId, tripData, { merge: true });
       showToast(result.failures.length > 0 ? 'error' : 'success', describeTripRestore(result));
       props.onImported();
@@ -68,8 +57,9 @@ export function TripImportModal(props: TripImportModalProps) {
       <div class="space-y-4">
         <div>
           <p class="mb-3 text-sm text-gray-600">
-            Select a YAML file to import. This will merge the imported data with your current trip:
-            items already in this trip are updated, and the rest are added.
+            Select a YAML file to import. Its bags and items are merged into this trip: items
+            already here are updated (and moved to the file's bag), and the rest are added. This
+            trip's name, dates and notes stay as they are.
           </p>
           <input
             type="file"

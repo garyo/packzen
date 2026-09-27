@@ -245,7 +245,11 @@ export function createTripItemsStore(tripId: string) {
   async function patchItems(ids: string[], patch: ItemPatch, options: MutationOptions) {
     const next = exclusivePackState(patch);
     const keys = Object.keys(next) as (keyof TripItem)[];
-    const targets = ids.map(find).filter((item): item is TripItem => !!item);
+    // Only items the patch actually changes count, get written, or get undone.
+    const targets = ids
+      .map(find)
+      .filter((item): item is TripItem => !!item)
+      .filter((item) => keys.some((key) => item[key] !== next[key as keyof typeof next]));
     if (targets.length === 0) return;
 
     const before = new Map(targets.map((item) => [item.id, pick(item, keys)]));

@@ -89,8 +89,9 @@ export interface TripRestoreResult {
  * nesting) into an existing trip.
  *
  * With `merge`, the trip's current bags and items are matched first — by
- * source id, then by name (bags) or name+bag+category (items) — and updated
- * in place; everything unmatched is created. Without it the trip is assumed
+ * source id, then by name (bags) or name+bag+category, then name alone
+ * (items) — and updated in place, so an item in a different bag is moved
+ * rather than duplicated; everything unmatched is created. Without it the trip is assumed
  * empty. Bag failures throw, since items depend on the bag ids; item
  * failures are collected in the result.
  */
@@ -166,7 +167,8 @@ export async function restoreTripContents(
           normalize(i.name) === normalize(item.name) &&
           (i.bag_id || null) === bagId &&
           normalize(i.category_name) === normalize(item.category_name)
-      );
+      ) ||
+      claim(unclaimedItems, (i) => normalize(i.name) === normalize(item.name));
     const fields = {
       name: item.name,
       category_name: item.category_name ?? null,

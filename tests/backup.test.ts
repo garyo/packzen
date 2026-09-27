@@ -813,6 +813,33 @@ test('restoreTripContents merge: matches bags case-insensitively and takes items
   assert.equal(sandals?.container_item_id, null);
 });
 
+test('restoreTripContents merge: an item in a different bag is moved, not duplicated', async () => {
+  const { trip, bags: bagList, items } = makeTripFixture();
+  const { db, api } = await handlerBackedDb();
+  await db.insert(trips).values({ ...trip, clerk_user_id: TEST_USER });
+  const carryOn = { ...bagList[0], id: crypto.randomUUID(), name: 'Carry-on', sort_order: 1 };
+  await db.insert(bags).values([...bagList, carryOn]);
+  await db.insert(tripItems).values(items);
+
+  // Same items, matched by name only (no source ids), with Sandals in the Carry-on.
+  const tripExport = yamlToTrip(tripToYAML(trip, [...bagList, carryOn], items));
+  for (const bag of tripExport.bags) bag.source_id = undefined;
+  for (const item of tripExport.items) {
+    item.source_id = undefined;
+    item.bag_source_id = null;
+    item.container_source_id = null;
+    if (item.name === 'Sandals') item.bag_name = 'Carry-on';
+  }
+
+  const result = await restoreTripContents(trip.id, tripExport, { merge: true, api });
+  assert.equal(result.created, 0);
+  assert.equal(result.updated, items.length);
+
+  const after = await tripItemsIn(db, trip.id);
+  assert.equal(after.length, items.length);
+  assert.equal(after.find((i) => i.name === 'Sandals')?.bag_id, carryOn.id);
+});
+
 test('describeTripRestore counts an item that was restored but not nested only once', () => {
   const nestOnly = describeTripRestore({
     created: 2,

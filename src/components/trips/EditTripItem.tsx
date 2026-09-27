@@ -198,7 +198,13 @@ export function EditTripItem(props: EditTripItemProps) {
 
   return (
     <Modal title="Edit Item" onClose={props.onClose} isDirty={isDirty}>
-      <div class="space-y-4">
+      <form
+        class="space-y-4"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void handleSave();
+        }}
+      >
         <div>
           <label class="mb-1 block text-sm font-medium text-gray-700">Name</label>
           <Input
@@ -301,10 +307,11 @@ export function EditTripItem(props: EditTripItemProps) {
         </div>
 
         <div class="flex gap-2 pt-4">
-          <Button onClick={handleSave} class="flex-1" disabled={saving()}>
+          <Button type="submit" class="flex-1" disabled={saving()}>
             Save
           </Button>
           <button
+            type="button"
             onClick={handleDelete}
             disabled={saving()}
             class="p-2 text-gray-400 hover:text-red-600 disabled:opacity-50"
@@ -313,7 +320,7 @@ export function EditTripItem(props: EditTripItemProps) {
             <TrashIcon class="h-5 w-5" />
           </button>
         </div>
-      </div>
+      </form>
 
       <Show when={choosingContainerDelete()}>
         <Modal
