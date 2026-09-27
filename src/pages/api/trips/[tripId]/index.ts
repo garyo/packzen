@@ -53,30 +53,6 @@ export const PATCH: APIRoute = createPatchHandler(
   sync
 );
 
-export const PUT: APIRoute = createPatchHandler(
-  async ({ db, userId, validatedData, params }) => {
-    const { name, destination, start_date, end_date, notes } = validatedData;
-    const dates = normalizeTripDates(start_date, end_date);
-
-    return await db
-      .update(trips)
-      .set({
-        name,
-        destination,
-        start_date: dates.startDate,
-        end_date: dates.endDate,
-        notes,
-        updated_at: new Date(),
-      })
-      .where(and(eq(trips.id, params.tripId), eq(trips.clerk_user_id, userId)))
-      .returning()
-      .get();
-  },
-  'update trip (PUT)',
-  tripUpdateSchema,
-  sync
-);
-
 export const DELETE: APIRoute = createDeleteHandler(
   async ({ db, userId, params }) => {
     const deleted = await db

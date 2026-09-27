@@ -1317,6 +1317,94 @@ test('An item is never both packed and skipped; trip counts ignore skipped items
   assert.equal(stats.items_packed, 1);
 });
 
+test('PATCH accepts every field the removed PUT handlers did', async () => {
+  const d1 = await createTestDatabase();
+  const db = drizzle(d1);
+  const userId = 'patch_parity_user';
+
+  const tripRoute = await import('../src/pages/api/trips/[tripId]/index');
+  assert.equal('PUT' in tripRoute, false);
+  const trip = await db
+    .insert(trips)
+    .values({ clerk_user_id: userId, name: 'Old', start_date: '2026-01-01' })
+    .returning()
+    .get();
+  const tripResponse = await callApi(tripRoute.PATCH, d1, userId, {
+    method: 'PATCH',
+    body: {
+      name: 'New',
+      destination: 'Oslo',
+      start_date: '2026-03-10',
+      end_date: '2026-03-01',
+      notes: 'Bring gloves',
+    },
+    params: { tripId: trip.id },
+  });
+  assert.equal(tripResponse.status, 200);
+  assert.deepEqual(
+    (({ name, destination, start_date, end_date, notes }) => ({
+      name,
+      destination,
+      start_date,
+      end_date,
+      notes,
+    }))((await tripResponse.json()) as Record<string, unknown>),
+    {
+      name: 'New',
+      destination: 'Oslo',
+      start_date: '2026-03-01',
+      end_date: '2026-03-10',
+      notes: 'Bring gloves',
+    }
+  );
+  const clearDates = await callApi(tripRoute.PATCH, d1, userId, {
+    method: 'PATCH',
+    body: { start_date: null, end_date: '' },
+    params: { tripId: trip.id },
+  });
+  const cleared = (await clearDates.json()) as { start_date: unknown; end_date: unknown };
+  assert.equal(cleared.start_date, null);
+  assert.equal(cleared.end_date, null);
+
+  const itemRoute = await import('../src/pages/api/master-items/[id]');
+  assert.equal('PUT' in itemRoute, false);
+  const category = await db
+    .insert(categories)
+    .values({ clerk_user_id: userId, name: 'Gear' })
+    .returning()
+    .get();
+  const master = await db
+    .insert(masterItems)
+    .values({ clerk_user_id: userId, name: 'Tent', description: 'old' })
+    .returning()
+    .get();
+  const itemResponse = await callApi(itemRoute.PATCH, d1, userId, {
+    method: 'PATCH',
+    body: {
+      name: 'Big Tent',
+      description: null,
+      category_id: category.id,
+      default_quantity: 2,
+      is_container: true,
+    },
+    params: { id: master.id },
+  });
+  assert.equal(itemResponse.status, 200);
+  const updated = (await itemResponse.json()) as Record<string, unknown>;
+  assert.equal(updated.name, 'Big Tent');
+  assert.equal(updated.description, null);
+  assert.equal(updated.category_name, 'Gear');
+  assert.equal(updated.default_quantity, 2);
+  assert.equal(updated.is_container, true);
+
+  const foreignCategory = await callApi(itemRoute.PATCH, d1, 'someone_else', {
+    method: 'PATCH',
+    body: { category_id: category.id },
+    params: { id: master.id },
+  });
+  assert.equal(foreignCategory.status, 400);
+});
+
 test('Plan limits consult the billing override only when the session plan falls short (P1)', async () => {
   let fetches = 0;
   const fetchOverride = async () => {

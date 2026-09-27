@@ -47,9 +47,6 @@ export const PATCH: APIRoute = createPatchHandler(
   sync
 );
 
-// Drizzle ignores undefined fields, so PUT and PATCH behave the same.
-export const PUT = PATCH;
-
 export const DELETE: APIRoute = createDeleteHandler(
   async ({ db, userId, params }) => {
     const deleted = await db
