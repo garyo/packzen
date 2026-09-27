@@ -3,13 +3,13 @@
  * Loads curated packing items from YAML data file
  */
 
-import yaml from 'js-yaml';
+import { load } from 'js-yaml';
 import builtInDataRaw from '../data/built-in-items.yaml?raw';
 import type { BuiltInItemsData, BuiltInItem } from './types';
 
 export type TripType = BuiltInItemsData['trip_types'][number];
 
-export const builtInItems = yaml.load(builtInDataRaw) as BuiltInItemsData;
+export const builtInItems = load(builtInDataRaw) as BuiltInItemsData;
 
 // Categories excluded from generic starter lists: situational for a subset of
 // travelers, with no dedicated family trip type. Still browsable in the Built-in browser.

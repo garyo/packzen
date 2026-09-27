@@ -1,8 +1,9 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createSQLiteDB } from '@miniflare/shared';
+import Database from 'better-sqlite3';
 import { D1Database, D1DatabaseAPI } from '@miniflare/d1';
+import { env } from 'cloudflare:workers';
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, asc } from 'drizzle-orm';
 import {
@@ -51,7 +52,7 @@ export interface TripItemSummary {
 const MIGRATIONS_DIR = fileURLToPath(new URL('../db/migrations/', import.meta.url));
 
 /** Apply db/migrations/*.sql in order, exactly as wrangler does for D1. */
-function applyMigrations(sqliteDb: Awaited<ReturnType<typeof createSQLiteDB>>) {
+function applyMigrations(sqliteDb: Database.Database) {
   const files = readdirSync(MIGRATIONS_DIR)
     .filter((file) => file.endsWith('.sql'))
     .sort();
@@ -85,7 +86,7 @@ function enforceD1ParamLimit(d1: D1Database) {
 }
 
 export async function createTestDatabase() {
-  const sqliteDb = await createSQLiteDB(':memory:');
+  const sqliteDb = new Database(':memory:');
   applyMigrations(sqliteDb);
   const d1 = new D1Database(new D1DatabaseAPI(sqliteDb));
   enforceD1ParamLimit(d1);
@@ -106,12 +107,13 @@ export function buildApiContext({
   params?: Record<string, string>;
 }): APIContext {
   const req = request ?? new Request('http://localhost', { method: 'GET' });
+  // Handlers reach D1 through the Worker's `env` binding.
+  env.DB = db as unknown as Cloudflare.Env['DB'];
 
   return {
     request: req,
     params: params ?? {},
     locals: {
-      runtime: { env: { DB: db } },
       userId,
       billing,
     },

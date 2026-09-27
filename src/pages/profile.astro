@@ -1,13 +1,13 @@
 ---
 import AppLayout from '../layouts/AppLayout.astro';
-import { UserProfile, SignedIn } from '@clerk/astro/components';
+import { UserProfile, Show } from '@clerk/astro/components';
 ---
 
 <AppLayout title="Account Settings - PackZen" nav>
   <div class="flex justify-center px-4 py-8">
-    <SignedIn>
+    <Show when="signed-in">
       <UserProfile />
-    </SignedIn>
+    </Show>
   </div>
 </AppLayout>
 

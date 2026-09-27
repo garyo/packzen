@@ -78,7 +78,7 @@ npx wrangler secret put CLERK_SECRET_KEY
 - Use **production** Clerk keys (`pk_live_*`, `sk_live_*`), NOT test keys
 - `CLERK_SECRET_KEY` is sensitive - never commit to git or expose publicly
 - Secrets are encrypted and only available at runtime
-- These variables are available to your Astro app via `import.meta.env`
+- The Worker reads them at runtime (`env` from `cloudflare:workers`)
 
 ## Step 5: Deploy to Cloudflare Workers
 
@@ -94,8 +94,8 @@ npx wrangler deploy
 
 This will:
 
-1. Upload your Worker script (`dist/_worker.js/index.js`)
-2. Upload static assets from `dist/` directory
+1. Upload your Worker script (`dist/server/`, via the config the build writes to `dist/server/wrangler.json`)
+2. Upload static assets from `dist/client/`
 3. Bind the D1 database
 4. Make your app live at `https://packzen.<your-subdomain>.workers.dev`
 

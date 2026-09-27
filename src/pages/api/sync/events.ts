@@ -14,7 +14,7 @@ const sseResponse = (body: string) =>
   });
 
 export const GET: APIRoute = async (context) => {
-  const db = getDatabaseConnection(context.locals);
+  const db = getDatabaseConnection();
   const userId = getUserId(context.locals);
 
   // Absent Last-Event-ID = first poll of a fresh tab: don't replay history.

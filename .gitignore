@@ -18,6 +18,7 @@ pnpm-debug.log*
 # environment variables
 .env
 .env.local
+.dev.vars*
 .env.production
 
 # macOS-specific files
@@ -29,3 +30,6 @@ pnpm-debug.log*
 
 # auto-generated files
 src/lib/version.ts
+
+# clerk configuration (can include secrets)
+/.clerk/

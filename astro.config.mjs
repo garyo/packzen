@@ -20,11 +20,10 @@ export default defineConfig({
     },
   },
 
-  adapter: cloudflare({
-    platformProxy: {
-      enabled: true,
-    },
-  }),
+  // No astro:assets images or Astro sessions, so skip the Cloudflare Images
+  // and KV bindings the adapter would otherwise provision.
+  adapter: cloudflare({ imageService: 'passthrough' }),
+  session: false,
 
   output: 'static',
 });

@@ -21,7 +21,7 @@ import { logChange, getSourceId } from '../../../../lib/sync';
  */
 export const POST: APIRoute = async (context) => {
   try {
-    const db = getDatabaseConnection(context.locals);
+    const db = getDatabaseConnection();
     const userId = getUserId(context.locals);
     const originalTrip = await requireOwnedTrip(db, userId, context.params.tripId!);
 

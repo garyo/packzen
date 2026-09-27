@@ -43,7 +43,7 @@ async function readSmallJson(request: Request): Promise<unknown> {
 export const POST: APIRoute = async (context) => {
   try {
     const { event, props } = parseWith(clientEventSchema, await readSmallJson(context.request));
-    const db = getDatabaseConnection(context.locals);
+    const db = getDatabaseConnection();
     logEvent(db, event, { userId: getUserId(context.locals), props });
     return successResponse({ ok: true }, 202);
   } catch (error) {

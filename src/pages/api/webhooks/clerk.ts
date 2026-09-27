@@ -8,9 +8,9 @@ export const prerender = false;
  */
 
 import type { APIRoute } from 'astro';
+import { env } from 'cloudflare:workers';
 import { Webhook } from 'svix';
 import { drizzle } from 'drizzle-orm/d1';
-import type { D1Database } from '@cloudflare/workers-types';
 import { deleteAllUserData } from '../../../lib/user-data-cleanup';
 import { runInBackground } from '../../../lib/background';
 
@@ -58,21 +58,9 @@ interface ClerkWebhookEvent {
   timestamp: number;
 }
 
-export const POST: APIRoute = async (context) => {
-  const { request, locals } = context;
-
+export const POST: APIRoute = async ({ request }) => {
   try {
-    // Get webhook secret from runtime environment
-    const runtime = locals.runtime as
-      | { env: { CLERK_WEBHOOK_SECRET?: string; DB: D1Database } }
-      | undefined;
-
-    if (!runtime?.env) {
-      console.error('Runtime environment not available');
-      return new Response('Server configuration error', { status: 500 });
-    }
-
-    const WEBHOOK_SECRET = runtime.env.CLERK_WEBHOOK_SECRET;
+    const WEBHOOK_SECRET = env.CLERK_WEBHOOK_SECRET;
 
     if (!WEBHOOK_SECRET) {
       console.error('Missing CLERK_WEBHOOK_SECRET environment variable');
@@ -95,11 +83,12 @@ export const POST: APIRoute = async (context) => {
     let evt: ClerkWebhookEvent;
 
     try {
-      evt = wh.verify(payload, {
+      wh.verify(payload, {
         'svix-id': svixId,
         'svix-timestamp': svixTimestamp,
         'svix-signature': svixSignature,
-      }) as ClerkWebhookEvent;
+      });
+      evt = JSON.parse(payload) as ClerkWebhookEvent;
     } catch (err) {
       console.error('Webhook signature verification failed:', err);
       return new Response('Invalid signature', { status: 400 });
@@ -113,7 +102,7 @@ export const POST: APIRoute = async (context) => {
 
     // Handle user.deleted event
     if (type === 'user.deleted') {
-      const db = drizzle(runtime.env.DB);
+      const db = drizzle(env.DB);
 
       try {
         await deleteAllUserData(userId, db);

@@ -1,13 +1,9 @@
 {
-  "main": "dist/_worker.js/index.js",
+  "main": "@astrojs/cloudflare/entrypoints/server",
   "name": "packzen",
   "account_id": "97571a833a50d387280ecaac7d736c4e",
   "compatibility_date": "2025-12-12",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
-  "assets": {
-    "binding": "ASSETS",
-    "directory": "./dist",
-  },
   "d1_databases": [
     {
       "binding": "DB",
