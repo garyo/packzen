@@ -11,11 +11,13 @@ declare namespace App {
   interface Locals {
     userId: string;
     billing?: import('./lib/billing').Billing;
-    runtime: {
-      env: {
-        DB: D1Database;
-        CLERK_SECRET_KEY?: string;
-      };
-    };
+  }
+}
+
+// Bindings and secrets on `env` from 'cloudflare:workers' (see wrangler.jsonc).
+declare namespace Cloudflare {
+  interface Env {
+    DB: D1Database;
+    CLERK_WEBHOOK_SECRET?: string;
   }
 }

@@ -137,7 +137,7 @@ export const GET: APIRoute = createGetHandler(async ({ db, userId, params }) => 
  */
 export const POST: APIRoute = async (context) => {
   try {
-    const db = getDatabaseConnection(context.locals);
+    const db = getDatabaseConnection();
     const userId = getUserId(context.locals);
     const trip = await requireOwnedTrip(db, userId, context.params.tripId!);
     const body = await readJsonBody(context.request);

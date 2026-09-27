@@ -1,5 +1,5 @@
 // @ts-check
-import { defineConfig } from 'astro/config';
+import { defineConfig, sessionDrivers } from 'astro/config';
 
 import solidJs from '@astrojs/solid-js';
 import tailwindcss from '@tailwindcss/vite';
@@ -20,11 +20,10 @@ export default defineConfig({
     },
   },
 
-  adapter: cloudflare({
-    platformProxy: {
-      enabled: true,
-    },
-  }),
+  // No astro:assets images or Astro sessions, so skip the Cloudflare Images
+  // and KV bindings the adapter would otherwise provision.
+  adapter: cloudflare({ imageService: 'passthrough' }),
+  session: { driver: sessionDrivers.lruCache() },
 
   output: 'static',
 });

@@ -5,7 +5,7 @@
  */
 
 import type { APIContext } from 'astro';
-import type { D1Database } from '@cloudflare/workers-types';
+import { env } from 'cloudflare:workers';
 import { and, eq } from 'drizzle-orm';
 import { drizzle, type DrizzleD1Database } from 'drizzle-orm/d1';
 import type { z } from 'zod';
@@ -15,11 +15,10 @@ import { logChange, getSourceId } from './sync';
 import { validateRequestSafe } from './validation';
 
 /**
- * Get database connection from Astro locals
+ * Get a database connection to the Worker's D1 binding
  */
-export function getDatabaseConnection(locals: APIContext['locals']): DrizzleD1Database {
-  const runtime = locals.runtime as { env: { DB: D1Database } };
-  return drizzle(runtime.env.DB);
+export function getDatabaseConnection(): DrizzleD1Database {
+  return drizzle(env.DB);
 }
 
 /**
@@ -131,7 +130,7 @@ interface HandlerContext {
 
 function handlerContext(context: APIContext): HandlerContext {
   return {
-    db: getDatabaseConnection(context.locals),
+    db: getDatabaseConnection(),
     userId: getUserId(context.locals),
     params: context.params as Params,
     request: context.request,

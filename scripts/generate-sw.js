@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Generate dist/sw.js after `astro build`. The cache name is a hash of the
+ * Generate dist/client/sw.js after `astro build`. The cache name is a hash of the
  * precached files' contents, so it changes exactly when what's cached does.
  */
 
@@ -32,13 +32,13 @@ const BASE_PRECACHE_URLS = [
 ];
 
 /**
- * Recursively collect hashed build assets under dist/_astro so a
+ * Recursively collect hashed build assets under dist/client/_astro so a
  * first-ever offline visit has real JS/CSS to run against instead of a
  * dead HTML shell. Astro fingerprints these filenames per build, so they
  * can only be discovered by scanning actual build output — there's no
  * pre-build manifest to read.
  *
- * The `build` script runs `sw:generate` after `astro build`, so dist/ holds
+ * The `build` script runs `sw:generate` after `astro build`, so dist/client/ holds
  * this build's freshly-hashed assets when this runs.
  *
  * @param {string} distDir
@@ -265,9 +265,9 @@ async function fetchAndCache(request) {
 }
 
 function main() {
-  const distDir = join(__dirname, '../dist');
+  const distDir = join(__dirname, '../dist/client');
   if (!existsSync(distDir)) {
-    throw new Error('generate-sw: dist/ not found; run this after `astro build`.');
+    throw new Error('generate-sw: dist/client/ not found; run this after `astro build`.');
   }
 
   const versionContent = readFileSync(join(__dirname, '../src/lib/version.ts'), 'utf8');

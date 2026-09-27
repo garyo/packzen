@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3';
 import { D1Database, D1DatabaseAPI } from '@miniflare/d1';
+import { env } from 'cloudflare:workers';
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, asc } from 'drizzle-orm';
 import {
@@ -106,12 +107,13 @@ export function buildApiContext({
   params?: Record<string, string>;
 }): APIContext {
   const req = request ?? new Request('http://localhost', { method: 'GET' });
+  // Handlers reach D1 through the Worker's `env` binding.
+  env.DB = db as unknown as Cloudflare.Env['DB'];
 
   return {
     request: req,
     params: params ?? {},
     locals: {
-      runtime: { env: { DB: db } },
       userId,
       billing,
     },
