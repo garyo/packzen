@@ -4,7 +4,7 @@
   "version": "0.0.1",
   "license": "MIT",
   "scripts": {
-    "dev": "npm run version:generate:dev && npm run sw:generate && astro dev",
+    "dev": "bun run version:generate:dev && astro dev",
     "build": "npm run validate:data && npm run version:generate && astro build && npm run sw:generate",
     "preview": "astro preview",
     "test": "node --import tsx --import ./tests/raw-import.mjs --test tests/d1-api.test.ts tests/backup.test.ts tests/sync-manager.test.ts tests/service-worker.test.ts tests/sync-events.test.ts tests/sync-buffer.test.ts tests/api.test.ts tests/csv.test.ts tests/starter.test.ts",
