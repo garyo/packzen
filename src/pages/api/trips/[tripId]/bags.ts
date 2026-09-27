@@ -3,75 +3,45 @@ export const prerender = false;
 import type { APIRoute } from 'astro';
 import { eq, and, asc } from 'drizzle-orm';
 import { z } from 'zod';
-import { bags, trips, tripItems } from '../../../../../db/schema';
-import { bagCreateSchema, bagUpdateSchema, validateRequestSafe } from '../../../../lib/validation';
+import { bags } from '../../../../../db/schema';
+import { bagCreateSchema, bagUpdateSchema } from '../../../../lib/validation';
 import {
   createGetHandler,
   createPostHandler,
   createPatchHandler,
   createDeleteHandler,
-  NotFoundError,
+  requireOwnedTrip,
+  readJsonBody,
+  parseWith,
   BadRequestError,
   type SyncConfig,
 } from '../../../../lib/api-helpers';
 
 const sync: SyncConfig = {
   entityType: 'bag',
-  parentId: (params) => params.tripId || null,
+  parentId: (params) => params.tripId,
 };
 
+const bagDeleteSchema = z.object({ bag_id: z.string().uuid() });
+
 export const GET: APIRoute = createGetHandler(async ({ db, userId, params }) => {
-  const { tripId } = params;
-  if (!tripId) {
-    throw new Error('Trip ID is required');
-  }
-
-  // Verify trip ownership
-  const trip = await db
-    .select()
-    .from(trips)
-    .where(and(eq(trips.id, tripId), eq(trips.clerk_user_id, userId)))
-    .get();
-
-  if (!trip) {
-    throw new NotFoundError('Trip not found');
-  }
-
+  const trip = await requireOwnedTrip(db, userId, params.tripId);
   return await db
     .select()
     .from(bags)
-    .where(eq(bags.trip_id, tripId))
+    .where(eq(bags.trip_id, trip.id))
     .orderBy(asc(bags.sort_order))
     .all();
 }, 'fetch bags');
 
-export const POST: APIRoute = createPostHandler<
-  z.infer<typeof bagCreateSchema>,
-  typeof bags.$inferSelect
->(
+export const POST: APIRoute = createPostHandler(
   async ({ db, userId, validatedData, params }) => {
-    const { tripId } = params;
-    if (!tripId) {
-      throw new Error('Trip ID is required');
-    }
-
-    // Verify trip ownership
-    const trip = await db
-      .select()
-      .from(trips)
-      .where(and(eq(trips.id, tripId), eq(trips.clerk_user_id, userId)))
-      .get();
-
-    if (!trip) {
-      throw new NotFoundError('Trip not found');
-    }
-
+    const trip = await requireOwnedTrip(db, userId, params.tripId);
     const { name, type, color, sort_order } = validatedData;
-
     return await db
       .insert(bags)
       .values({
-        trip_id: tripId,
+        trip_id: trip.id,
         name,
         type,
         color: color || null,
@@ -81,112 +51,43 @@ export const POST: APIRoute = createPostHandler<
       .get();
   },
   'create bag',
-  (data) => validateRequestSafe(bagCreateSchema, data),
+  bagCreateSchema,
   sync
 );
 
-export const PATCH: APIRoute = createPatchHandler<
-  z.infer<typeof bagUpdateSchema>,
-  typeof bags.$inferSelect
->(
+export const PATCH: APIRoute = createPatchHandler(
   async ({ db, userId, validatedData, params }) => {
-    const { tripId } = params;
-    if (!tripId) {
-      throw new Error('Trip ID is required');
-    }
-
-    // Verify trip ownership
-    const trip = await db
-      .select()
-      .from(trips)
-      .where(and(eq(trips.id, tripId), eq(trips.clerk_user_id, userId)))
-      .get();
-
-    if (!trip) {
-      throw new NotFoundError('Trip not found');
-    }
-
-    const { bag_id, name, type, color, sort_order } = validatedData;
-
-    // Build update object dynamically
-    type BagUpdate = Partial<
-      Pick<typeof bags.$inferSelect, 'name' | 'type' | 'color' | 'sort_order'>
-    >;
-    const updates: BagUpdate = {};
-    if (name !== undefined) updates.name = name;
-    if (type !== undefined) updates.type = type;
-    if (color !== undefined) updates.color = color;
-    if (sort_order !== undefined) updates.sort_order = sort_order;
-
-    if (Object.keys(updates).length === 0) {
+    const trip = await requireOwnedTrip(db, userId, params.tripId);
+    const { bag_id, ...fields } = validatedData;
+    if (Object.values(fields).every((value) => value === undefined)) {
       throw new BadRequestError('No fields provided to update');
     }
 
     return await db
       .update(bags)
-      .set(updates)
-      .where(and(eq(bags.id, bag_id), eq(bags.trip_id, tripId)))
+      .set(fields)
+      .where(and(eq(bags.id, bag_id), eq(bags.trip_id, trip.id)))
       .returning()
       .get();
   },
   'update bag',
-  (data) => validateRequestSafe(bagUpdateSchema, data),
-  { ...sync, entityId: (result) => result.id || (result as any).bag_id }
+  bagUpdateSchema,
+  sync
 );
 
+// Deleting a bag leaves its items in the trip: the bag_id foreign key is
+// ON DELETE SET NULL, so they move to "no bag".
 export const DELETE: APIRoute = createDeleteHandler(
   async ({ db, userId, params, request }) => {
-    const { tripId } = params;
-    if (!tripId) {
-      return false;
-    }
-
-    const body = await request.json();
-    const bag_id =
-      typeof body === 'object' &&
-      body !== null &&
-      'bag_id' in body &&
-      typeof body.bag_id === 'string'
-        ? body.bag_id
-        : null;
-
-    if (!bag_id) {
-      return false;
-    }
-
-    // Verify trip ownership
-    const trip = await db
-      .select()
-      .from(trips)
-      .where(and(eq(trips.id, tripId), eq(trips.clerk_user_id, userId)))
-      .get();
-
-    if (!trip) {
-      return false;
-    }
+    const { bag_id } = parseWith(bagDeleteSchema, await readJsonBody(request));
+    const trip = await requireOwnedTrip(db, userId, params.tripId);
 
     const deleted = await db
       .delete(bags)
-      .where(and(eq(bags.id, bag_id), eq(bags.trip_id, tripId)))
-      .returning()
+      .where(and(eq(bags.id, bag_id), eq(bags.trip_id, trip.id)))
+      .returning({ id: bags.id })
       .get();
-
-    if (!deleted) {
-      return false;
-    }
-
-    // Unassign items that were in this bag so they remain visible (under
-    // "Wearing / No Bag") instead of disappearing with a dangling bag_id.
-    // Affected items aren't individually synced here; PackingPage refetches
-    // items + bags after bag manager actions, and other devices pick up the
-    // change on their next refetch.
-    await db
-      .update(tripItems)
-      .set({ bag_id: null, updated_at: new Date() })
-      .where(and(eq(tripItems.bag_id, bag_id), eq(tripItems.trip_id, tripId)))
-      .run();
-
-    return bag_id;
+    return deleted?.id ?? false;
   },
   'delete bag',
   sync

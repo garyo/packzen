@@ -17,7 +17,8 @@ import { deleteAllUserData } from '../src/lib/user-data-cleanup';
 import * as bagTemplatesApi from '../src/pages/api/bag-templates/index';
 import * as tripsApiIndex from '../src/pages/api/trips/index';
 import * as tripItemsApi from '../src/pages/api/trips/[tripId]/items';
-import { getLimitsForPlan } from '../src/lib/resource-limits';
+import { getLimitsForPlan, planLimit } from '../src/lib/resource-limits';
+import { createBilling } from '../src/lib/billing';
 import {
   createTestDatabase,
   buildApiContext,
@@ -25,6 +26,7 @@ import {
   loadSnapshot,
   summarizeSnapshot,
   importBackupForUser,
+  callApi,
 } from './test-helpers';
 
 test('Full backup export/import round-trips data through YAML using a D1 database', async () => {
@@ -70,11 +72,7 @@ test('Bag template API enforces free-plan limits and allows standard plan', asyn
   const userId = 'user_limit_test';
 
   // Seed up to limit - 1
-  const limit = getLimitsForPlan({
-    activePlan: 'free_user',
-    hasFreeUserPlan: true,
-    hasStandardPlan: false,
-  }).maxBagTemplates;
+  const limit = getLimitsForPlan('free_user').maxBagTemplates;
   for (let i = 0; i < limit; i++) {
     await db.insert(bagTemplates).values({
       clerk_user_id: userId,
@@ -109,7 +107,7 @@ test('Bag template API enforces free-plan limits and allows standard plan', asyn
     db: d1,
     userId,
     request: postRequest.clone() as unknown as Request,
-    billingStatus: { activePlan: 'standard', hasFreeUserPlan: false, hasStandardPlan: true },
+    billing: createBilling('standard'),
   });
 
   const standardResponse = await bagTemplatesApi.POST!(standardContext);
@@ -126,11 +124,7 @@ test('Bag template API enforces free-plan limits and allows standard plan', asyn
 test('Trip API enforces trip limits and returns stats', async () => {
   const d1 = await createTestDatabase();
   const userId = 'trip_test_user';
-  const limit = getLimitsForPlan({
-    activePlan: 'free_user',
-    hasFreeUserPlan: true,
-    hasStandardPlan: false,
-  }).maxTrips;
+  const limit = getLimitsForPlan('free_user').maxTrips;
 
   const createTripRequest = (name: string) =>
     new Request('http://localhost/api/trips', {
@@ -727,11 +721,7 @@ test('Trip copy respects the per-user trip limit (B1)', async () => {
   const d1 = await createTestDatabase();
   const db = drizzle(d1);
   const userId = 'copy_trip_limit_user';
-  const limit = getLimitsForPlan({
-    activePlan: 'free_user',
-    hasFreeUserPlan: true,
-    hasStandardPlan: false,
-  }).maxTrips;
+  const limit = getLimitsForPlan('free_user').maxTrips;
 
   let sourceTripId = '';
   for (let i = 0; i < limit; i++) {
@@ -765,11 +755,7 @@ test('Trip copy respects the per-trip item limit (B1)', async () => {
   const d1 = await createTestDatabase();
   const db = drizzle(d1);
   const userId = 'copy_item_limit_user';
-  const maxItems = getLimitsForPlan({
-    activePlan: 'free_user',
-    hasFreeUserPlan: true,
-    hasStandardPlan: false,
-  }).maxItemsPerTrip;
+  const maxItems = getLimitsForPlan('free_user').maxItemsPerTrip;
 
   const trip = await db
     .insert(trips)
@@ -782,21 +768,29 @@ test('Trip copy respects the per-trip item limit (B1)', async () => {
   }
 
   const { POST: COPY_POST } = await import('../src/pages/api/trips/[tripId]/copy');
-  const copyCtx = buildApiContext({
-    db: d1,
-    userId,
-    request: new Request(`http://localhost/api/trips/${trip.id}/copy`, { method: 'POST' }),
-    params: { tripId: trip.id },
-  });
-  const copyResponse = await COPY_POST!(copyCtx);
-  assert.equal(copyResponse.status, 403);
+  const copy = () =>
+    COPY_POST!(
+      buildApiContext({
+        db: d1,
+        userId,
+        request: new Request(`http://localhost/api/trips/${trip.id}/copy`, { method: 'POST' }),
+        params: { tripId: trip.id },
+      })
+    );
+
+  // Exactly the limit fits in the copy...
+  assert.equal((await copy()).status, 201);
+
+  // ...one more doesn't.
+  await db.insert(tripItems).values({ trip_id: trip.id, name: 'One too many' });
+  assert.equal((await copy()).status, 403);
 
   const tripCountAfter = await db
     .select({ count: count() })
     .from(trips)
     .where(eq(trips.clerk_user_id, userId))
     .get();
-  assert.equal(tripCountAfter?.count, 1, 'no copy trip should have been created');
+  assert.equal(tripCountAfter?.count, 2, 'only the first copy should have been created');
 });
 
 test('Trip copy duplicates bags, items, and container relationships in one atomic batch (B2)', async () => {
@@ -1048,4 +1042,417 @@ test('Empty PATCH body returns 400 instead of crashing (B8)', async () => {
   });
   const categoryPatchResponse = await CATEGORY_PATCH!(categoryPatchCtx);
   assert.equal(categoryPatchResponse.status, 400);
+});
+
+test('Trip copy with many bags stays within D1 bound-parameter limits (C2)', async () => {
+  const d1 = await createTestDatabase();
+  const db = drizzle(d1);
+  const userId = 'copy_many_bags_user';
+
+  const trip = await db
+    .insert(trips)
+    .values({ clerk_user_id: userId, name: 'Many Bags' })
+    .returning()
+    .get();
+  for (let i = 0; i < 20; i++) {
+    const bag = await db
+      .insert(bags)
+      .values({ trip_id: trip.id, name: `Bag ${i + 1}`, type: 'custom', sort_order: i })
+      .returning()
+      .get();
+    await db.insert(tripItems).values({ trip_id: trip.id, bag_id: bag.id, name: `Item ${i + 1}` });
+  }
+
+  const { POST: COPY_POST } = await import('../src/pages/api/trips/[tripId]/copy');
+  const copyResponse = await COPY_POST!(
+    buildApiContext({
+      db: d1,
+      userId,
+      request: new Request(`http://localhost/api/trips/${trip.id}/copy`, { method: 'POST' }),
+      params: { tripId: trip.id },
+    })
+  );
+  assert.equal(copyResponse.status, 201);
+  const newTrip = (await copyResponse.json()) as { id: string };
+
+  const newBags = await db.select().from(bags).where(eq(bags.trip_id, newTrip.id)).all();
+  assert.equal(newBags.length, 20);
+  const newItems = await db.select().from(tripItems).where(eq(tripItems.trip_id, newTrip.id)).all();
+  assert.equal(newItems.length, 20);
+});
+
+test('Batch item create referencing many master items stays within D1 limits (C3)', async () => {
+  const d1 = await createTestDatabase();
+  const db = drizzle(d1);
+  const userId = 'batch_many_refs_user';
+
+  const trip = await db
+    .insert(trips)
+    .values({ clerk_user_id: userId, name: 'Suggestions Trip' })
+    .returning()
+    .get();
+  const items = [];
+  for (let i = 0; i < 150; i++) {
+    const master = await db
+      .insert(masterItems)
+      .values({ clerk_user_id: userId, name: `Thing ${i + 1}` })
+      .returning()
+      .get();
+    items.push({ name: master.name, master_item_id: master.id });
+  }
+
+  const response = await tripItemsApi.POST!(
+    buildApiContext({
+      db: d1,
+      userId,
+      request: new Request(`http://localhost/api/trips/${trip.id}/items`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items }),
+      }),
+      params: { tripId: trip.id },
+      billing: createBilling('standard'),
+    })
+  );
+  assert.equal(response.status, 201);
+  const inserted = (await response.json()) as unknown[];
+  assert.equal(inserted.length, 150);
+});
+
+test('A failed batch item create leaves no partial rows (C17)', async () => {
+  const d1 = await createTestDatabase();
+  const db = drizzle(d1);
+  const userId = 'batch_atomic_user';
+  const trip = await db
+    .insert(trips)
+    .values({ clerk_user_id: userId, name: 'Atomic' })
+    .returning()
+    .get();
+
+  const originalBatch = d1.batch.bind(d1);
+  (d1 as unknown as { batch: unknown }).batch = async () => {
+    throw new Error('Simulated D1 batch failure');
+  };
+  try {
+    const items = Array.from({ length: 20 }, (_, i) => ({ name: `Item ${i + 1}` }));
+    const response = await callApi(tripItemsApi.POST, d1, userId, {
+      method: 'POST',
+      body: { items },
+      params: { tripId: trip.id },
+    });
+    assert.equal(response.status, 500);
+  } finally {
+    (d1 as unknown as { batch: unknown }).batch = originalBatch;
+  }
+
+  assert.equal(await db.$count(tripItems, eq(tripItems.trip_id, trip.id)), 0);
+});
+
+test('Item validation failures are 4xx, not 500 (B7)', async () => {
+  const d1 = await createTestDatabase();
+  const db = drizzle(d1);
+  const userId = 'item_errors_user';
+  const trip = await db
+    .insert(trips)
+    .values({ clerk_user_id: userId, name: 'Mine' })
+    .returning()
+    .get();
+  const otherTrip = await db
+    .insert(trips)
+    .values({ clerk_user_id: userId, name: 'Other' })
+    .returning()
+    .get();
+  const foreignBag = await db
+    .insert(bags)
+    .values({ trip_id: otherTrip.id, name: 'Elsewhere', type: 'custom' })
+    .returning()
+    .get();
+  const container = await db
+    .insert(tripItems)
+    .values({ trip_id: trip.id, name: 'Kit', is_container: true })
+    .returning()
+    .get();
+  const params = { tripId: trip.id };
+  const patch = (body: unknown) =>
+    callApi(tripItemsApi.PATCH, d1, userId, { method: 'PATCH', body, params });
+
+  assert.equal((await patch({ id: container.id, bag_id: foreignBag.id })).status, 400);
+  assert.equal((await patch({ id: container.id, container_item_id: container.id })).status, 400);
+  assert.equal((await patch({ id: crypto.randomUUID(), name: 'Ghost' })).status, 404);
+  assert.equal((await patch('{not json')).status, 400);
+
+  const deleteMissing = await callApi(tripItemsApi.DELETE, d1, userId, {
+    method: 'DELETE',
+    body: { id: crypto.randomUUID() },
+    params,
+  });
+  assert.equal(deleteMissing.status, 404);
+
+  const postMalformed = await callApi(tripsApiIndex.POST, d1, userId, {
+    method: 'POST',
+    body: '{"name": ',
+  });
+  assert.equal(postMalformed.status, 400);
+});
+
+test('Merging a duplicate item clamps quantity and is allowed at the item limit', async () => {
+  const d1 = await createTestDatabase();
+  const db = drizzle(d1);
+  const userId = 'merge_limit_user';
+  const maxItems = getLimitsForPlan('free_user').maxItemsPerTrip;
+  const trip = await db
+    .insert(trips)
+    .values({ clerk_user_id: userId, name: 'Full Trip' })
+    .returning()
+    .get();
+  await db.insert(tripItems).values({ trip_id: trip.id, name: 'Socks', quantity: 9990 });
+  for (let i = 1; i < maxItems; i++) {
+    await db.insert(tripItems).values({ trip_id: trip.id, name: `Item ${i}` });
+  }
+
+  const add = (name: string) =>
+    callApi(tripItemsApi.POST, d1, userId, {
+      method: 'POST',
+      body: { name, quantity: 20 },
+      params: { tripId: trip.id },
+    });
+
+  // The trip is full, but merging adds no row.
+  const merged = await add('socks');
+  assert.equal(merged.status, 200);
+  assert.equal(((await merged.json()) as { quantity: number }).quantity, 9999);
+
+  assert.equal((await add('Hat')).status, 403);
+});
+
+test('Trip dates must be real calendar dates', async () => {
+  const d1 = await createTestDatabase();
+  const create = (start_date: string) =>
+    callApi(tripsApiIndex.POST, d1, 'date_user', {
+      method: 'POST',
+      body: { name: 'Dated', start_date },
+    });
+
+  assert.equal((await create('2026-99-99')).status, 400);
+  assert.equal((await create('2026-02-30')).status, 400);
+  assert.equal((await create('2028-02-29')).status, 201);
+});
+
+test('Analytics endpoint accepts only list_printed with a trip id (S2)', async () => {
+  const d1 = await createTestDatabase();
+  const db = drizzle(d1);
+  const { POST } = await import('../src/pages/api/analytics');
+  const post = (body: unknown) => callApi(POST, d1, 'analytics_user', { method: 'POST', body });
+  const tripId = crypto.randomUUID();
+
+  assert.equal((await post({ event: 'list_printed', props: { tripId } })).status, 202);
+  assert.equal((await post({ event: 'trip_created', props: { tripId } })).status, 400);
+  assert.equal((await post({ event: 'list_printed', props: { tripId: 'x' } })).status, 400);
+  assert.equal(
+    (await post({ event: 'list_printed', props: { tripId, extra: 'x'.repeat(10) } })).status,
+    400
+  );
+  assert.equal(
+    (await post({ event: 'list_printed', props: { tripId }, pad: 'x'.repeat(2000) })).status,
+    400
+  );
+
+  await new Promise((resolve) => setTimeout(resolve, 10)); // background insert
+  const rows = await db.select().from(analyticsEvents).all();
+  assert.equal(rows.length, 1);
+  assert.deepEqual(JSON.parse(rows[0].props!), { tripId });
+});
+
+test('Creating a category that already exists returns it instead of a duplicate', async () => {
+  const d1 = await createTestDatabase();
+  const db = drizzle(d1);
+  const userId = 'category_dedup_user';
+  const { POST } = await import('../src/pages/api/categories/index');
+  const create = (name: string) => callApi(POST, d1, userId, { method: 'POST', body: { name } });
+
+  const first = await create('Toiletries');
+  assert.equal(first.status, 201);
+  const again = await create('  toiletries ');
+  assert.equal(again.status, 200);
+  assert.equal(
+    ((await again.json()) as { id: string }).id,
+    ((await first.json()) as { id: string }).id
+  );
+  assert.equal(await db.$count(categories, eq(categories.clerk_user_id, userId)), 1);
+
+  // Another user's category of the same name is separate.
+  const otherUser = await callApi(POST, d1, 'someone_else', {
+    method: 'POST',
+    body: { name: 'Toiletries' },
+  });
+  assert.equal(otherUser.status, 201);
+});
+
+test('An item is never both packed and skipped; trip counts ignore skipped items (C7)', async () => {
+  const d1 = await createTestDatabase();
+  const db = drizzle(d1);
+  const userId = 'pack_state_user';
+  const trip = await db
+    .insert(trips)
+    .values({ clerk_user_id: userId, name: 'Pack State' })
+    .returning()
+    .get();
+  const params = { tripId: trip.id };
+  const patch = async (body: Record<string, unknown>) => {
+    const response = await callApi(tripItemsApi.PATCH, d1, userId, {
+      method: 'PATCH',
+      body,
+      params,
+    });
+    assert.equal(response.status, 200);
+    return (await response.json()) as { is_packed: boolean; is_skipped: boolean };
+  };
+
+  const item = await db
+    .insert(tripItems)
+    .values({ trip_id: trip.id, name: 'Umbrella', is_packed: true })
+    .returning()
+    .get();
+
+  const skipped = await patch({ id: item.id, is_skipped: true });
+  assert.equal(skipped.is_packed, false);
+  assert.equal(skipped.is_skipped, true);
+  const packedAgain = await patch({ id: item.id, is_packed: true });
+  assert.equal(packedAgain.is_packed, true);
+  assert.equal(packedAgain.is_skipped, false);
+  const both = await patch({ id: item.id, is_packed: true, is_skipped: true });
+  assert.equal(both.is_packed, false);
+  assert.equal(both.is_skipped, true);
+
+  const created = await callApi(tripItemsApi.POST, d1, userId, {
+    method: 'POST',
+    body: { items: [{ name: 'Kite', is_packed: true, is_skipped: true }] },
+    params,
+  });
+  const [kite] = (await created.json()) as { is_packed: boolean; is_skipped: boolean }[];
+  assert.equal(kite.is_packed, false);
+  assert.equal(kite.is_skipped, true);
+
+  await db.insert(tripItems).values({ trip_id: trip.id, name: 'Passport', is_packed: true });
+  await db.insert(tripItems).values({ trip_id: trip.id, name: 'Map' });
+
+  const list = await callApi(tripsApiIndex.GET, d1, userId);
+  const [stats] = (await list.json()) as { items_total: number; items_packed: number }[];
+  assert.equal(stats.items_total, 2, 'skipped Umbrella and Kite are not counted');
+  assert.equal(stats.items_packed, 1);
+});
+
+test('PATCH accepts every field the removed PUT handlers did', async () => {
+  const d1 = await createTestDatabase();
+  const db = drizzle(d1);
+  const userId = 'patch_parity_user';
+
+  const tripRoute = await import('../src/pages/api/trips/[tripId]/index');
+  assert.equal('PUT' in tripRoute, false);
+  const trip = await db
+    .insert(trips)
+    .values({ clerk_user_id: userId, name: 'Old', start_date: '2026-01-01' })
+    .returning()
+    .get();
+  const tripResponse = await callApi(tripRoute.PATCH, d1, userId, {
+    method: 'PATCH',
+    body: {
+      name: 'New',
+      destination: 'Oslo',
+      start_date: '2026-03-10',
+      end_date: '2026-03-01',
+      notes: 'Bring gloves',
+    },
+    params: { tripId: trip.id },
+  });
+  assert.equal(tripResponse.status, 200);
+  assert.deepEqual(
+    (({ name, destination, start_date, end_date, notes }) => ({
+      name,
+      destination,
+      start_date,
+      end_date,
+      notes,
+    }))((await tripResponse.json()) as Record<string, unknown>),
+    {
+      name: 'New',
+      destination: 'Oslo',
+      start_date: '2026-03-01',
+      end_date: '2026-03-10',
+      notes: 'Bring gloves',
+    }
+  );
+  const clearDates = await callApi(tripRoute.PATCH, d1, userId, {
+    method: 'PATCH',
+    body: { start_date: null, end_date: '' },
+    params: { tripId: trip.id },
+  });
+  const cleared = (await clearDates.json()) as { start_date: unknown; end_date: unknown };
+  assert.equal(cleared.start_date, null);
+  assert.equal(cleared.end_date, null);
+
+  const itemRoute = await import('../src/pages/api/master-items/[id]');
+  assert.equal('PUT' in itemRoute, false);
+  const category = await db
+    .insert(categories)
+    .values({ clerk_user_id: userId, name: 'Gear' })
+    .returning()
+    .get();
+  const master = await db
+    .insert(masterItems)
+    .values({ clerk_user_id: userId, name: 'Tent', description: 'old' })
+    .returning()
+    .get();
+  const itemResponse = await callApi(itemRoute.PATCH, d1, userId, {
+    method: 'PATCH',
+    body: {
+      name: 'Big Tent',
+      description: null,
+      category_id: category.id,
+      default_quantity: 2,
+      is_container: true,
+    },
+    params: { id: master.id },
+  });
+  assert.equal(itemResponse.status, 200);
+  const updated = (await itemResponse.json()) as Record<string, unknown>;
+  assert.equal(updated.name, 'Big Tent');
+  assert.equal(updated.description, null);
+  assert.equal(updated.category_name, 'Gear');
+  assert.equal(updated.default_quantity, 2);
+  assert.equal(updated.is_container, true);
+
+  const foreignCategory = await callApi(itemRoute.PATCH, d1, 'someone_else', {
+    method: 'PATCH',
+    body: { category_id: category.id },
+    params: { id: master.id },
+  });
+  assert.equal(foreignCategory.status, 400);
+});
+
+test('Plan limits consult the billing override only when the session plan falls short (P1)', async () => {
+  let fetches = 0;
+  const fetchOverride = async () => {
+    fetches++;
+    return 'standard';
+  };
+  const free = getLimitsForPlan('free_user').maxTrips;
+
+  const overridden = createBilling('free_user', fetchOverride);
+  assert.equal(await planLimit(overridden, 'maxTrips', free), free);
+  assert.equal(fetches, 0, 'within the free limit, no Clerk call');
+  assert.equal(
+    await planLimit(overridden, 'maxTrips', free + 1),
+    getLimitsForPlan('standard').maxTrips
+  );
+  await planLimit(overridden, 'maxTrips', free + 1);
+  assert.equal(fetches, 1, 'the override is fetched once per request');
+
+  await planLimit(createBilling('standard', fetchOverride), 'maxTrips', 1000);
+  assert.equal(fetches, 1, 'a standard session never fetches the override');
+
+  const unreachable = createBilling('free_user', async () => {
+    throw new Error('Clerk is down');
+  });
+  assert.equal(await planLimit(unreachable, 'maxTrips', free + 1), free);
 });

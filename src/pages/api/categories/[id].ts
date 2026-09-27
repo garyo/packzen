@@ -2,71 +2,38 @@ export const prerender = false;
 
 import type { APIRoute } from 'astro';
 import { eq, and } from 'drizzle-orm';
-import { z } from 'zod';
 import { categories } from '../../../../db/schema';
-import { categoryUpdateSchema, validateRequestSafe } from '../../../lib/validation';
-import {
-  createPatchHandler,
-  createDeleteHandler,
-  BadRequestError,
-  type SyncConfig,
-} from '../../../lib/api-helpers';
+import { categoryUpdateSchema } from '../../../lib/validation';
+import { createPatchHandler, createDeleteHandler, BadRequestError } from '../../../lib/api-helpers';
 
-const sync: SyncConfig = { entityType: 'category' };
+const sync = { entityType: 'category' };
 
-export const PATCH: APIRoute = createPatchHandler<
-  z.infer<typeof categoryUpdateSchema>,
-  typeof categories.$inferSelect
->(
+export const PATCH: APIRoute = createPatchHandler(
   async ({ db, userId, validatedData, params }) => {
-    const categoryId = params.id;
-    if (!categoryId) {
-      throw new Error('Category ID is required');
-    }
-
-    const { name, icon, sort_order } = validatedData;
-
-    // Build update object dynamically
-    type CategoryUpdate = Partial<
-      Pick<typeof categories.$inferSelect, 'name' | 'icon' | 'sort_order'>
-    >;
-    const updates: CategoryUpdate = {};
-    if (name !== undefined) updates.name = name;
-    if (icon !== undefined) updates.icon = icon;
-    if (sort_order !== undefined) updates.sort_order = sort_order;
-
-    if (Object.keys(updates).length === 0) {
+    if (Object.values(validatedData).every((value) => value === undefined)) {
       throw new BadRequestError('No fields provided to update');
     }
 
-    const updated = await db
+    return await db
       .update(categories)
-      .set(updates)
-      .where(and(eq(categories.id, categoryId), eq(categories.clerk_user_id, userId)))
+      .set(validatedData)
+      .where(and(eq(categories.id, params.id), eq(categories.clerk_user_id, userId)))
       .returning()
       .get();
-
-    return updated || null;
   },
   'update category',
-  (data) => validateRequestSafe(categoryUpdateSchema, data),
+  categoryUpdateSchema,
   sync
 );
 
 export const DELETE: APIRoute = createDeleteHandler(
   async ({ db, userId, params }) => {
-    const categoryId = params.id;
-    if (!categoryId) {
-      return false;
-    }
-
     const deleted = await db
       .delete(categories)
-      .where(and(eq(categories.id, categoryId), eq(categories.clerk_user_id, userId)))
-      .returning()
+      .where(and(eq(categories.id, params.id), eq(categories.clerk_user_id, userId)))
+      .returning({ id: categories.id })
       .get();
-
-    return deleted ? categoryId : false;
+    return deleted?.id ?? false;
   },
   'delete category',
   sync

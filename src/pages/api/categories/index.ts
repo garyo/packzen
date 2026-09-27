@@ -1,66 +1,50 @@
 export const prerender = false;
 
 import type { APIRoute } from 'astro';
-import { eq, count } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { categories } from '../../../../db/schema';
-import { categoryCreateSchema, validateRequestSafe } from '../../../lib/validation';
+import { categoryCreateSchema } from '../../../lib/validation';
 import {
   createGetHandler,
-  getDatabaseConnection,
-  getUserId,
-  getBillingStatus,
-  errorResponse,
+  createPostHandler,
+  enforceLimit,
   successResponse,
-  handleApiError,
 } from '../../../lib/api-helpers';
-import { checkCategoryLimit } from '../../../lib/resource-limits';
-import { logChange, getSourceId } from '../../../lib/sync';
 
 export const GET: APIRoute = createGetHandler(async ({ db, userId }) => {
   return await db.select().from(categories).where(eq(categories.clerk_user_id, userId)).all();
 }, 'fetch categories');
 
-export const POST: APIRoute = async (context) => {
-  try {
-    const db = getDatabaseConnection(context.locals);
-    const userId = getUserId(context.locals);
-    const billingStatus = getBillingStatus(context.locals);
+/**
+ * Get-or-create: a name the user already has (ignoring case and surrounding
+ * whitespace) returns that category with 200 instead of adding a duplicate.
+ */
+export const POST: APIRoute = createPostHandler(
+  async ({ db, userId, validatedData, locals }) => {
+    const { name, icon, sort_order } = validatedData;
 
-    // Validate request body
-    const body = await context.request.json();
-    const validation = validateRequestSafe(categoryCreateSchema, body);
-    if (!validation.success) {
-      return errorResponse(validation.error, 400);
-    }
-
-    // Check resource limit
-    const [{ categoryCount }] = await db
-      .select({ categoryCount: count() })
+    const existing = await db
+      .select()
       .from(categories)
-      .where(eq(categories.clerk_user_id, userId));
+      .where(
+        and(
+          eq(categories.clerk_user_id, userId),
+          sql`lower(trim(${categories.name})) = lower(${name})`
+        )
+      )
+      .get();
+    if (existing) return successResponse(existing);
 
-    const limitCheck = checkCategoryLimit(categoryCount, billingStatus);
-    if (!limitCheck.allowed) {
-      return errorResponse(limitCheck.message!, 403);
-    }
+    const count = await db.$count(categories, eq(categories.clerk_user_id, userId));
+    await enforceLimit(locals, 'maxCategories', count + 1);
 
-    const { name, icon, sort_order } = validation.data;
-
-    const newCategory = await db
+    return await db
       .insert(categories)
-      .values({
-        clerk_user_id: userId,
-        name,
-        icon: icon || null,
-        sort_order: sort_order || 0,
-      })
+      .values({ clerk_user_id: userId, name, icon: icon || null, sort_order: sort_order || 0 })
       .returning()
       .get();
-
-    const sourceId = getSourceId(context.request);
-    logChange(db, userId, 'category', newCategory.id, null, 'create', newCategory, sourceId);
-    return successResponse(newCategory, 201);
-  } catch (error) {
-    return handleApiError(error, 'create category');
-  }
-};
+  },
+  'create category',
+  categoryCreateSchema,
+  { entityType: 'category' }
+);

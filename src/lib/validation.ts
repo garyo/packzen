@@ -1,11 +1,5 @@
 /**
- * Input Validation and Sanitization Utilities
- *
- * Using Zod for schema validation to ensure:
- * - Type safety
- * - Input sanitization
- * - Protection against injection attacks
- * - Data integrity
+ * Input validation for API request bodies and imports, using Zod.
  */
 
 import { z } from 'zod';
@@ -15,7 +9,7 @@ const MAX_NAME_LENGTH = 255;
 const MAX_DESCRIPTION_LENGTH = 5000;
 const MAX_NOTES_LENGTH = 10000;
 const MIN_QUANTITY = 1;
-const MAX_QUANTITY = 9999;
+export const MAX_QUANTITY = 9999;
 
 // ISO 8601 date string regex (YYYY-MM-DD format)
 const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
@@ -34,12 +28,9 @@ const COLOR_NAMES: ColorName[] = [
 ];
 const HEX_COLOR_REGEX = /^#[0-9A-Fa-f]{6}$/;
 
-// Sanitization helpers
 /**
- * Sanitize string input to prevent XSS and injection attacks
- * - Trims whitespace
- * - Removes null bytes
- * - Limits length
+ * Normalize a string field: trims whitespace, removes null bytes, and limits
+ * length. This is not XSS protection — the UI renders text escaped.
  */
 function sanitizeString(maxLength: number = MAX_NAME_LENGTH) {
   return z
@@ -51,15 +42,22 @@ function sanitizeString(maxLength: number = MAX_NAME_LENGTH) {
     });
 }
 
+/** A real calendar date in YYYY-MM-DD form (rejects e.g. 2026-02-30). */
+function isValidIsoDate(val: string): boolean {
+  if (!ISO_DATE_REGEX.test(val)) return false;
+  const date = new Date(`${val}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().startsWith(val);
+}
+
 /**
  * Validate ISO date string
- * Allows empty strings (converted to empty string), null, or valid ISO dates
+ * Allows empty strings, null, or valid ISO dates
  */
 function isoDateString() {
   return z
     .string()
     .transform((val) => val.trim())
-    .refine((val) => val === '' || ISO_DATE_REGEX.test(val), {
+    .refine((val) => val === '' || isValidIsoDate(val), {
       message: 'Must be a valid ISO date string (YYYY-MM-DD) or empty',
     })
     .nullable()
@@ -205,14 +203,6 @@ export type BagTemplateUpdate = z.infer<typeof bagTemplateUpdateSchema>;
 export type TripItemCreate = z.infer<typeof tripItemCreateSchema>;
 export type TripItemBatchCreate = z.infer<typeof tripItemBatchCreateSchema>;
 export type TripItemUpdate = z.infer<typeof tripItemUpdateSchema>;
-
-/**
- * Validate and sanitize request body
- * Returns validated data or throws ZodError
- */
-export function validateRequest<T>(schema: z.ZodSchema<T>, data: unknown): T {
-  return schema.parse(data);
-}
 
 /**
  * Validate and sanitize request body (safe version)

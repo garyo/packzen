@@ -17,10 +17,10 @@ export const GET: APIRoute = async (context) => {
   const db = getDatabaseConnection(context.locals);
   const userId = getUserId(context.locals);
 
-  // Last-Event-ID header (sent automatically by EventSource on reconnect).
-  // Absent header = first poll of a fresh tab: don't replay history. Return
-  // the current max id as a checkpoint so subsequent polls only pick up
-  // changes from this point forward. The initial GET /trip-items already
+  // Absent Last-Event-ID = first poll of a fresh tab: don't replay history.
+  // Return the current max id as a checkpoint — always, even `id: 0` for an
+  // empty log — so every later poll resumes from an id and none of the
+  // changes after this point is missed. The initial GET /trip-items already
   // reflects all prior changes.
   const lastEventIdHeader = context.request.headers.get('Last-Event-ID');
   if (lastEventIdHeader === null) {
@@ -29,9 +29,7 @@ export const GET: APIRoute = async (context) => {
       .from(changeLog)
       .where(eq(changeLog.clerk_user_id, userId))
       .get();
-    const maxId = row?.maxId ?? 0;
-    const body = maxId > 0 ? `retry: 3000\n\nid: ${maxId}\n\n` : 'retry: 3000\n\n:heartbeat\n\n';
-    return sseResponse(body);
+    return sseResponse(`retry: 3000\n\nid: ${row?.maxId ?? 0}\n\n`);
   }
 
   const parsed = parseInt(lastEventIdHeader, 10);

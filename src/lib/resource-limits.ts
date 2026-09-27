@@ -1,15 +1,11 @@
 /**
  * Resource Limits Configuration
  *
- * Enforces per-user limits on resources to prevent abuse.
- * Limits vary by billing plan for future flexibility.
+ * Per-user limits on resources, by billing plan.
  */
 
-import type { BillingPlan, BillingStatus } from './billing';
+import type { Billing, PlanName } from './billing';
 
-/**
- * Resource limit definitions per plan
- */
 interface PlanLimits {
   maxTrips: number;
   maxItemsPerTrip: number;
@@ -18,12 +14,9 @@ interface PlanLimits {
   maxBagTemplates: number;
 }
 
-/**
- * Resource limits by billing plan
- * Standard plan gets higher limits; free users get baseline limits
- */
-const PLAN_LIMITS: Record<BillingPlan | 'none', PlanLimits> = {
-  // Free users - baseline limits
+export type LimitKey = keyof PlanLimits;
+
+const PLAN_LIMITS: Record<PlanName, PlanLimits> = {
   free_user: {
     maxTrips: 3,
     maxItemsPerTrip: 100,
@@ -31,7 +24,7 @@ const PLAN_LIMITS: Record<BillingPlan | 'none', PlanLimits> = {
     maxMasterItems: 100,
     maxBagTemplates: 3,
   },
-  // Standard (paid) plan - same for now, can increase later
+  // Standard (paid) plan
   standard: {
     maxTrips: 100,
     maxItemsPerTrip: 500,
@@ -49,106 +42,38 @@ const PLAN_LIMITS: Record<BillingPlan | 'none', PlanLimits> = {
   },
 };
 
-/**
- * Get resource limits for a user based on their billing status
- */
-export function getLimitsForPlan(billingStatus: BillingStatus | null): PlanLimits {
-  const plan = billingStatus?.activePlan || 'none';
+const LIMIT_MESSAGES: Record<LimitKey, (max: number) => string> = {
+  maxTrips: (max) =>
+    `You've reached the maximum of ${max} trips. Please delete some trips to create new ones, or upgrade your subscription.`,
+  maxItemsPerTrip: (max) =>
+    `This trip has reached the maximum of ${max} items. Please remove some, or upgrade your subscription.`,
+  maxCategories: (max) =>
+    `You've reached the maximum of ${max} categories. Please remove some, or upgrade your subscription.`,
+  maxMasterItems: (max) =>
+    `You've reached the maximum of ${max} items in My Items. Please remove some, or upgrade your subscription.`,
+  maxBagTemplates: (max) =>
+    `You've reached the maximum of ${max} bags in My Bags. Please remove some, or upgrade your subscription.`,
+};
+
+export function getLimitsForPlan(plan: PlanName): PlanLimits {
   return PLAN_LIMITS[plan];
 }
 
-/**
- * Resource limit check result
- */
-export interface LimitCheckResult {
-  allowed: boolean;
-  currentCount: number;
-  maxAllowed: number;
-  message?: string;
+export function limitMessage(key: LimitKey, max: number): string {
+  return LIMIT_MESSAGES[key](max);
 }
 
 /**
- * Generic resource limit checker.
- * All specific check functions delegate to this.
+ * The user's limit for `key`. The session token's plan settles most checks;
+ * the billing override (a Clerk API call) is consulted only when that plan's
+ * limit is below `needed`.
  */
-function checkLimit(
-  currentCount: number,
-  billingStatus: BillingStatus | null,
-  limitKey: keyof PlanLimits,
-  message: (max: number) => string
-): LimitCheckResult {
-  const limits = getLimitsForPlan(billingStatus);
-  const maxAllowed = limits[limitKey];
-  const allowed = currentCount < maxAllowed;
-  return {
-    allowed,
-    currentCount,
-    maxAllowed,
-    message: allowed ? undefined : message(maxAllowed),
-  };
-}
-
-export function checkTripLimit(
-  currentCount: number,
-  billingStatus: BillingStatus | null
-): LimitCheckResult {
-  return checkLimit(
-    currentCount,
-    billingStatus,
-    'maxTrips',
-    (max) =>
-      `You've reached the maximum of ${max} trips. Please delete some trips to create new ones, or upgrade your subscription.`
-  );
-}
-
-export function checkTripItemLimit(
-  currentCount: number,
-  billingStatus: BillingStatus | null
-): LimitCheckResult {
-  return checkLimit(
-    currentCount,
-    billingStatus,
-    'maxItemsPerTrip',
-    (max) =>
-      `This trip has reached the maximum of ${max} items. Please remove some, or upgrade your subscription.`
-  );
-}
-
-export function checkCategoryLimit(
-  currentCount: number,
-  billingStatus: BillingStatus | null
-): LimitCheckResult {
-  return checkLimit(
-    currentCount,
-    billingStatus,
-    'maxCategories',
-    (max) =>
-      `You've reached the maximum of ${max} categories. Please remove some, or upgrade your subscription.`
-  );
-}
-
-export function checkMasterItemLimit(
-  currentCount: number,
-  billingStatus: BillingStatus | null
-): LimitCheckResult {
-  return checkLimit(
-    currentCount,
-    billingStatus,
-    'maxMasterItems',
-    (max) =>
-      `You've reached the maximum of ${max} items in My Items. Please remove some, or upgrade your subscription.`
-  );
-}
-
-export function checkBagTemplateLimit(
-  currentCount: number,
-  billingStatus: BillingStatus | null
-): LimitCheckResult {
-  return checkLimit(
-    currentCount,
-    billingStatus,
-    'maxBagTemplates',
-    (max) =>
-      `You've reached the maximum of ${max} bags in My Bags. Please remove some, or upgrade your subscription.`
-  );
+export async function planLimit(
+  billing: Billing | undefined,
+  key: LimitKey,
+  needed: number
+): Promise<number> {
+  const limit = PLAN_LIMITS[billing?.plan ?? 'none'][key];
+  if (!billing || needed <= limit) return limit;
+  return PLAN_LIMITS[await billing.effectivePlan()][key];
 }

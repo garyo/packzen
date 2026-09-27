@@ -22,118 +22,44 @@ The billing code uses this to override the user's actual plan (may be none or fr
 
 ## How It Works
 
-### 1. Automatic Logging (Middleware)
+Plan checks never cost a Clerk API call on the common path:
 
-Every API request automatically logs the user's billing status:
+1. **Middleware** (`src/middleware.ts`) reads the plan from the session token's
+   claims with Clerk's `has({ plan })` — a local check — and stores a `Billing`
+   object in `locals.billing`.
+2. **Plan limits** (`src/lib/resource-limits.ts`) are enforced by the create
+   endpoints via `enforceLimit(locals, key, total)` in `src/lib/api-helpers.ts`,
+   which answers 403 when the plan doesn't allow `total`.
+3. **The billing override** is only fetched (one `users.getUser` call, memoized
+   per request) when a limit check would fail under the token's plan and that
+   plan isn't already `standard`. If Clerk is unreachable, the token's plan
+   applies.
 
-```
-[Billing] User user_xxx: { activePlan: 'standard', hasFreeUserPlan: false, hasStandardPlan: true }
-```
-
-This happens in `src/middleware.ts:25-29`.
-
-### 2. Check Billing Status in API Routes
-
-The billing status is available in `locals.billingStatus` for all API routes.
-
-#### Example: Get Billing Status
-
-```typescript
-// GET /api/user/billing-status
-export const GET: APIRoute = async ({ locals }) => {
-  const status = locals.billingStatus;
-
-  return new Response(
-    JSON.stringify({
-      activePlan: status.activePlan,
-      plans: {
-        free_user: status.hasFreeUserPlan,
-        standard: status.hasStandardPlan,
-      },
-    }),
-    { status: 200 }
-  );
-};
-```
-
-#### Example: Require Standard Plan
+To gate a feature on the plan in an API route:
 
 ```typescript
-import { requireStandardPlan } from '../../../lib/api-helpers';
-
-export const GET: APIRoute = async ({ locals }) => {
-  // Check if user has standard plan
-  const billingCheck = requireStandardPlan(locals);
-  if (billingCheck) return billingCheck; // Returns 403 if not standard
-
-  // User has standard plan - continue with premium feature
-  // ...
-};
+const plan = await locals.billing?.effectivePlan(); // includes billingOverride
+if (plan !== 'standard') {
+  return errorResponse('This feature requires the standard plan.', 403);
+}
 ```
-
-#### Example: Require Specific Plan
-
-```typescript
-import { requirePlan } from '../../../lib/api-helpers';
-
-export const GET: APIRoute = async ({ locals }) => {
-  // Require free_user plan
-  const billingCheck = requirePlan(locals, 'free_user');
-  if (billingCheck) return billingCheck;
-
-  // Or require standard plan
-  const standardCheck = requirePlan(locals, 'standard');
-  if (standardCheck) return standardCheck;
-
-  // User has required plan
-  // ...
-};
-```
-
-## Available Utilities
-
-### From `src/lib/billing.ts`
-
-- `checkBillingStatus(auth)` - Get billing status from auth object
-- `logBillingStatus(userId, status)` - Log billing info to console
-- `hasActivePlan(status, plan)` - Check if user has specific plan
-- `hasStandardPlan(status)` - Check if user has standard plan
-- `isFreePlan(status)` - Check if user is on free plan
-
-### From `src/lib/api-helpers.ts`
-
-- `getBillingStatus(locals)` - Get billing status from locals
-- `requirePlan(locals, plan)` - Require specific plan (returns 403 error if not met)
-- `requireStandardPlan(locals)` - Require standard plan (returns 403 error if not met)
 
 ## Types
 
 ```typescript
 type BillingPlan = 'free_user' | 'standard';
+type PlanName = BillingPlan | 'none';
 
-interface BillingStatus {
-  hasFreeUserPlan: boolean;
-  hasStandardPlan: boolean;
-  activePlan: BillingPlan | 'none';
+interface Billing {
+  plan: PlanName; // from the session token
+  effectivePlan(): Promise<PlanName>; // including billingOverride
 }
 ```
 
 ## Testing
 
-1. **View billing status:**
-   - Make any API request
-   - Check Cloudflare logs for `[Billing]` messages
-
-2. **Get billing status endpoint:**
-
-   ```bash
-   curl https://packzen.org/api/user/billing-status
-   ```
-
-3. **Test plan requirements:**
-   - Add `requireStandardPlan(locals)` to an API route
-   - Try accessing as free user → should get 403
-   - Try accessing as standard user → should work
+Plan limits are covered by `tests/d1-api.test.ts`. Locally, dev fake auth
+(`/dev/login`) lets you sign in as a free or standard user without Clerk.
 
 ## Frontend Setup
 

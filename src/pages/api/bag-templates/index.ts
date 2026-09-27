@@ -1,20 +1,10 @@
 export const prerender = false;
 
 import type { APIRoute } from 'astro';
-import { eq, asc, count } from 'drizzle-orm';
+import { eq, asc } from 'drizzle-orm';
 import { bagTemplates } from '../../../../db/schema';
-import { bagTemplateCreateSchema, validateRequestSafe } from '../../../lib/validation';
-import {
-  createGetHandler,
-  getDatabaseConnection,
-  getUserId,
-  getBillingStatus,
-  errorResponse,
-  successResponse,
-  handleApiError,
-} from '../../../lib/api-helpers';
-import { checkBagTemplateLimit } from '../../../lib/resource-limits';
-import { logChange, getSourceId } from '../../../lib/sync';
+import { bagTemplateCreateSchema } from '../../../lib/validation';
+import { createGetHandler, createPostHandler, enforceLimit } from '../../../lib/api-helpers';
 
 export const GET: APIRoute = createGetHandler(async ({ db, userId }) => {
   return await db
@@ -25,31 +15,13 @@ export const GET: APIRoute = createGetHandler(async ({ db, userId }) => {
     .all();
 }, 'fetch bag templates');
 
-export const POST: APIRoute = async (context) => {
-  try {
-    const db = getDatabaseConnection(context.locals);
-    const userId = getUserId(context.locals);
-    const billingStatus = getBillingStatus(context.locals);
+export const POST: APIRoute = createPostHandler(
+  async ({ db, userId, validatedData, locals }) => {
+    const count = await db.$count(bagTemplates, eq(bagTemplates.clerk_user_id, userId));
+    await enforceLimit(locals, 'maxBagTemplates', count + 1);
 
-    const body = await context.request.json();
-    const validation = validateRequestSafe(bagTemplateCreateSchema, body);
-    if (!validation.success) {
-      return errorResponse(validation.error, 400);
-    }
-
-    const [{ templateCount }] = await db
-      .select({ templateCount: count() })
-      .from(bagTemplates)
-      .where(eq(bagTemplates.clerk_user_id, userId));
-
-    const limitCheck = checkBagTemplateLimit(templateCount, billingStatus);
-    if (!limitCheck.allowed) {
-      return errorResponse(limitCheck.message!, 403);
-    }
-
-    const { name, type, color, sort_order } = validation.data;
-
-    const newTemplate = await db
+    const { name, type, color, sort_order } = validatedData;
+    return await db
       .insert(bagTemplates)
       .values({
         clerk_user_id: userId,
@@ -60,11 +32,8 @@ export const POST: APIRoute = async (context) => {
       })
       .returning()
       .get();
-
-    const sourceId = getSourceId(context.request);
-    logChange(db, userId, 'bagTemplate', newTemplate.id, null, 'create', newTemplate, sourceId);
-    return successResponse(newTemplate, 201);
-  } catch (error) {
-    return handleApiError(error, 'create bag template');
-  }
-};
+  },
+  'create bag template',
+  bagTemplateCreateSchema,
+  { entityType: 'bagTemplate' }
+);

@@ -1,92 +1,78 @@
-import { eq, lt, and } from 'drizzle-orm';
+import { lt } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { changeLog } from '../../db/schema';
+import { runInBackground } from './background';
+import { chunkRowsForInsert } from './d1';
 
-// Cloudflare Workers direct waitUntil import (compat_date >= 2025-08-08).
-// Keeps the isolate alive after the Response is returned so the D1 write completes.
-// Falls back to fire-and-forget in local dev where the import may not exist.
-let waitUntil: ((promise: Promise<unknown>) => void) | undefined;
-try {
-  // Dynamic import to avoid build errors in non-Workers environments
-  const mod = await import('cloudflare:workers');
-  waitUntil = mod.waitUntil;
-} catch {
-  // Not running on Cloudflare Workers (e.g. local dev) — fire-and-forget is fine
+export interface Change {
+  entityType: string;
+  entityId: string;
+  parentId: string | null;
+  action: 'create' | 'update' | 'delete';
+  data: unknown;
 }
 
-/**
- * Log a change to the change_log table for multi-device sync.
- *
- * On ~1% of calls, piggyback a cleanup of entries older than 24 hours.
- */
-async function logChangeAsync(
+/** Change-log rows older than this are pruned; devices offline longer do a full refetch. */
+const RETENTION_SECONDS = 24 * 60 * 60;
+
+async function writeChanges(
   db: DrizzleD1Database,
   userId: string,
-  entityType: string,
-  entityId: string,
-  parentId: string | null,
-  action: string,
-  data: unknown,
+  changes: Change[],
   sourceId: string | null
 ): Promise<void> {
   const now = Math.floor(Date.now() / 1000);
-
-  await db.insert(changeLog).values({
+  const rows = changes.map((change) => ({
     clerk_user_id: userId,
-    entity_type: entityType,
-    entity_id: entityId,
-    parent_id: parentId,
-    action,
-    data: data ? JSON.stringify(data) : null,
+    entity_type: change.entityType,
+    entity_id: change.entityId,
+    parent_id: change.parentId,
+    action: change.action,
+    data: change.data ? JSON.stringify(change.data) : null,
     source_id: sourceId,
     created_at: now,
-  });
+  }));
+  const [first, ...rest] = chunkRowsForInsert(changeLog, rows).map((chunk) =>
+    db.insert(changeLog).values(chunk)
+  );
+  await db.batch([first, ...rest]);
 
-  // Piggyback cleanup on ~1% of calls
+  // Piggyback a prune of every user's old rows on ~1% of writes.
   if (Math.random() < 0.01) {
-    const cutoff = now - 86400; // 24 hours ago
     await db
       .delete(changeLog)
-      .where(and(eq(changeLog.clerk_user_id, userId), lt(changeLog.created_at, cutoff)))
-      .catch(() => {
-        // Cleanup failure is non-critical
-      });
+      .where(lt(changeLog.created_at, now - RETENTION_SECONDS))
+      .catch((error) => console.error('change_log prune failed:', error));
   }
 }
 
 /**
- * Schedule a change log write that survives after the Response is returned.
- * Uses Cloudflare's waitUntil when available, otherwise fire-and-forget.
+ * Record changes for multi-device sync, in the background so the request
+ * doesn't wait on it.
  */
+export function logChanges(
+  db: DrizzleD1Database,
+  userId: string,
+  changes: Change[],
+  sourceId: string | null
+): void {
+  if (changes.length === 0) return;
+  runInBackground(
+    writeChanges(db, userId, changes, sourceId).catch((error) => {
+      // Don't fail the request, but a lost write means other devices never
+      // learn of these changes — make it visible.
+      console.error('logChanges failed:', changes.length, changes[0]?.entityType, error);
+    })
+  );
+}
+
 export function logChange(
   db: DrizzleD1Database,
   userId: string,
-  entityType: string,
-  entityId: string,
-  parentId: string | null,
-  action: string,
-  data: unknown,
+  change: Change,
   sourceId: string | null
 ): void {
-  const promise = logChangeAsync(
-    db,
-    userId,
-    entityType,
-    entityId,
-    parentId,
-    action,
-    data,
-    sourceId
-  ).catch((error) => {
-    // Don't fail the request over a change-log write failure, but a swallowed
-    // failure here means other devices silently never learn of this change —
-    // log it so it's visible instead of vanishing.
-    console.error('logChange failed:', entityType, entityId, action, error);
-  });
-
-  if (waitUntil) {
-    waitUntil(promise);
-  }
+  logChanges(db, userId, [change], sourceId);
 }
 
 /**

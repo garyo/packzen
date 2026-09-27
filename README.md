@@ -91,13 +91,10 @@ Copy the `database_id` and update `wrangler.jsonc`:
 }
 ```
 
-### 4. Generate and Run Database Migrations
+### 4. Apply Database Migrations
 
 ```bash
-# Generate migrations from schema
-bun run db:generate
-
-# Apply migrations to local D1 database
+# Apply migrations to the local D1 database
 bun run db:migrate
 ```
 
@@ -121,11 +118,11 @@ bun run build
 # Preview production build
 bun run preview
 
+# Run tests
+bun run test
+
 # Format code with Prettier
 bun run format
-
-# Generate database migrations
-bun run db:generate
 
 # Apply migrations (local)
 bun run db:migrate
@@ -133,16 +130,28 @@ bun run db:migrate
 # Apply migrations (production)
 bun run db:migrate:prod
 
-# Open Drizzle Studio (database GUI)
+# Open Drizzle Studio on the local database
 bun run db:studio
 ```
+
+### Changing the Database Schema
+
+Migrations are hand-written SQL, applied in order by wrangler (and by the tests,
+which build their database from them):
+
+1. Add the next numbered file to `db/migrations/`, e.g. `0010_add_widgets.sql`.
+   Make it additive or data-preserving — never drop user data.
+2. Mirror the change in `db/schema.ts` (tables and indexes).
+3. `bun run db:migrate` locally, then `bun run test`.
+4. Apply to production with `bun run db:migrate:prod` before deploying code that
+   needs it.
 
 ## Project Structure
 
 ```
 ├── db/                      # Database schema & migrations
 │   ├── schema.ts            # Drizzle schema definitions
-│   └── migrations/          # Generated SQL migrations
+│   └── migrations/          # Hand-written SQL migrations
 ├── src/
 │   ├── components/          # Solid.js components
 │   ├── layouts/             # Astro layouts
@@ -153,7 +162,7 @@ bun run db:studio
 │   └── styles/              # Global CSS
 ├── public/                  # Static assets
 ├── astro.config.mjs         # Astro configuration
-├── drizzle.config.ts        # Drizzle ORM configuration
+├── drizzle.config.ts        # Drizzle Studio configuration
 ├── wrangler.jsonc           # Cloudflare configuration
 └── package.json
 ```
@@ -206,29 +215,16 @@ Then redeploy: `npx wrangler deploy`
 bun run db:migrate:prod
 ```
 
-## Implementation Phases
-
-- ✅ **Phase 1**: Project Setup
-- ✅ **Phase 2**: Database Schema & Auth
-- ✅ **Phase 3**: All Items Management
-- ✅ **Phase 4**: Trip Management
-- ✅ **Phase 5**: Bag Management
-- ✅ **Phase 6**: Trip Items & Packing
-- ✅ **Phase 7**: Layout & Navigation
-- ⏳ **Phase 8**: Polish & Optimization
-
 ## Mobile-First Design Principles
 
 - Minimum 44x44px touch targets
 - 16px base font size (prevents iOS zoom)
-- Bottom navigation for easy thumb access
 - Large, clear tap targets for checkboxes
 - Generous spacing (16px minimum)
 - Smooth animations and transitions
 
 ## Free Tier Limits
 
-- **Cloudflare Pages**: Unlimited sites, 500 builds/month
 - **Cloudflare Workers**: 100K requests/day
 - **Cloudflare D1**: 5GB storage, 5M reads/day, 100K writes/day
 - **Clerk**: 10K monthly active users
