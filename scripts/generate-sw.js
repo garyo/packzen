@@ -12,8 +12,8 @@ import { dirname, join, relative, sep } from 'path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Base app-shell routes cached immediately on install. `/dashboard/`,
-// `/trips/`, and `/all-items/` are safe here even though they're
+// Base app-shell routes cached immediately on install. `/trips/` and
+// `/all-items/` are safe here even though they're
 // "logged-in" pages: they're static-output Astro pages with a purely
 // client-side auth gate (a script that redirects to /sign-in if
 // unauthenticated) — the built HTML is identical for every visitor, so
@@ -21,14 +21,14 @@ const __dirname = dirname(__filename);
 // session.
 const BASE_PRECACHE_URLS = [
   '/',
-  '/dashboard/',
   '/trips/',
   '/all-items/',
   '/sign-in/',
   '/sign-up/',
   '/manifest.json',
   '/favicon.png',
-  '/logo.png',
+  '/icon-192.png',
+  '/logo.webp',
 ];
 
 /**

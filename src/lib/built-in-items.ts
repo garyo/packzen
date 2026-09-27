@@ -57,15 +57,11 @@ export function getStarterItems(
   });
 }
 
-/**
- * Get items by multiple trip types (intersection)
- * Returns items that have ALL the specified trip types
- */
-export function getItemsByTripTypes(tripTypeIds: string[]): BuiltInItem[] {
-  if (tripTypeIds.length === 0) return builtInItems.items;
-  return builtInItems.items.filter((item) =>
-    tripTypeIds.every((typeId) => item.trip_types.includes(typeId))
-  );
+/** Items suited to any of the given trip types (none given = all items). */
+export function getItemsByTripTypes(tripTypeIds: Iterable<string>): BuiltInItem[] {
+  const wanted = new Set(tripTypeIds);
+  if (wanted.size === 0) return builtInItems.items;
+  return builtInItems.items.filter((item) => item.trip_types.some((t) => wanted.has(t)));
 }
 
 /**

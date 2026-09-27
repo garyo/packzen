@@ -193,19 +193,8 @@ export const analyticsEvents = sqliteTable(
 
 // Type exports for TypeScript
 export type Category = typeof categories.$inferSelect;
-export type NewCategory = typeof categories.$inferInsert;
-
 export type MasterItem = typeof masterItems.$inferSelect;
-export type NewMasterItem = typeof masterItems.$inferInsert;
-
 export type Trip = typeof trips.$inferSelect;
-export type NewTrip = typeof trips.$inferInsert;
-
 export type Bag = typeof bags.$inferSelect;
-export type NewBag = typeof bags.$inferInsert;
-
 export type BagTemplate = typeof bagTemplates.$inferSelect;
-export type NewBagTemplate = typeof bagTemplates.$inferInsert;
-
 export type TripItem = typeof tripItems.$inferSelect;
-export type NewTripItem = typeof tripItems.$inferInsert;

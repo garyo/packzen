@@ -1,23 +1,17 @@
 ---
 export const prerender = false;
 
-import BaseLayout from '../../../layouts/BaseLayout.astro';
+import AppLayout from '../../../layouts/AppLayout.astro';
 
 const { id } = Astro.params;
 ---
 
-<BaseLayout title="Pack - PackZen">
-  <div id="app-root" data-trip-id={id}></div>
-</BaseLayout>
+<AppLayout title="Pack - PackZen" data-trip-id={id} />
 
 <script>
-  import { render } from 'solid-js/web';
   import { PackingPage } from '../../../components/trips/PackingPage';
-  import { mountWhenSignedIn } from '../../../components/trips/auth-gate';
+  import { mountApp } from '../../../components/nav/mountApp';
 
-  const root = document.getElementById('app-root');
-  const tripId = root?.dataset.tripId;
-  if (root && tripId) {
-    void mountWhenSignedIn(root, () => render(() => PackingPage({ tripId }), root));
-  }
+  const tripId = document.getElementById('app-root')?.dataset.tripId;
+  if (tripId) void mountApp(() => PackingPage({ tripId }));
 </script>

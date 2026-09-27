@@ -48,10 +48,6 @@ const SYNC_READY_TIMEOUT_MS = 3000;
 
 const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-// Resolves once the sync poller has its checkpoint, on SyncManager versions that
-// provide it; with older ones, the load simply doesn't wait.
-const syncReady = () => (syncManager as { ready?: () => Promise<void> }).ready?.();
-
 const isFullRow = (data: unknown): data is TripItem =>
   typeof data === 'object' &&
   data !== null &&
@@ -356,7 +352,7 @@ export function createTripItemsStore(tripId: string) {
     void (async () => {
       await authStore.initAuth();
       // Load after the poller's checkpoint, so every later change arrives as an event.
-      await Promise.race([syncReady(), delay(SYNC_READY_TIMEOUT_MS)]);
+      await Promise.race([syncManager.ready(), delay(SYNC_READY_TIMEOUT_MS)]);
       await load();
     })();
   });

@@ -273,7 +273,7 @@ test('S7: buildServiceWorkerSource embeds hashed /_astro asset paths in PRECACHE
   }
   // Base app-shell routes must still be present alongside the hashed assets.
   assert.ok(source.includes('"/"'));
-  assert.ok(source.includes('"/dashboard/"'));
+  assert.ok(source.includes('"/trips/"'));
 });
 
 test('S7: findPrecacheAssetPaths recursively discovers hashed .js/.css files under dist/_astro', async () => {

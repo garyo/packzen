@@ -29,4 +29,3 @@ pnpm-debug.log*
 
 # auto-generated files
 src/lib/version.ts
-public/sw.js

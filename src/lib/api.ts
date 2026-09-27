@@ -162,8 +162,6 @@ export function createApi(deps: Partial<ApiDeps> = {}) {
       request<T>('GET', endpoint, undefined, options),
     post: <T>(endpoint: string, data?: unknown, options?: RequestInit) =>
       request<T>('POST', endpoint, data, options),
-    put: <T>(endpoint: string, data?: unknown, options?: RequestInit) =>
-      request<T>('PUT', endpoint, data, options),
     patch: <T>(endpoint: string, data?: unknown, options?: RequestInit) =>
       request<T>('PATCH', endpoint, data, options),
     delete: <T>(endpoint: string, options?: RequestInit) =>

@@ -1,7 +1,7 @@
 ---
 export const prerender = false;
 
-import BaseLayout from '../../../layouts/BaseLayout.astro';
+import AppLayout from '../../../layouts/AppLayout.astro';
 
 const { id } = Astro.params;
 const sortBy = Astro.url.searchParams.get('sortBy') || 'bag';
@@ -9,24 +9,20 @@ const columnsParam = Astro.url.searchParams.get('columns');
 const includeSkipped = Astro.url.searchParams.get('includeSkipped') === '1';
 ---
 
-<BaseLayout title="Print Checklist - PackZen">
-  <div
-    id="app-root"
-    data-trip-id={id}
-    data-sort-by={sortBy}
-    data-columns={columnsParam ?? ''}
-    data-include-skipped={includeSkipped ? '1' : '0'}
-  >
-  </div>
-</BaseLayout>
+<AppLayout
+  title="Print Checklist - PackZen"
+  data-trip-id={id}
+  data-sort-by={sortBy}
+  data-columns={columnsParam ?? ''}
+  data-include-skipped={includeSkipped ? '1' : '0'}
+/>
 
 <script>
-  import { render } from 'solid-js/web';
   import {
     TripPrintView,
     PRINT_COLUMNS_STORAGE_KEY,
   } from '../../../components/trips/TripPrintView';
-  import { mountWhenSignedIn } from '../../../components/trips/auth-gate';
+  import { mountApp } from '../../../components/nav/mountApp';
 
   // Column count: the URL's explicit choice, else the user's last choice, else
   // 2 columns on wide screens and 1 on phones (where 2 won't fit).
@@ -45,17 +41,13 @@ const includeSkipped = Astro.url.searchParams.get('includeSkipped') === '1';
     const includeSkipped = root.dataset.includeSkipped === '1';
     const columns = chooseColumns(root.dataset.columns);
 
-    void mountWhenSignedIn(root, () =>
-      render(
-        () =>
-          TripPrintView({
-            tripId,
-            sortBy,
-            initialColumns: columns,
-            initialIncludeSkipped: includeSkipped,
-          }),
-        root
-      )
+    void mountApp(() =>
+      TripPrintView({
+        tripId,
+        sortBy,
+        initialColumns: columns,
+        initialIncludeSkipped: includeSkipped,
+      })
     );
   }
 </script>

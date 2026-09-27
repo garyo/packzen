@@ -11,7 +11,7 @@ import { Button } from '../ui/Button';
 import { QuantityInput } from '../ui/QuantityInput';
 import { ChevronRightIcon } from '../ui/Icons';
 import type { BuiltInItem, SelectedBuiltInItem } from '../../lib/types';
-import { builtInItems, getCategoryIcon } from '../../lib/built-in-items';
+import { builtInItems, getCategoryIcon, getItemsByTripTypes } from '../../lib/built-in-items';
 
 interface BuiltInItemsBrowserProps {
   onClose: () => void;
@@ -34,11 +34,7 @@ export function BuiltInItemsBrowser(props: BuiltInItemsBrowserProps) {
   const [expandedCategories, setExpandedCategories] = createSignal<Set<string>>(new Set());
 
   // Items for any of the selected trip types (none selected = all items).
-  const tripTypeItems = createMemo(() => {
-    const tripTypes = selectedTripTypes();
-    if (tripTypes.size === 0) return builtInItems.items;
-    return builtInItems.items.filter((item) => item.trip_types.some((t) => tripTypes.has(t)));
-  });
+  const tripTypeItems = createMemo(() => getItemsByTripTypes(selectedTripTypes()));
 
   const availableCategories = createMemo(() =>
     [...new Set(tripTypeItems().map((item) => item.category))].sort(

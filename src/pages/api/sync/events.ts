@@ -55,7 +55,7 @@ export const GET: APIRoute = async (context) => {
     .from(changeLog)
     .where(conditions)
     .orderBy(asc(changeLog.id))
-    .limit(50)
+    .limit(50) // matches SYNC_PAGE_SIZE in src/lib/sync-manager.ts
     .all();
 
   // Build SSE response
