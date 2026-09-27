@@ -13,7 +13,7 @@ import { authStore } from '../stores/auth';
 import { syncManager, type SyncChange } from './sync-manager';
 import { LoadGate } from './sync-buffer';
 import { exclusivePackState, packingStats } from './packing-stats';
-import { showToast } from '../components/ui/Toast';
+import { errorToastOptions, showToast } from '../components/ui/Toast';
 
 type ItemPatch = Partial<TripItem>;
 
@@ -283,7 +283,11 @@ export function createTripItemsStore(tripId: string) {
     return tracked(async () => {
       const response = await api.post<TripItem[]>(endpoints.tripItems(tripId), { items: rows });
       if (!response.success) {
-        showToast('error', response.error || 'Failed to add items');
+        showToast(
+          'error',
+          response.error || 'Failed to add items',
+          errorToastOptions(response.statusCode)
+        );
         return null;
       }
       const inserted = response.data ?? [];

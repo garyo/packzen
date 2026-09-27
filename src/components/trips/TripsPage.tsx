@@ -5,7 +5,7 @@ import type { Trip, TripWithStats } from '../../lib/types';
 import { Button } from '../ui/Button';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
 import { EmptyState } from '../ui/EmptyState';
-import { showToast } from '../ui/Toast';
+import { errorToastOptions, showToast } from '../ui/Toast';
 import { EditIcon, CopyIcon, TrashIcon, MoreVerticalIcon } from '../ui/Icons';
 import { TripForm } from './TripForm';
 import { TripFormWithBags } from './TripFormWithBags';
@@ -74,7 +74,11 @@ export function TripsPage() {
   const handleCopy = async (trip: Trip) => {
     const response = await api.post(`/api/trips/${trip.id}/copy`, {});
     if (!response.success) {
-      showToast('error', response.error || 'Failed to copy trip');
+      showToast(
+        'error',
+        response.error || 'Failed to copy trip',
+        errorToastOptions(response.statusCode)
+      );
       return;
     }
     showToast('success', `Created copy of "${trip.name}"`);
