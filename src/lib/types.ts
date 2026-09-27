@@ -52,6 +52,10 @@ interface TripType {
   description: string;
   /** Nominal trip length in nights, used to scale per-day consumables. */
   nights: number;
+  /** Default name for a trip started from this type. */
+  trip_name: string;
+  /** Words in a trip's name that suggest this type. */
+  keywords: string[];
 }
 
 export interface BuiltInItem {

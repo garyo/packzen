@@ -17,8 +17,8 @@
     },
   ],
   "vars": {
-    "CLERK_SIGN_IN_FALLBACK_REDIRECT_URL": "/dashboard",
-    "CLERK_SIGN_UP_FALLBACK_REDIRECT_URL": "/dashboard",
+    "CLERK_SIGN_IN_FALLBACK_REDIRECT_URL": "/trips",
+    "CLERK_SIGN_UP_FALLBACK_REDIRECT_URL": "/trips",
   },
   "observability": {
     "enabled": true,

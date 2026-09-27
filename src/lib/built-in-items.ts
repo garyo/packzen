@@ -7,17 +7,9 @@ import yaml from 'js-yaml';
 import builtInDataRaw from '../data/built-in-items.yaml?raw';
 import type { BuiltInItemsData, BuiltInItem } from './types';
 
-export type TripType = BuiltInItemsData['trip_types'][number] & {
-  /** Default name for a trip started from this type. */
-  trip_name: string;
-  /** Words in a trip's name that suggest this type. */
-  keywords: string[];
-};
+export type TripType = BuiltInItemsData['trip_types'][number];
 
-// Load and parse the YAML data
-export const builtInItems = yaml.load(builtInDataRaw) as Omit<BuiltInItemsData, 'trip_types'> & {
-  trip_types: TripType[];
-};
+export const builtInItems = yaml.load(builtInDataRaw) as BuiltInItemsData;
 
 // Categories excluded from generic starter lists: situational for a subset of
 // travelers, with no dedicated family trip type. Still browsable in the Built-in browser.

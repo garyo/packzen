@@ -10,6 +10,7 @@ import {
   type JSX,
 } from 'solid-js';
 import { cn } from '../../lib/utils';
+import { NO_BAG_LABEL } from '../../lib/vocabulary';
 
 export interface ComboboxItem {
   id: string;
@@ -265,8 +266,8 @@ export function Combobox(props: ComboboxProps) {
                             <Show when={item.existingLocation}>
                               <span class="ml-2 text-xs text-blue-600">
                                 (
-                                {item.existingLocation === 'No Bag'
-                                  ? 'no bag'
+                                {item.existingLocation === NO_BAG_LABEL
+                                  ? NO_BAG_LABEL.toLowerCase()
                                   : `in ${item.existingLocation}`}
                                 )
                               </span>

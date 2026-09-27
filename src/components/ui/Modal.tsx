@@ -98,15 +98,12 @@ export function Modal(props: ModalProps) {
     modalStack.push(stackId);
     document.body.style.overflow = 'hidden';
     document.addEventListener('keydown', handleKeyDown);
-    // Prefer the first form field, then the first control in the body, so the
-    // header's close button never takes initial focus (Enter would close).
+    // Focus the first form field; otherwise the dialog itself, so no button
+    // (e.g. the close button, where Enter would dismiss) shows a focus ring.
     const field = Array.from(contentRef?.querySelectorAll<HTMLElement>(FIELD_SELECTOR) ?? []).find(
       visible
     );
-    const control = Array.from(
-      contentRef?.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR) ?? []
-    ).find(visible);
-    (field ?? control ?? containerRef)?.focus();
+    (field ?? containerRef)?.focus();
   });
 
   onCleanup(() => {
@@ -132,7 +129,7 @@ export function Modal(props: ModalProps) {
             aria-modal="true"
             aria-labelledby={titleId}
             tabIndex={-1}
-            class={`relative z-10 flex max-h-[90dvh] w-full flex-col ${maxWidthClass()} rounded-lg bg-white shadow-xl`}
+            class={`relative z-10 flex max-h-[90dvh] w-full flex-col outline-none ${maxWidthClass()} rounded-lg bg-white shadow-xl`}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}

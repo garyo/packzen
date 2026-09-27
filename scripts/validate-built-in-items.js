@@ -91,10 +91,21 @@ function validateBuiltInItems() {
   const tripTypeIds = new Set(trip_types.map((t) => t.id));
   const VALID_MODIFIERS = new Set(['international', 'feminine', 'masculine']);
 
-  // Trip types must declare nominal nights (used to scale per-day consumables)
+  // Trip types need nominal nights (to scale per-day consumables), a default
+  // trip name (one-tap trips), and name keywords (to pre-select a type).
   trip_types.forEach((t, index) => {
+    const label = `Trip type #${index + 1} "${t.id}"`;
     if (typeof t.nights !== 'number' || t.nights <= 0) {
-      errors.push(`Trip type #${index + 1} "${t.id}": nights must be a positive number`);
+      errors.push(`${label}: nights must be a positive number`);
+    }
+    if (typeof t.trip_name !== 'string' || !t.trip_name.trim()) {
+      errors.push(`${label}: trip_name must be a non-empty string`);
+    }
+    if (
+      !Array.isArray(t.keywords) ||
+      t.keywords.some((k) => typeof k !== 'string' || k !== k.toLowerCase())
+    ) {
+      errors.push(`${label}: keywords must be an array of lowercase strings`);
     }
   });
   const itemsPerCategory = new Map();

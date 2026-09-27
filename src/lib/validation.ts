@@ -95,7 +95,7 @@ export const categoryUpdateSchema = z.object({
 export const masterItemCreateSchema = z.object({
   name: sanitizeString(MAX_NAME_LENGTH),
   description: sanitizeString(MAX_DESCRIPTION_LENGTH).nullable().optional(),
-  category_id: z.string().uuid().nullable().optional(),
+  category_id: z.uuid().nullable().optional(),
   default_quantity: z.number().int().min(MIN_QUANTITY).max(MAX_QUANTITY).default(1),
   is_container: z.boolean().default(false),
 });
@@ -103,7 +103,7 @@ export const masterItemCreateSchema = z.object({
 export const masterItemUpdateSchema = z.object({
   name: sanitizeString(MAX_NAME_LENGTH).optional(),
   description: sanitizeString(MAX_DESCRIPTION_LENGTH).nullable().optional(),
-  category_id: z.string().uuid().nullable().optional(),
+  category_id: z.uuid().nullable().optional(),
   default_quantity: z.number().int().min(MIN_QUANTITY).max(MAX_QUANTITY).optional(),
   is_container: z.boolean().optional(),
 });
@@ -134,7 +134,7 @@ export const bagCreateSchema = z.object({
 });
 
 export const bagUpdateSchema = z.object({
-  bag_id: z.string().uuid(),
+  bag_id: z.uuid(),
   name: sanitizeString(MAX_NAME_LENGTH).optional(),
   type: z.enum(['carry_on', 'checked', 'personal', 'custom']).optional(),
   color: colorString(),
@@ -161,9 +161,9 @@ export const tripItemCreateSchema = z.object({
   name: sanitizeString(MAX_NAME_LENGTH),
   category_name: sanitizeString(MAX_NAME_LENGTH).nullable().optional(),
   quantity: z.number().int().min(MIN_QUANTITY).max(MAX_QUANTITY).default(1),
-  bag_id: z.string().uuid().nullable().optional(),
-  master_item_id: z.string().uuid().nullable().optional(),
-  container_item_id: z.string().uuid().nullable().optional(),
+  bag_id: z.uuid().nullable().optional(),
+  master_item_id: z.uuid().nullable().optional(),
+  container_item_id: z.uuid().nullable().optional(),
   notes: sanitizeString(MAX_NOTES_LENGTH).nullable().optional(),
   is_container: z.boolean().default(false),
   is_packed: z.boolean().default(false),
@@ -177,15 +177,15 @@ export const tripItemBatchCreateSchema = z.object({
 });
 
 export const tripItemUpdateSchema = z.object({
-  id: z.string().uuid(),
+  id: z.uuid(),
   name: sanitizeString(MAX_NAME_LENGTH).optional(),
   category_name: sanitizeString(MAX_NAME_LENGTH).nullable().optional(),
   quantity: z.number().int().min(MIN_QUANTITY).max(MAX_QUANTITY).optional(),
-  bag_id: z.string().uuid().nullable().optional(),
-  master_item_id: z.string().uuid().nullable().optional(),
+  bag_id: z.uuid().nullable().optional(),
+  master_item_id: z.uuid().nullable().optional(),
   is_packed: z.boolean().optional(),
   is_skipped: z.boolean().optional(),
-  container_item_id: z.string().uuid().nullable().optional(),
+  container_item_id: z.uuid().nullable().optional(),
   is_container: z.boolean().optional(),
   notes: sanitizeString(MAX_NOTES_LENGTH).nullable().optional(),
 });
@@ -227,7 +227,7 @@ export function validateRequestSafe<T>(
 
 // YAML Import Schemas
 const yamlBagSchema = z.object({
-  source_id: z.string().uuid().optional(),
+  source_id: z.uuid().optional(),
   name: sanitizeString(MAX_NAME_LENGTH),
   type: z.enum(['carry_on', 'checked', 'personal', 'custom']),
   color: colorString(),
@@ -235,9 +235,9 @@ const yamlBagSchema = z.object({
 });
 
 const yamlTripItemSchema = z.object({
-  source_id: z.string().uuid().optional(),
-  bag_source_id: z.string().uuid().nullable().optional(),
-  container_source_id: z.string().uuid().nullable().optional(),
+  source_id: z.uuid().optional(),
+  bag_source_id: z.uuid().nullable().optional(),
+  container_source_id: z.uuid().nullable().optional(),
   name: sanitizeString(MAX_NAME_LENGTH),
   category_name: sanitizeString(MAX_NAME_LENGTH).nullable().optional(),
   quantity: z.number().int().min(MIN_QUANTITY).max(MAX_QUANTITY).default(1),
@@ -247,12 +247,12 @@ const yamlTripItemSchema = z.object({
   notes: sanitizeString(MAX_NOTES_LENGTH).nullable().optional(),
   is_container: z.boolean().default(false),
   container_name: sanitizeString(MAX_NAME_LENGTH).nullable().optional(), // Name of parent container for YAML import
-  master_item_id: z.string().uuid().nullable().optional(),
+  master_item_id: z.uuid().nullable().optional(),
 });
 
 export const yamlTripExportSchema = z.object({
   trip: z.object({
-    source_id: z.string().uuid().optional(),
+    source_id: z.uuid().optional(),
     name: sanitizeString(MAX_NAME_LENGTH),
     destination: sanitizeString(MAX_NAME_LENGTH).nullable().optional(),
     start_date: isoDateString(),
@@ -278,7 +278,7 @@ const yamlMasterItemSchema = z.object({
 });
 
 const yamlBagTemplateSchema = z.object({
-  source_id: z.string().uuid().optional(),
+  source_id: z.uuid().optional(),
   name: sanitizeString(MAX_NAME_LENGTH),
   type: z.enum(['carry_on', 'checked', 'personal', 'custom']),
   color: colorString(),
@@ -286,7 +286,7 @@ const yamlBagTemplateSchema = z.object({
 });
 
 const yamlFullTripSchema = z.object({
-  source_id: z.string().uuid().optional(),
+  source_id: z.uuid().optional(),
   name: sanitizeString(MAX_NAME_LENGTH),
   destination: sanitizeString(MAX_NAME_LENGTH).nullable().optional(),
   start_date: isoDateString(),
