@@ -83,49 +83,6 @@ export function getPackingProgress(packedCount: number, totalCount: number): num
   return Math.round((packedCount / totalCount) * 100);
 }
 
-// Generate a random color for bag identification
-export function generateRandomColor(): string {
-  const colors = [
-    '#ef4444', // red
-    '#f97316', // orange
-    '#f59e0b', // amber
-    '#eab308', // yellow
-    '#84cc16', // lime
-    '#22c55e', // green
-    '#10b981', // emerald
-    '#14b8a6', // teal
-    '#06b6d4', // cyan
-    '#0ea5e9', // sky
-    '#3b82f6', // blue
-    '#6366f1', // indigo
-    '#8b5cf6', // violet
-    '#a855f7', // purple
-    '#d946ef', // fuchsia
-    '#ec4899', // pink
-  ];
-  return colors[Math.floor(Math.random() * colors.length)];
-}
-
-// Debounce function for search inputs
-export function debounce<T extends (...args: any[]) => any>(
-  func: T,
-  wait: number
-): (...args: Parameters<T>) => void {
-  let timeout: ReturnType<typeof setTimeout> | null = null;
-
-  return function executedFunction(...args: Parameters<T>) {
-    const later = () => {
-      timeout = null;
-      func(...args);
-    };
-
-    if (timeout) {
-      clearTimeout(timeout);
-    }
-    timeout = setTimeout(later, wait);
-  };
-}
-
 // Class name helper (similar to clsx)
 export function cn(...classes: (string | undefined | null | false)[]): string {
   return classes.filter(Boolean).join(' ');
@@ -138,6 +95,40 @@ export function cn(...classes: (string | undefined | null | false)[]): string {
 export function isSmallScreen(): boolean {
   if (typeof window === 'undefined') return false;
   return window.matchMedia('(max-width: 767px), (max-height: 500px)').matches;
+}
+
+/**
+ * Map `items` through async `fn` with at most `limit` calls in flight,
+ * preserving order. Keeps big fan-outs (restores, imports) from flooding the
+ * network and tripping request timeouts.
+ */
+export async function mapLimit<T, R>(
+  items: readonly T[],
+  limit: number,
+  fn: (item: T, index: number) => Promise<R>
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const index = next++;
+      results[index] = await fn(items[index], index);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
+
+/** Save `content` as a file download in the browser. */
+export function downloadFile(filename: string, content: string, mimeType: string): void {
+  const url = URL.createObjectURL(new Blob([content], { type: mimeType }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 /** Split an array into chunks of at most `size` elements each. */

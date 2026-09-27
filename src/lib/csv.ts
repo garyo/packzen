@@ -1,5 +1,10 @@
 import Papa from 'papaparse';
 import type { MasterItemWithCategory } from './types';
+import { downloadFile } from './utils';
+
+// Spreadsheet apps run cells starting with these as formulas. Export prefixes
+// such cells with `'` (Papa's escapeFormulae); import strips that guard again.
+const FORMULA_GUARD = /^'(?=[=+\-@\t\r])/;
 
 /**
  * Convert master items to CSV format
@@ -17,6 +22,7 @@ export function masterItemsToCSV(items: MasterItemWithCategory[]): string {
   return Papa.unparse(data, {
     header: true,
     quotes: true, // Quote all fields for safety
+    escapeFormulae: true,
   });
 }
 
@@ -35,6 +41,7 @@ export function csvToMasterItems(csv: string): Array<{
     header: true,
     skipEmptyLines: true,
     transformHeader: (header: string) => header.toLowerCase().trim(),
+    transform: (value: string) => value.replace(FORMULA_GUARD, ''),
   });
 
   if (result.errors && result.errors.length > 0) {
@@ -93,18 +100,6 @@ export function csvToMasterItems(csv: string): Array<{
   return deduped;
 }
 
-/**
- * Download data as CSV file
- */
 export function downloadCSV(filename: string, csvContent: string): void {
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-  const link = document.createElement('a');
-  const url = URL.createObjectURL(blob);
-
-  link.setAttribute('href', url);
-  link.setAttribute('download', filename);
-  link.style.visibility = 'hidden';
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+  downloadFile(filename, csvContent, 'text/csv;charset=utf-8');
 }
