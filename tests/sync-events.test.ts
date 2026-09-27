@@ -150,6 +150,29 @@ test('checkpoint semantics: a change committed after the checkpoint is captured 
   });
 });
 
+test('checkpoint semantics: an empty log checkpoints at id 0, so the first change is delivered (C6)', async () => {
+  const d1 = await createTestDatabase();
+  const db = drizzle(d1);
+  const userId = 'user_empty_log';
+
+  const { body } = await pollEvents(d1, userId);
+  assert.match(body, /^id: 0$/m, 'an empty log still returns a checkpoint id');
+
+  const first = await insertChange(db, {
+    userId,
+    entityType: 'trip',
+    entityId: 'trip-1',
+    action: 'create',
+    data: JSON.stringify({ name: 'First Trip' }),
+  });
+
+  const { events } = await pollEvents(d1, userId, { lastEventId: 0 });
+  assert.deepEqual(
+    events.map((e) => e.id),
+    [first.id]
+  );
+});
+
 test('checkpoint semantics: history before the checkpoint is not replayed to a fresh tab', async () => {
   const d1 = await createTestDatabase();
   const db = drizzle(d1);
