@@ -113,7 +113,7 @@ export function PackingItemCard(props: PackingItemCardProps) {
             </Show>
           </span>
           <Show when={props.item.notes}>
-            <span class="hidden truncate text-xs text-gray-400 md:block">{props.item.notes}</span>
+            <span class="hidden truncate text-xs text-gray-500 md:block">{props.item.notes}</span>
           </Show>
         </span>
       </label>
@@ -124,15 +124,19 @@ export function PackingItemCard(props: PackingItemCardProps) {
             type="button"
             onClick={() => props.onContainerClick?.()}
             disabled={!props.onContainerClick}
-            class="btn-compact flex-shrink-0 rounded-full px-2 py-0.5 text-xs font-medium"
-            classList={{
-              'bg-green-100 text-green-700': stats().remaining === 0,
-              'bg-blue-100 text-blue-700': stats().remaining > 0,
-            }}
+            class="btn-compact flex min-h-8 flex-shrink-0 items-center md:min-h-0"
             title="Show what's inside"
           >
-            {stats().packed}/{stats().total}
-            <Show when={props.onContainerClick}> ↓</Show>
+            <span
+              class="rounded-full px-2 py-0.5 text-xs font-medium"
+              classList={{
+                'bg-green-100 text-green-700': stats().remaining === 0,
+                'bg-blue-100 text-blue-700': stats().remaining > 0,
+              }}
+            >
+              {stats().packed}/{stats().total}
+              <Show when={props.onContainerClick}> ↓</Show>
+            </span>
           </button>
         )}
       </Show>

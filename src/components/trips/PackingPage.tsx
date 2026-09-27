@@ -44,6 +44,17 @@ import { syncManager } from '../../lib/sync-manager';
 import { tripToYAML, downloadYAML } from '../../lib/yaml';
 import { deleteTripWithConfirm } from '../../lib/trip-actions';
 
+type SortBy = 'bag' | 'category';
+const SORT_BY_STORAGE_KEY = 'packzen-pack-sort-by';
+
+function loadSortBy(): SortBy {
+  try {
+    return localStorage.getItem(SORT_BY_STORAGE_KEY) === 'category' ? 'category' : 'bag';
+  } catch {
+    return 'bag';
+  }
+}
+
 interface PackingPageProps {
   tripId: string;
 }
@@ -87,7 +98,16 @@ export function PackingPage(props: PackingPageProps) {
 
   const [selectMode, setSelectMode] = createSignal(false);
   const [selectedItems, setSelectedItems] = createSignal<Set<string>>(new Set());
-  const [sortBy, setSortBy] = createSignal<'bag' | 'category'>('bag');
+  const [sortBy, setSortBy] = createSignal<SortBy>(loadSortBy());
+  const toggleSortBy = () => {
+    const next = sortBy() === 'bag' ? 'category' : 'bag';
+    setSortBy(next);
+    try {
+      localStorage.setItem(SORT_BY_STORAGE_KEY, next);
+    } catch {
+      // Unavailable storage just means the choice isn't remembered.
+    }
+  };
   const [viewMode, setViewMode] = createSignal<ViewMode>('pack');
   const [showUnpackedOnly, setShowUnpackedOnly] = createSignal(false);
 
@@ -415,7 +435,7 @@ export function PackingPage(props: PackingPageProps) {
         showUnpackedOnly={showUnpackedOnly}
         onToggleShowUnpackedOnly={() => setShowUnpackedOnly(!showUnpackedOnly())}
         onToggleSelectMode={toggleSelectMode}
-        onToggleSortBy={() => setSortBy(sortBy() === 'bag' ? 'category' : 'bag')}
+        onToggleSortBy={toggleSortBy}
         onManageBags={() => setShowBagManager(true)}
         onShowNotes={() => {
           setViewMode('pack');
@@ -470,7 +490,7 @@ export function PackingPage(props: PackingPageProps) {
                 class="mb-2 flex w-full items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 text-left text-sm text-amber-900"
               >
                 <span class="flex-shrink-0 font-medium">Notes</span>
-                <span class="min-w-0 flex-1 truncate text-amber-800/80">{notes()}</span>
+                <span class="min-w-0 flex-1 truncate text-amber-800">{notes()}</span>
               </button>
             </Show>
             <Show
@@ -549,6 +569,7 @@ export function PackingPage(props: PackingPageProps) {
                         onAddToContainer={(containerId) => openAddForm(null, containerId)}
                         onReplaceBag={setReplacingBag}
                         onAddBag={() => setShowBagManager(true)}
+                        hideEmptyBags={search.isFiltered}
                       />
                     </Show>
                   </Show>

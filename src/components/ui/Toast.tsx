@@ -104,11 +104,11 @@ export function Toast() {
         <For each={toasts().slice(-3)}>
           {(toast) => (
             <div class={getStyles(toast.type)} role={toast.type === 'error' ? 'alert' : undefined}>
-              <span class="flex-1">{toast.message}</span>
+              <span class="min-w-0 flex-1 wrap-anywhere">{toast.message}</span>
               <Show when={toast.action}>
                 <button
                   onClick={() => handleAction(toast)}
-                  class="rounded bg-white/20 px-2 py-1 text-sm font-medium hover:bg-white/30"
+                  class="flex-shrink-0 rounded bg-white/20 px-2 py-1 text-sm font-medium whitespace-nowrap hover:bg-white/30"
                 >
                   {toast.action!.label}
                 </button>

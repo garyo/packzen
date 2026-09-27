@@ -13,6 +13,7 @@ import {
   createSignal,
   onCleanup,
   onMount,
+  type Accessor,
   type JSX,
 } from 'solid-js';
 import type { Bag, TripItem } from '../../lib/types';
@@ -113,7 +114,7 @@ function WayfindingNavBar(props: {
               <button
                 data-section={navSectionId(navItem)}
                 onClick={() => props.onScrollToSection(navSectionId(navItem))}
-                class={`btn-compact flex shrink-0 items-center gap-1 px-1.5 py-0.5 text-xs ${
+                class={`btn-compact flex min-h-8 shrink-0 items-center gap-1 px-1.5 py-0.5 text-xs md:min-h-0 ${
                   highlighted() === navSectionId(navItem)
                     ? 'text-gray-900 underline decoration-2 underline-offset-2'
                     : 'text-gray-500 hover:text-gray-900'
@@ -131,12 +132,15 @@ function WayfindingNavBar(props: {
             )}
           </For>
         </div>
+        {/* The pill stays small; the button around it is the tap target. */}
         <button
           type="button"
           onClick={props.onAddBag}
-          class="btn-compact shrink-0 rounded-full border border-dashed border-gray-300 px-2 py-0.5 text-xs font-medium text-gray-600 hover:border-blue-400 hover:text-blue-700"
+          class="btn-compact group flex min-h-8 shrink-0 items-center md:min-h-0"
         >
-          + Bag
+          <span class="rounded-full border border-dashed border-gray-300 px-2 py-0.5 text-xs font-medium text-gray-600 group-hover:border-blue-400 group-hover:text-blue-700">
+            + Bag
+          </span>
         </button>
       </div>
     </div>
@@ -148,6 +152,8 @@ interface PackingListBagViewProps extends PackingListProps {
   onAddToContainer: (containerId: string) => void;
   onReplaceBag: (bag: Bag) => void;
   onAddBag: () => void;
+  /** Hide bags with no items, e.g. while search narrows the list. */
+  hideEmptyBags: Accessor<boolean>;
 }
 
 export function PackingListBagView(props: PackingListBagViewProps) {
@@ -161,8 +167,13 @@ export function PackingListBagView(props: PackingListBagViewProps) {
   const bagName = (bagId: string | null) =>
     props.bags()?.find((bag) => bag.id === bagId)?.name ?? NO_BAG_LABEL;
 
-  const sortedBags = createMemo(() => [...(props.bags() ?? [])].sort(byName).concat(NO_BAG));
   const bagItems = (bagId: string | null) => placement().byBag.get(bagId) ?? [];
+  const sortedBags = createMemo(() =>
+    [...(props.bags() ?? [])]
+      .sort(byName)
+      .concat(NO_BAG)
+      .filter((bag) => !props.hideEmptyBags() || bagItems(bag.id).length > 0)
+  );
   const containersIn = (bagId: string | null) =>
     bagItems(bagId)
       .filter((item) => item.is_container)

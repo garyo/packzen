@@ -182,7 +182,7 @@ export function TripNotesPanel(props: TripNotesPanelProps) {
     <div ref={panelRef} class="mb-2 rounded-lg border border-amber-200 bg-amber-50 p-1.5 shadow-sm">
       <div class="mb-1 flex items-center justify-between px-0.5">
         <span class="text-xs font-medium text-amber-700">Trip Notes</span>
-        {isSaving() && <span class="text-xs text-amber-600">Saving...</span>}
+        {isSaving() && <span class="text-xs text-amber-700">Saving...</span>}
       </div>
 
       <Show

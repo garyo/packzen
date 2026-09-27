@@ -56,6 +56,8 @@ export function useItemSearch(
   });
 
   const isSearching = () => query().trim().length > 0;
+  /** `results` is narrowed by a query (it lags typing by the debounce). */
+  const isFiltered = () => !!debouncedQuery().trim();
   const noResults = () => isSearching() && (results()?.length ?? 0) === 0;
   /** An item on the list is named exactly like the search (ignoring case). */
   const hasExactMatch = () => {
@@ -80,6 +82,7 @@ export function useItemSearch(
     query,
     setQuery,
     results,
+    isFiltered,
     noResults,
     hasExactMatch,
     scrollToItem: setScrollTarget,

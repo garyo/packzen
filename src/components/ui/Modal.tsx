@@ -136,14 +136,14 @@ export function Modal(props: ModalProps) {
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div class="flex flex-shrink-0 items-center justify-between px-6 pt-6 pb-4">
-              <h2 id={titleId} class="text-xl font-semibold text-gray-900">
+            <div class="flex flex-shrink-0 items-center justify-between gap-2 px-6 pt-6 pb-4">
+              <h2 id={titleId} class="min-w-0 text-xl font-semibold wrap-anywhere text-gray-900">
                 {props.title}
               </h2>
               <button
                 type="button"
                 onClick={props.onClose}
-                class="text-gray-400 transition-colors hover:text-gray-600"
+                class="flex-shrink-0 text-gray-400 transition-colors hover:text-gray-600"
                 aria-label="Close"
               >
                 <CloseIcon class="h-6 w-6" />
