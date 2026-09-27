@@ -1,6 +1,6 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import { SignIn, SignedIn, SignedOut } from '@clerk/astro/components';
+import { SignIn, Show } from '@clerk/astro/components';
 import { DEV_FAKE_AUTH } from '../lib/dev-auth';
 ---
 
@@ -13,7 +13,7 @@ import { DEV_FAKE_AUTH } from '../lib/dev-auth';
       </div>
 
       <div class="flex justify-center">
-        <SignedOut>
+        <Show when="signed-out">
           <!--
             Clerk's <SignIn> renders its own loading + error states, fixing the
             empty-box problem. It natively reads the `redirect_url` query param
@@ -21,10 +21,10 @@ import { DEV_FAKE_AUTH } from '../lib/dev-auth';
             so `fallbackRedirectUrl` only applies when `redirect_url` is absent.
           -->
           <SignIn signUpUrl="/sign-up" fallbackRedirectUrl="/trips" />
-        </SignedOut>
-        <SignedIn>
-          <p class="text-gray-600">You're already signed in. Redirecting…</p>
-        </SignedIn>
+          <p slot="fallback" class="text-gray-600">
+            You're already signed in. Redirecting…
+          </p>
+        </Show>
       </div>
 
       {DEV_FAKE_AUTH && (

@@ -29,3 +29,6 @@ pnpm-debug.log*
 
 # auto-generated files
 src/lib/version.ts
+
+# clerk configuration (can include secrets)
+/.clerk/
