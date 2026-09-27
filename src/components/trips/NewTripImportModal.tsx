@@ -4,7 +4,8 @@ import { Button } from '../ui/Button';
 import { showToast } from '../ui/Toast';
 import { yamlToTrip } from '../../lib/yaml';
 import { api, endpoints } from '../../lib/api';
-import type { Bag } from '../../lib/types';
+import { describeTripRestore, restoreTripContents } from '../../lib/backup';
+import type { Trip } from '../../lib/types';
 
 interface NewTripImportModalProps {
   onClose: () => void;
@@ -39,53 +40,19 @@ export function NewTripImportModal(props: NewTripImportModalProps) {
     try {
       const tripData = yamlToTrip(fileContent());
 
-      // Create new trip
-      const tripResponse = await api.post<{ id: string }>(endpoints.trips, {
+      const tripResponse = await api.post<Trip>(endpoints.trips, {
         name: tripData.trip.name,
         destination: tripData.trip.destination,
         start_date: tripData.trip.start_date,
         end_date: tripData.trip.end_date,
         notes: tripData.trip.notes,
       });
-
       if (!tripResponse.success || !tripResponse.data) {
-        showToast('error', 'Failed to create trip');
-        return;
+        throw new Error(`Could not create trip: ${tripResponse.error}`);
       }
 
-      const newTripId = tripResponse.data.id;
-
-      // Create bags in parallel and map names to IDs
-      const bagNameToId = new Map<string, string>();
-      await Promise.all(
-        tripData.bags.map(async (bagData) => {
-          const createResponse = await api.post<Bag>(endpoints.tripBags(newTripId), {
-            name: bagData.name,
-            type: bagData.type,
-            color: bagData.color,
-            sort_order: bagData.sort_order,
-          });
-          if (createResponse.data) {
-            bagNameToId.set(bagData.name, createResponse.data.id);
-          }
-        })
-      );
-
-      // Create items in parallel (bags are done, so bag IDs available)
-      await Promise.all(
-        tripData.items.map(async (itemData) => {
-          const bagId = itemData.bag_name ? bagNameToId.get(itemData.bag_name) || null : null;
-          await api.post(endpoints.tripItems(newTripId), {
-            name: itemData.name,
-            category_name: itemData.category_name,
-            quantity: itemData.quantity,
-            bag_id: bagId,
-            master_item_id: null,
-          });
-        })
-      );
-
-      showToast('success', `Trip "${tripData.trip.name}" imported successfully!`);
+      const result = await restoreTripContents(tripResponse.data.id, tripData);
+      showToast(result.failures.length > 0 ? 'error' : 'success', describeTripRestore(result));
       props.onImported();
       props.onClose();
     } catch (error) {

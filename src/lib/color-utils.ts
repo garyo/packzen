@@ -2,8 +2,6 @@
  * Color utility functions for bag colors
  */
 
-import type { ColorName } from './validation';
-
 /**
  * Named bag colors offered in color pickers, with their Tailwind swatch class.
  */
@@ -31,26 +29,7 @@ export function getBagColorSwatchClass(value: string | null | undefined): string
  * Returns undefined for hex colors (use getBagColorStyle instead)
  */
 export function getBagColorClass(color: string | null | undefined): string | undefined {
-  if (!color) return 'bg-gray-500';
-
-  // Check if it's a hex color
-  if (color.startsWith('#')) {
-    return undefined; // Use inline style instead
-  }
-
-  // Map color names to Tailwind classes
-  const colorMap: Record<ColorName, string> = {
-    blue: 'bg-blue-500',
-    red: 'bg-red-500',
-    green: 'bg-green-500',
-    yellow: 'bg-yellow-500',
-    purple: 'bg-purple-500',
-    black: 'bg-black',
-    gray: 'bg-gray-500',
-    white: 'bg-white',
-  };
-
-  return colorMap[color as ColorName] || 'bg-gray-500';
+  return color?.startsWith('#') ? undefined : getBagColorSwatchClass(color);
 }
 
 /**

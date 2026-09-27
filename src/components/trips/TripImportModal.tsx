@@ -4,7 +4,7 @@ import { Button } from '../ui/Button';
 import { showToast } from '../ui/Toast';
 import { yamlToTrip } from '../../lib/yaml';
 import { api, endpoints } from '../../lib/api';
-import type { Bag } from '../../lib/types';
+import { describeTripRestore, restoreTripContents } from '../../lib/backup';
 
 interface TripImportModalProps {
   tripId: string;
@@ -40,84 +40,19 @@ export function TripImportModal(props: TripImportModalProps) {
     try {
       const tripData = yamlToTrip(fileContent());
 
-      // Update trip details
-      await api.patch(endpoints.trip(props.tripId), {
+      const tripResponse = await api.patch(endpoints.trip(props.tripId), {
         name: tripData.trip.name,
         destination: tripData.trip.destination,
         start_date: tripData.trip.start_date,
         end_date: tripData.trip.end_date,
         notes: tripData.trip.notes,
       });
+      if (!tripResponse.success) {
+        throw new Error(`Could not update trip details: ${tripResponse.error}`);
+      }
 
-      // Fetch existing bags and items in parallel
-      const [bagsResponse, itemsResponse] = await Promise.all([
-        api.get<Bag[]>(endpoints.tripBags(props.tripId)),
-        api.get<any[]>(endpoints.tripItems(props.tripId)),
-      ]);
-      const existingBags = bagsResponse.data || [];
-      const existingItems = itemsResponse.data || [];
-
-      // Create or update bags in parallel
-      const bagNameToId = new Map<string, string>();
-      await Promise.all(
-        tripData.bags.map(async (bagData) => {
-          const existingBag = existingBags.find((b) => b.name === bagData.name);
-          if (existingBag) {
-            await api.patch(endpoints.tripBags(props.tripId), {
-              bag_id: existingBag.id,
-              name: bagData.name,
-              type: bagData.type,
-              color: bagData.color,
-            });
-            bagNameToId.set(bagData.name, existingBag.id);
-          } else {
-            const createResponse = await api.post<Bag>(endpoints.tripBags(props.tripId), {
-              name: bagData.name,
-              type: bagData.type,
-              color: bagData.color,
-              sort_order: bagData.sort_order,
-            });
-            if (createResponse.data) {
-              bagNameToId.set(bagData.name, createResponse.data.id);
-            }
-          }
-        })
-      );
-
-      // Create or update items in parallel (bags are done, so bag IDs available)
-      let importedCount = 0;
-      await Promise.all(
-        tripData.items.map(async (itemData) => {
-          const bagId = itemData.bag_name ? bagNameToId.get(itemData.bag_name) || null : null;
-          const existingItem = existingItems.find(
-            (i) => i.name.toLowerCase() === itemData.name.toLowerCase()
-          );
-
-          if (existingItem) {
-            await api.patch(endpoints.tripItems(props.tripId), {
-              id: existingItem.id,
-              name: itemData.name,
-              category_name: itemData.category_name,
-              quantity: itemData.quantity,
-              bag_id: bagId,
-              is_packed: itemData.is_packed,
-              is_skipped: itemData.is_skipped,
-            });
-          } else {
-            await api.post(endpoints.tripItems(props.tripId), {
-              name: itemData.name,
-              category_name: itemData.category_name,
-              quantity: itemData.quantity,
-              bag_id: bagId,
-              master_item_id: null,
-              is_skipped: itemData.is_skipped,
-            });
-            importedCount++;
-          }
-        })
-      );
-
-      showToast('success', `Trip imported successfully! ${importedCount} new items added.`);
+      const result = await restoreTripContents(props.tripId, tripData, { merge: true });
+      showToast(result.failures.length > 0 ? 'error' : 'success', describeTripRestore(result));
       props.onImported();
       props.onClose();
     } catch (error) {
@@ -133,8 +68,8 @@ export function TripImportModal(props: TripImportModalProps) {
       <div class="space-y-4">
         <div>
           <p class="mb-3 text-sm text-gray-600">
-            Select a YAML file to import. This will merge the imported data with your current trip.
-            Existing items with the same name will be updated.
+            Select a YAML file to import. This will merge the imported data with your current trip:
+            items already in this trip are updated, and the rest are added.
           </p>
           <input
             type="file"

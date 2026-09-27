@@ -1,7 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
-import { buildServiceWorkerSource, findPrecacheAssetPaths } from '../scripts/generate-sw.js';
+import {
+  buildServiceWorkerSource,
+  computeCacheVersion,
+  findPrecacheAssetPaths,
+} from '../scripts/generate-sw.js';
 
 // ---------------------------------------------------------------------------
 // Test harness: run the generated service-worker source in a sandboxed
@@ -119,7 +123,7 @@ function delay<T>(ms: number, value: T): Promise<T> {
 test('S1: slow API GET that resolves after >2s still returns the real response', async () => {
   const source = buildServiceWorkerSource({
     version: 'test',
-    commitHash: 'abc123',
+    cacheVersion: 'abc123',
     precacheAssets: [],
   });
 
@@ -151,7 +155,7 @@ test('S1: slow API GET that resolves after >2s still returns the real response',
 test('S1: a genuinely failed API GET with no cache still falls back to a synthetic 503', async () => {
   const source = buildServiceWorkerSource({
     version: 'test',
-    commitHash: 'abc123',
+    cacheVersion: 'abc123',
     precacheAssets: [],
   });
 
@@ -172,7 +176,7 @@ test('S1: a genuinely failed API GET with no cache still falls back to a synthet
 test('S1: static assets are still served cache-first (unchanged behavior)', async () => {
   const source = buildServiceWorkerSource({
     version: 'test',
-    commitHash: 'abc123',
+    cacheVersion: 'abc123',
     precacheAssets: [],
   });
 
@@ -192,6 +196,63 @@ test('S1: static assets are still served cache-first (unchanged behavior)', asyn
 
   const text = await response.text();
   assert.equal(text, 'cached-chunk', 'cached static asset should be returned immediately');
+  assert.equal(networkFetchCount, 0, 'hashed /_astro assets are never revalidated');
+});
+
+test('unhashed static assets are served from cache and refreshed in the background', async () => {
+  const source = buildServiceWorkerSource({ version: 'test', cacheVersion: 'abc123' });
+  let networkFetchCount = 0;
+  const fetchImpl = (async () => {
+    networkFetchCount += 1;
+    return new Response('fresh', { status: 200 });
+  }) as typeof fetch;
+
+  const sandbox = runServiceWorkerSource(source, { fetchImpl });
+  const request = new Request('https://packzen.test/logo.png');
+  sandbox.cache.store.set(request.url, new Response('cached-logo', { status: 200 }));
+
+  const { event, responsePromise } = makeFakeFetchEvent(request);
+  sandbox.listeners.fetch[0](event);
+  assert.equal(await (await responsePromise).text(), 'cached-logo');
+  assert.equal(networkFetchCount, 1);
+});
+
+test('non-GET and cross-origin requests are left to the browser', () => {
+  const source = buildServiceWorkerSource({ version: 'test', cacheVersion: 'abc123' });
+  const fetchImpl = (async () => new Response('x')) as typeof fetch;
+  const sandbox = runServiceWorkerSource(source, { fetchImpl });
+
+  for (const request of [
+    new Request('https://packzen.test/api/trips', { method: 'POST', body: '{}' }),
+    new Request('https://analytics.example.com/tracker.js'),
+  ]) {
+    let responded = false;
+    sandbox.listeners.fetch[0]({ request, respondWith: () => (responded = true) });
+    assert.equal(responded, false, `${request.method} ${request.url} must not be intercepted`);
+  }
+});
+
+test('computeCacheVersion changes exactly when a precached file changes', async () => {
+  const { mkdtempSync, mkdirSync, writeFileSync, rmSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+
+  const distDir = mkdtempSync(join(tmpdir(), 'sw-version-test-'));
+  mkdirSync(join(distDir, 'trips'));
+  writeFileSync(join(distDir, 'index.html'), '<h1>home</h1>');
+  writeFileSync(join(distDir, 'trips', 'index.html'), '<h1>trips</h1>');
+  const urls = ['/', '/trips/', '/missing.png'];
+
+  try {
+    const first = computeCacheVersion(distDir, urls);
+    assert.match(first, /^[0-9a-f]{12}$/);
+    assert.equal(computeCacheVersion(distDir, urls), first, 'stable for identical content');
+
+    writeFileSync(join(distDir, 'trips', 'index.html'), '<h1>trips v2</h1>');
+    assert.notEqual(computeCacheVersion(distDir, urls), first, 'changes with page content');
+  } finally {
+    rmSync(distDir, { recursive: true, force: true });
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -203,7 +264,7 @@ test('S7: buildServiceWorkerSource embeds hashed /_astro asset paths in PRECACHE
   const precacheAssets = ['/_astro/client.D0tpiZvq.js', '/_astro/index.NPsBXKxg.js'];
   const source = buildServiceWorkerSource({
     version: 'test',
-    commitHash: 'abc123',
+    cacheVersion: 'abc123',
     precacheAssets,
   });
 
@@ -251,7 +312,7 @@ test('S7: findPrecacheAssetPaths returns [] when dist/_astro does not exist (pre
 test('S7: a total precache failure is surfaced via console.error, not silently swallowed', async () => {
   const source = buildServiceWorkerSource({
     version: 'test',
-    commitHash: 'abc123',
+    cacheVersion: 'abc123',
     precacheAssets: ['/_astro/client.js'],
   });
 

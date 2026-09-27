@@ -1,21 +1,7 @@
 // Re-export database types from schema
-export type {
-  Category,
-  NewCategory,
-  MasterItem,
-  NewMasterItem,
-  Trip,
-  NewTrip,
-  Bag,
-  NewBag,
-  BagTemplate,
-  NewBagTemplate,
-  TripItem,
-  NewTripItem,
-} from '../../db/schema';
+export type { Category, MasterItem, Trip, Bag, BagTemplate, TripItem } from '../../db/schema';
 
-// Import for extending
-import type { MasterItem, Trip } from '../../db/schema';
+import type { Bag, MasterItem, Trip } from '../../db/schema';
 
 // Extended type for master items with joined category name (returned by API)
 export type MasterItemWithCategory = MasterItem & {
@@ -46,16 +32,7 @@ export interface ApiResponse<T = unknown> {
   statusCode?: number;
 }
 
-// Bag types (predefined)
-export type BagType = 'carry_on' | 'checked' | 'personal' | 'custom';
-
-export interface BagTypeOption {
-  type: BagType;
-  label: string;
-  description: string;
-}
-
-export const BAG_TYPES: BagTypeOption[] = [
+export const BAG_TYPES: Array<{ type: Bag['type']; label: string; description: string }> = [
   { type: 'carry_on', label: 'Carry-on', description: 'Cabin bag for overhead storage' },
   { type: 'checked', label: 'Checked Bag', description: 'Luggage checked at the counter' },
   { type: 'personal', label: 'Personal Item', description: 'Small bag under the seat' },
@@ -63,13 +40,13 @@ export const BAG_TYPES: BagTypeOption[] = [
 ];
 
 // Built-in items types
-export interface BuiltInCategory {
+interface BuiltInCategory {
   name: string;
   icon: string;
   sort_order: number;
 }
 
-export interface TripType {
+interface TripType {
   id: string;
   name: string;
   description: string;
