@@ -1,15 +1,12 @@
 /**
  * Shared "get or create" helpers for categories and master items.
- *
- * These were previously implemented separately in PackingPage.tsx,
- * AddTripItemForm.tsx, EditTripItem.tsx, and CSVImportExport.tsx, each with
- * slightly different matching/creation behavior. This is the single, unified
- * implementation; see call sites for the (documented) behavior changes each
- * one picked up by switching to it.
  */
 import { api, endpoints } from './api';
 import { builtInItems } from './built-in-items';
 import type { Category, MasterItemWithCategory } from './types';
+import { mapLimit } from './utils';
+
+const MAX_CONCURRENT_REQUESTS = 6;
 
 /**
  * Find a category by name (case-insensitive) in `categories`, creating it via
@@ -56,8 +53,8 @@ export interface GetOrCreateMasterItemInput {
 
 export interface GetOrCreateMasterItemOptions {
   /**
-   * When a master item with the same name already exists, PUT the new
-   * description/category/quantity onto it instead of leaving it untouched.
+   * When a master item with the same name already exists, PATCH the new
+   * description/category/quantity/container flag onto it instead of leaving it untouched.
    * CSV import uses this — the file is treated as the source of truth for
    * existing rows. Quick-add flows (quick add form, built-in browser)
    * intentionally leave an existing master item's saved metadata alone.
@@ -93,11 +90,11 @@ export async function getOrCreateMasterItem(
     : null;
 
   if (existing) {
-    const response = await api.put<MasterItemWithCategory>(endpoints.masterItem(existing.id), {
-      name: existing.name,
+    const response = await api.patch<MasterItemWithCategory>(endpoints.masterItem(existing.id), {
       description: item.description || existing.description,
       category_id: categoryRecord?.id || existing.category_id,
       default_quantity: item.quantity,
+      is_container: item.is_container ?? existing.is_container,
     });
     if (!response.success || !response.data) {
       return { item: existing, status: 'failed' };
@@ -125,7 +122,7 @@ export async function getOrCreateMasterItem(
  * Resolve master items for a whole batch at once, minimizing round trips:
  * distinct categories are created first, one at a time (so two items sharing
  * a brand-new category name don't race each other into creating duplicate
- * rows for it), then master items are resolved concurrently — memoized by
+ * rows for it), then master items are resolved a few at a time — memoized by
  * name so duplicate names within the same batch share one create/update
  * instead of racing to create two.
  */
@@ -149,21 +146,19 @@ export async function resolveMasterItems<T extends GetOrCreateMasterItemInput>(
   const total = items.length;
   let done = 0;
   const cache = new Map<string, Promise<MasterItemUpsertResult>>();
-  return Promise.all(
-    items.map((item) => {
-      const key = item.name.toLowerCase();
-      let pending = cache.get(key);
-      if (!pending) {
-        pending = getOrCreateMasterItem(item, masterItems, categories, upsertOptions).then(
-          (result) => {
-            done++;
-            onProgress?.(done, total);
-            return result;
-          }
-        );
-        cache.set(key, pending);
-      }
-      return pending;
-    })
-  );
+  return mapLimit(items, MAX_CONCURRENT_REQUESTS, (item) => {
+    const key = item.name.toLowerCase();
+    let pending = cache.get(key);
+    if (!pending) {
+      pending = getOrCreateMasterItem(item, masterItems, categories, upsertOptions).then(
+        (result) => {
+          done++;
+          onProgress?.(done, total);
+          return result;
+        }
+      );
+      cache.set(key, pending);
+    }
+    return pending;
+  });
 }
