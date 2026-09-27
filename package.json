@@ -46,8 +46,8 @@
     "better-sqlite3": "^13.0.3",
     "drizzle-kit": "^0.31.11",
     "prettier": "^3.9.9",
-    "prettier-plugin-astro": "^0.14.1",
-    "prettier-plugin-tailwindcss": "^0.7.4",
+    "prettier-plugin-astro": "^1.1.0",
+    "prettier-plugin-tailwindcss": "^0.8.1",
     "tsx": "^4.23.15",
     "typescript": "^5.9.3",
     "wrangler": "^4.142.0"
