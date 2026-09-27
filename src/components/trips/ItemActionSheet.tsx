@@ -1,14 +1,16 @@
 /**
  * An item's actions: skip, edit or delete it, or move it to a bag or
- * container in one tap.
+ * container in one tap — including a new bag, created on the spot.
  */
 
-import { For, Show, type JSX } from 'solid-js';
+import { createSignal, For, Show, type JSX } from 'solid-js';
 import type { Bag, TripItem } from '../../lib/types';
 import { NO_BAG_LABEL } from '../../lib/vocabulary';
+import { BAG_COLORS } from '../../lib/color-utils';
 import { Modal } from '../ui/Modal';
+import { Button } from '../ui/Button';
 import { EditIcon, SkipIcon, TrashIcon } from '../ui/Icons';
-import { BagChip } from '../ui/BagFields';
+import { BagChip, BagFields, DEFAULT_BAG_FIELDS, type BagFieldValues } from '../ui/BagFields';
 
 interface ItemActionSheetProps {
   item: TripItem;
@@ -16,6 +18,8 @@ interface ItemActionSheetProps {
   containers: TripItem[];
   onMoveToBag: (bagId: string | null) => void;
   onMoveToContainer: (containerId: string) => void;
+  /** Create a bag and move the item into it; resolves false if that failed. */
+  onMoveToNewBag: (bag: BagFieldValues) => Promise<boolean>;
   onToggleSkipped: () => void;
   onEdit: () => void;
   onDelete: () => void;
@@ -65,6 +69,20 @@ export function ItemActionSheet(props: ItemActionSheetProps) {
   // A container can't go inside another container.
   const containers = () => (props.item.is_container ? [] : props.containers);
 
+  const [newBag, setNewBag] = createSignal<BagFieldValues | null>(null);
+  const [saving, setSaving] = createSignal(false);
+  const startNewBag = () => {
+    const used = new Set(props.bags.map((bag) => bag.color));
+    const color = BAG_COLORS.find((c) => !used.has(c.value))?.value ?? DEFAULT_BAG_FIELDS.color;
+    setNewBag({ ...DEFAULT_BAG_FIELDS, color });
+  };
+  const createAndMove = async (bag: BagFieldValues) => {
+    setSaving(true);
+    const moved = await props.onMoveToNewBag({ ...bag, name: bag.name.trim() });
+    setSaving(false);
+    if (moved) props.onClose();
+  };
+
   return (
     <Modal title={props.item.name} size="small" onClose={props.onClose}>
       <div class="grid grid-cols-3 gap-2">
@@ -82,47 +100,78 @@ export function ItemActionSheet(props: ItemActionSheetProps) {
         </Action>
       </div>
 
-      <Show when={props.bags.length > 0 || containers().length > 0}>
-        <h3 class="mt-5 mb-2 text-sm font-medium text-gray-700">Move to</h3>
-        <div class="space-y-2">
-          <For each={props.bags}>
-            {(bag) => (
-              <Destination
-                current={props.item.bag_id === bag.id && !inContainer()}
-                onClick={act(() => props.onMoveToBag(bag.id))}
-              >
-                <BagChip bag={bag} />
-              </Destination>
-            )}
-          </For>
-          <For each={containers()}>
-            {(container) => (
-              <Destination
-                current={props.item.container_item_id === container.id}
-                onClick={act(() => props.onMoveToContainer(container.id))}
-              >
-                <span class="w-4 flex-shrink-0 text-center text-sm" aria-hidden="true">
-                  📦
-                </span>
-                <span class="min-w-0 flex-1 truncate text-sm font-medium text-gray-900">
-                  {container.name}
-                </span>
-              </Destination>
-            )}
-          </For>
-          <Destination
-            current={!props.item.bag_id && !inContainer()}
-            onClick={act(() => props.onMoveToBag(null))}
-          >
-            <span class="w-4 flex-shrink-0 text-center text-sm" aria-hidden="true">
-              👕
-            </span>
-            <span class="min-w-0 flex-1 truncate text-sm font-medium text-gray-900">
-              {NO_BAG_LABEL}
-            </span>
-          </Destination>
-        </div>
-      </Show>
+      <h3 class="mt-5 mb-2 text-sm font-medium text-gray-700">Move to</h3>
+      <div class="space-y-2">
+        <For each={props.bags}>
+          {(bag) => (
+            <Destination
+              current={props.item.bag_id === bag.id && !inContainer()}
+              onClick={act(() => props.onMoveToBag(bag.id))}
+            >
+              <BagChip bag={bag} />
+            </Destination>
+          )}
+        </For>
+        <For each={containers()}>
+          {(container) => (
+            <Destination
+              current={props.item.container_item_id === container.id}
+              onClick={act(() => props.onMoveToContainer(container.id))}
+            >
+              <span class="w-4 flex-shrink-0 text-center text-sm" aria-hidden="true">
+                📦
+              </span>
+              <span class="min-w-0 flex-1 truncate text-sm font-medium text-gray-900">
+                {container.name}
+              </span>
+            </Destination>
+          )}
+        </For>
+        <Destination
+          current={!props.item.bag_id && !inContainer()}
+          onClick={act(() => props.onMoveToBag(null))}
+        >
+          <span class="w-4 flex-shrink-0 text-center text-sm" aria-hidden="true">
+            👕
+          </span>
+          <span class="min-w-0 flex-1 truncate text-sm font-medium text-gray-900">
+            {NO_BAG_LABEL}
+          </span>
+        </Destination>
+        <Show
+          when={newBag()}
+          fallback={
+            <button
+              type="button"
+              onClick={startNewBag}
+              class="w-full rounded-lg border border-dashed border-gray-300 px-4 py-2 text-left text-sm font-medium text-gray-600 hover:border-blue-400 hover:text-blue-700"
+            >
+              + New bag…
+            </button>
+          }
+        >
+          {(bag) => (
+            <form
+              ref={(form) => queueMicrotask(() => form.querySelector('input')?.focus())}
+              class="space-y-3 rounded-lg border border-gray-200 p-3"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void createAndMove(bag());
+              }}
+            >
+              <BagFields value={bag()} onChange={setNewBag} placeholder="e.g., Backpack" />
+              <div class="flex justify-end gap-2">
+                <Button type="button" variant="secondary" size="sm" onClick={() => setNewBag(null)}>
+                  Cancel
+                </Button>
+                <Button type="submit" size="sm" disabled={saving() || !bag().name.trim()}>
+                  {saving() ? 'Creating…' : 'Create and move'}
+                </Button>
+              </div>
+            </form>
+          )}
+        </Show>
+      </div>
     </Modal>
   );
 }

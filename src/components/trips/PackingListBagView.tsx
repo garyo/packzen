@@ -65,6 +65,7 @@ function WayfindingNavBar(props: {
   navItems: NavItem[];
   currentSection: () => string | null;
   onScrollToSection: (sectionId: string) => void;
+  onAddBag: () => void;
 }) {
   const drag = useDragState();
 
@@ -103,6 +104,13 @@ function WayfindingNavBar(props: {
               </button>
             )}
           </For>
+          <button
+            type="button"
+            onClick={props.onAddBag}
+            class="btn-compact rounded-full border border-dashed border-gray-300 px-2 py-0.5 text-xs font-medium text-gray-600 hover:border-blue-400 hover:text-blue-700 [@media(max-height:500px)]:shrink-0"
+          >
+            + Bag
+          </button>
         </div>
       </div>
     </div>
@@ -113,6 +121,7 @@ interface PackingListBagViewProps extends PackingListProps {
   onAddToBag: (bagId: string | null) => void;
   onAddToContainer: (containerId: string) => void;
   onReplaceBag: (bag: Bag) => void;
+  onAddBag: () => void;
 }
 
 export function PackingListBagView(props: PackingListBagViewProps) {
@@ -189,13 +198,12 @@ export function PackingListBagView(props: PackingListBagViewProps) {
   return (
     <PackDnd onDrop={(item, target) => dropInto(props, item, target)}>
       <div class="space-y-3">
-        <Show when={navItems().length > 1}>
-          <WayfindingNavBar
-            navItems={navItems()}
-            currentSection={currentSection}
-            onScrollToSection={scrollToElement}
-          />
-        </Show>
+        <WayfindingNavBar
+          navItems={navItems()}
+          currentSection={currentSection}
+          onScrollToSection={scrollToElement}
+          onAddBag={props.onAddBag}
+        />
 
         <For each={sortedBags()}>
           {(bag) => {

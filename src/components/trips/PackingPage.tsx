@@ -22,6 +22,7 @@ import { AddModeView } from './AddModeView';
 import { SelectModeActionBar } from './SelectModeActionBar';
 import { StarterListPanel } from './StarterListPanel';
 import { ItemActionSheet } from './ItemActionSheet';
+import type { BagFieldValues } from '../ui/BagFields';
 import { TripNotesPanel } from './TripNotesPanel';
 import { useItemSearch } from './useItemSearch';
 import { fetchWithFallback } from '../../lib/resource-helpers';
@@ -87,7 +88,7 @@ export function PackingPage(props: PackingPageProps) {
       'Failed to load trip'
     )
   );
-  const [bags, { refetch: refetchBags }] = createResource(() =>
+  const [bags, { refetch: refetchBags, mutate: setBags }] = createResource(() =>
     fetchWithFallback(
       () => api.get<Bag[]>(endpoints.tripBags(props.tripId)),
       [],
@@ -187,6 +188,20 @@ export function PackingPage(props: PackingPageProps) {
       { container_item_id: containerId, bag_id: null },
       { label: `Moved "${item.name}" to ${container.name}` }
     );
+  };
+
+  const moveItemToNewBag = async (itemId: string, bag: BagFieldValues) => {
+    const response = await api.post<Bag>(endpoints.tripBags(props.tripId), {
+      ...bag,
+      sort_order: bags()?.length ?? 0,
+    });
+    if (!response.success || !response.data) {
+      showToast('error', response.error || 'Failed to add bag');
+      return false;
+    }
+    setBags([...(bags() ?? []), response.data]);
+    moveItemToBag(itemId, response.data.id);
+    return true;
   };
 
   const handleClearAll = async () => {
@@ -482,6 +497,7 @@ export function PackingPage(props: PackingPageProps) {
                         onAddToBag={(bagId) => openAddForm(bagId)}
                         onAddToContainer={(containerId) => openAddForm(null, containerId)}
                         onReplaceBag={setReplacingBag}
+                        onAddBag={() => setShowBagManager(true)}
                       />
                     </Show>
                   </Show>
@@ -524,6 +540,7 @@ export function PackingPage(props: PackingPageProps) {
             containers={containers().filter((c) => c.id !== item().id)}
             onMoveToBag={(bagId) => moveItemToBag(item().id, bagId)}
             onMoveToContainer={(containerId) => moveItemToContainer(item().id, containerId)}
+            onMoveToNewBag={(bag) => moveItemToNewBag(item().id, bag)}
             onToggleSkipped={() => toggleSkipped(item())}
             onEdit={() => setEditingItem(item())}
             onDelete={() => removeFromTrip(item().id)}
