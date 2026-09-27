@@ -64,8 +64,7 @@ export const POST: APIRoute = async (context) => {
   try {
     // Get webhook secret from runtime environment
     const runtime = locals.runtime as
-      | { env: { CLERK_WEBHOOK_SECRET?: string; DB: D1Database } }
-      | undefined;
+      { env: { CLERK_WEBHOOK_SECRET?: string; DB: D1Database } } | undefined;
 
     if (!runtime?.env) {
       console.error('Runtime environment not available');
