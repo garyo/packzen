@@ -16,6 +16,7 @@ import { EmptyState } from '../ui/EmptyState';
 import { Button } from '../ui/Button';
 import { showToast } from '../ui/Toast';
 import { confirmDialog } from '../ui/ConfirmDialog';
+import { isModalOpen } from '../ui/Modal';
 import { isSmallScreen } from '../../lib/utils';
 import { BagManager } from './BagManager';
 import { EditTripItem } from './EditTripItem';
@@ -149,6 +150,13 @@ export function PackingPage(props: PackingPageProps) {
         if (change.entityId === props.tripId) refetchTrip();
       })
     );
+
+    // Escape leaves Select mode, unless a dialog is open to take it.
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && selectMode() && !isModalOpen()) toggleSelectMode();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    onCleanup(() => document.removeEventListener('keydown', onKeyDown));
   });
 
   const containers = () => (items() ?? []).filter((item) => item.is_container);
@@ -260,8 +268,11 @@ export function PackingPage(props: PackingPageProps) {
   const patchSelection = (patch: Partial<TripItem>, label: (count: number) => string) =>
     void store.patchItems(takeSelection(), patch, { label });
 
+  const selectionHasContainer = () =>
+    [...selectedItems()].some((id) => store.find(id)?.is_container);
+
   const assignSelectionToContainer = (containerId: string | null) => {
-    if (containerId && [...selectedItems()].some((id) => store.find(id)?.is_container)) {
+    if (containerId && selectionHasContainer()) {
       showToast('error', 'Containers cannot be placed inside other containers');
       return;
     }
@@ -658,11 +669,12 @@ export function PackingPage(props: PackingPageProps) {
           }
           onAssignToContainer={assignSelectionToContainer}
           onAssignToCategory={assignSelectionToCategory}
-          onSkipAll={() => patchSelection({ is_skipped: true }, (n) => `Skipped ${itemCount(n)}`)}
-          onUnskipAll={() =>
-            patchSelection({ is_skipped: false }, (n) => `Unskipped ${itemCount(n)}`)
-          }
-          onDeleteAll={() =>
+          selectionHasContainer={selectionHasContainer}
+          onPack={() => patchSelection({ is_packed: true }, (n) => `Packed ${itemCount(n)}`)}
+          onUnpack={() => patchSelection({ is_packed: false }, (n) => `Unpacked ${itemCount(n)}`)}
+          onSkip={() => patchSelection({ is_skipped: true }, (n) => `Skipped ${itemCount(n)}`)}
+          onUnskip={() => patchSelection({ is_skipped: false }, (n) => `Unskipped ${itemCount(n)}`)}
+          onDelete={() =>
             void store.deleteItems(takeSelection(), { label: (n) => `Deleted ${itemCount(n)}` })
           }
         />

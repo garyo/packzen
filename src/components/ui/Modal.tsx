@@ -23,6 +23,9 @@ const FIELD_SELECTOR = 'input:not([disabled]), textarea:not([disabled]), select:
 // the page behind stays scroll-locked while any modal is open.
 const modalStack: symbol[] = [];
 
+/** Whether any modal is open, for page-level keys (like Escape) that should defer to it. */
+export const isModalOpen = () => modalStack.length > 0;
+
 export function Modal(props: ModalProps) {
   const titleId = createUniqueId();
   const stackId = Symbol('modal');

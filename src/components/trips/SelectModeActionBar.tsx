@@ -14,17 +14,23 @@ import { confirmDialog } from '../ui/ConfirmDialog';
 // "No bag"/"No container"/"No category" clear option, which uses value="".
 const PLACEHOLDER = '__placeholder__';
 
+// Narrow enough on phones for all five batch buttons to fit on one row.
+const ACTION_BUTTON = 'rounded-lg border px-2.5 py-1.5 text-sm font-medium md:px-3';
+
 interface SelectModeActionBarProps {
   selectedCount: Accessor<number>;
   bags: Accessor<Bag[] | undefined>;
   categories: Accessor<Category[] | undefined>;
   containers: Accessor<TripItem[]>;
+  selectionHasContainer: Accessor<boolean>;
   onAssignToBag: (bagId: string | null) => void;
   onAssignToContainer: (containerId: string | null) => void;
   onAssignToCategory: (categoryId: string | null) => void;
-  onSkipAll: () => void;
-  onUnskipAll: () => void;
-  onDeleteAll: () => void;
+  onPack: () => void;
+  onUnpack: () => void;
+  onSkip: () => void;
+  onUnskip: () => void;
+  onDelete: () => void;
 }
 
 export function SelectModeActionBar(props: SelectModeActionBarProps) {
@@ -33,11 +39,11 @@ export function SelectModeActionBar(props: SelectModeActionBarProps) {
   const confirmDelete = async () => {
     const confirmed = await confirmDialog({
       title: `Delete ${itemsLabel()}?`,
-      message: 'Containers are deleted with their contents. You can undo this afterward.',
+      message: `${props.selectionHasContainer() ? 'Containers are deleted with their contents. ' : ''}You can undo this afterward.`,
       confirmLabel: 'Delete',
       destructive: true,
     });
-    if (confirmed) props.onDeleteAll();
+    if (confirmed) props.onDelete();
   };
 
   // Sort categories alphabetically
@@ -107,27 +113,38 @@ export function SelectModeActionBar(props: SelectModeActionBarProps) {
               </select>
             </div>
 
-            {/* Skip/Unskip Buttons */}
-            <button
-              onClick={props.onSkipAll}
-              class="rounded-lg border border-orange-300 bg-orange-50 px-3 py-1.5 text-sm font-medium text-orange-600 hover:bg-orange-100"
-            >
-              Skip
-            </button>
-            <button
-              onClick={props.onUnskipAll}
-              class="rounded-lg border border-gray-300 bg-gray-50 px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-100"
-            >
-              Unskip
-            </button>
-
-            {/* Delete All Button */}
-            <button
-              onClick={confirmDelete}
-              class="rounded-lg border border-red-300 bg-red-50 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-100"
-            >
-              Delete All
-            </button>
+            <div class="flex flex-wrap gap-2">
+              <button
+                onClick={props.onPack}
+                class={`${ACTION_BUTTON} border-green-300 bg-green-50 text-green-700 hover:bg-green-100`}
+              >
+                Pack
+              </button>
+              <button
+                onClick={props.onUnpack}
+                class={`${ACTION_BUTTON} border-gray-300 bg-gray-50 text-gray-600 hover:bg-gray-100`}
+              >
+                Unpack
+              </button>
+              <button
+                onClick={props.onSkip}
+                class={`${ACTION_BUTTON} border-orange-300 bg-orange-50 text-orange-600 hover:bg-orange-100`}
+              >
+                Skip
+              </button>
+              <button
+                onClick={props.onUnskip}
+                class={`${ACTION_BUTTON} border-gray-300 bg-gray-50 text-gray-600 hover:bg-gray-100`}
+              >
+                Unskip
+              </button>
+              <button
+                onClick={confirmDelete}
+                class={`${ACTION_BUTTON} border-red-300 bg-red-50 text-red-600 hover:bg-red-100`}
+              >
+                Delete
+              </button>
+            </div>
           </div>
         </div>
       </div>
