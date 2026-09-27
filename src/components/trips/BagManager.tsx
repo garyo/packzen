@@ -1,13 +1,13 @@
 import { createSignal, createResource, For, Show } from 'solid-js';
 import { api, endpoints } from '../../lib/api';
-import type { Bag, BagTemplate } from '../../lib/types';
-import { BAG_TYPES } from '../../lib/types';
-import { BAG_COLORS, getBagColorSwatchClass } from '../../lib/color-utils';
+import type { Bag, BagTemplate, BagType } from '../../lib/types';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
-import { Input } from '../ui/Input';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
 import { showToast } from '../ui/Toast';
+import { confirmDialog } from '../ui/ConfirmDialog';
+import { EditIcon, TrashIcon } from '../ui/Icons';
+import { BagChip, BagFields, DEFAULT_BAG_FIELDS, type BagFieldValues } from './BagFields';
 
 interface BagManagerProps {
   tripId: string;
@@ -17,136 +17,129 @@ interface BagManagerProps {
 
 export function BagManager(props: BagManagerProps) {
   const [showForm, setShowForm] = createSignal(false);
-  const [formData, setFormData] = createSignal({
-    name: '',
-    type: 'carry_on' as const,
-    color: 'blue',
-  });
+  const [formData, setFormData] = createSignal<BagFieldValues>(DEFAULT_BAG_FIELDS);
   const [editingId, setEditingId] = createSignal<string | null>(null);
-  const [editData, setEditData] = createSignal({
-    name: '',
-    type: 'carry_on' as const,
-    color: 'blue',
-  });
+  const [editData, setEditData] = createSignal<BagFieldValues>(DEFAULT_BAG_FIELDS);
+  // Serializes writes so a double tap can't add the same bag twice.
+  const [busy, setBusy] = createSignal(false);
 
   const [bags, { refetch }] = createResource<Bag[]>(async () => {
     const response = await api.get<Bag[]>(endpoints.tripBags(props.tripId));
-    if (response.success && response.data) {
-      return response.data;
-    }
-    return [];
+    return response.success && response.data ? response.data : [];
   });
 
   const [bagTemplates] = createResource<BagTemplate[]>(async () => {
     const response = await api.get<BagTemplate[]>(endpoints.bagTemplates);
-    if (response.success && response.data) {
-      return response.data;
-    }
-    return [];
+    return response.success && response.data ? response.data : [];
   });
 
-  const handleAddFromTemplate = async (template: BagTemplate) => {
-    const response = await api.post(endpoints.tripBags(props.tripId), {
-      name: template.name,
-      type: template.type,
-      color: template.color,
-      sort_order: bags()?.length || 0,
-    });
-
-    if (response.success) {
-      showToast('success', `Added ${template.name}`);
-      refetch();
-      props.onSaved();
-    } else {
-      showToast('error', response.error || 'Failed to add bag');
-    }
+  const runExclusive = async (action: () => Promise<void>) => {
+    if (busy()) return;
+    setBusy(true);
+    await action();
+    setBusy(false);
   };
 
-  const handleSubmit = async (e: Event) => {
-    e.preventDefault();
+  const refreshAfterChange = () => {
+    refetch();
+    props.onSaved();
+  };
 
-    const data = formData();
-    if (!data.name.trim()) {
+  const addBag = async (bag: BagFieldValues, successMessage: string): Promise<boolean> => {
+    const response = await api.post(endpoints.tripBags(props.tripId), {
+      name: bag.name.trim(),
+      type: bag.type,
+      color: bag.color,
+      sort_order: bags()?.length || 0,
+    });
+    if (!response.success) {
+      showToast('error', response.error || 'Failed to add bag');
+      return false;
+    }
+    showToast('success', successMessage);
+    refreshAfterChange();
+    return true;
+  };
+
+  const handleAddFromTemplate = (template: BagTemplate) =>
+    runExclusive(async () => {
+      await addBag(
+        { name: template.name, type: template.type as BagType, color: template.color || 'blue' },
+        `Added ${template.name}`
+      );
+    });
+
+  const handleSubmit = (e: Event) => {
+    e.preventDefault();
+    if (!formData().name.trim()) {
       showToast('error', 'Bag name is required');
       return;
     }
-
-    const response = await api.post(endpoints.tripBags(props.tripId), {
-      name: data.name.trim(),
-      type: data.type,
-      color: data.color,
-      sort_order: bags()?.length || 0,
+    void runExclusive(async () => {
+      if (await addBag(formData(), 'Bag added')) {
+        setFormData(DEFAULT_BAG_FIELDS);
+        setShowForm(false);
+      }
     });
-
-    if (response.success) {
-      showToast('success', 'Bag added');
-      setFormData({ name: '', type: 'carry_on', color: 'blue' });
-      setShowForm(false);
-      refetch();
-      props.onSaved();
-    } else {
-      showToast('error', response.error || 'Failed to add bag');
-    }
   };
 
-  const handleDelete = async (bagId: string) => {
-    if (!confirm('Delete this bag? Items in this bag will not be deleted.')) return;
-
-    const response = await api.delete(endpoints.tripBags(props.tripId), {
-      body: JSON.stringify({ bag_id: bagId }),
+  const handleDelete = async (bag: Bag) => {
+    const confirmed = await confirmDialog({
+      title: `Delete "${bag.name}"?`,
+      message: 'Items in this bag will not be deleted.',
+      confirmLabel: 'Delete',
+      destructive: true,
     });
+    if (!confirmed) return;
 
-    if (response.success) {
-      showToast('success', 'Bag deleted');
-      refetch();
-      props.onSaved();
-    } else {
-      showToast('error', response.error || 'Failed to delete bag');
-    }
+    await runExclusive(async () => {
+      const response = await api.delete(endpoints.tripBags(props.tripId), {
+        body: JSON.stringify({ bag_id: bag.id }),
+      });
+      if (response.success) {
+        showToast('success', 'Bag deleted');
+        refreshAfterChange();
+      } else {
+        showToast('error', response.error || 'Failed to delete bag');
+      }
+    });
   };
 
   const startEdit = (bag: Bag) => {
     setEditingId(bag.id);
-    setEditData({
-      name: bag.name,
-      type: bag.type as any,
-      color: bag.color || 'blue',
-    });
+    setEditData({ name: bag.name, type: bag.type as BagType, color: bag.color || 'blue' });
   };
 
-  const cancelEdit = () => {
-    setEditingId(null);
-    setEditData({ name: '', type: 'carry_on', color: 'blue' });
-  };
-
-  const handleUpdate = async (e: Event) => {
+  const handleUpdate = (e: Event) => {
     e.preventDefault();
-
     const data = editData();
     if (!data.name.trim()) {
       showToast('error', 'Bag name is required');
       return;
     }
-
-    const response = await api.patch(endpoints.tripBags(props.tripId), {
-      bag_id: editingId(),
-      name: data.name.trim(),
-      type: data.type,
-      color: data.color,
+    void runExclusive(async () => {
+      const response = await api.patch(endpoints.tripBags(props.tripId), {
+        bag_id: editingId(),
+        name: data.name.trim(),
+        type: data.type,
+        color: data.color,
+      });
+      if (response.success) {
+        showToast('success', 'Bag updated');
+        setEditingId(null);
+        refreshAfterChange();
+      } else {
+        showToast('error', response.error || 'Failed to update bag');
+      }
     });
-
-    if (response.success) {
-      showToast('success', 'Bag updated');
-      cancelEdit();
-      refetch();
-      props.onSaved();
-    } else {
-      showToast('error', response.error || 'Failed to update bag');
-    }
   };
 
   return (
-    <Modal title="Manage Bags" onClose={props.onClose}>
+    <Modal
+      title="Manage Bags"
+      onClose={props.onClose}
+      isDirty={() => editingId() !== null || (showForm() && !!formData().name.trim())}
+    >
       <div class="space-y-4">
         {/* Existing Bags */}
         <div>
@@ -163,137 +156,51 @@ export function BagManager(props: BagManagerProps) {
               <div class="space-y-2">
                 <For each={bags()}>
                   {(bag) => (
-                    <>
-                      {editingId() === bag.id ? (
-                        <form
-                          onSubmit={handleUpdate}
-                          class="space-y-3 rounded-lg border border-blue-300 bg-blue-50 p-3"
-                        >
-                          <div>
-                            <label class="mb-1 block text-sm font-medium text-gray-700">
-                              Bag Type
-                            </label>
-                            <select
-                              value={editData().type}
-                              onChange={(e) =>
-                                setEditData({ ...editData(), type: e.target.value as any })
-                              }
-                              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
-                            >
-                              <For each={BAG_TYPES}>
-                                {(type) => <option value={type.type}>{type.label}</option>}
-                              </For>
-                            </select>
-                          </div>
-
-                          <div>
-                            <label class="mb-1 block text-sm font-medium text-gray-700">
-                              Bag Name
-                            </label>
-                            <Input
-                              type="text"
-                              value={editData().name}
-                              onInput={(e) =>
-                                setEditData({ ...editData(), name: e.currentTarget.value })
-                              }
-                              placeholder="e.g., Red Suitcase"
-                            />
-                          </div>
-
-                          <div>
-                            <label class="mb-1 block text-sm font-medium text-gray-700">
-                              Color
-                            </label>
-                            <div class="flex gap-2">
-                              <For each={BAG_COLORS}>
-                                {(color) => (
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      setEditData({ ...editData(), color: color.value })
-                                    }
-                                    class={`h-6 w-6 rounded-full border border-gray-300 ${color.class} ${
-                                      editData().color === color.value
-                                        ? 'ring-2 ring-blue-500 ring-offset-2'
-                                        : 'hover:scale-110'
-                                    } transition-transform`}
-                                    title={color.label}
-                                  />
-                                )}
-                              </For>
-                            </div>
-                          </div>
-
-                          <div class="flex gap-2">
-                            <Button type="submit" size="sm">
-                              Save
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="secondary"
-                              size="sm"
-                              onClick={cancelEdit}
-                            >
-                              Cancel
-                            </Button>
-                          </div>
-                        </form>
-                      ) : (
-                        <div class="flex items-center justify-between rounded-lg border border-gray-200 p-3 hover:border-gray-300">
-                          <div class="flex items-center gap-3">
-                            <div
-                              class={`h-4 w-4 rounded-full border border-gray-300 ${getBagColorSwatchClass(bag.color)}`}
-                            />
-                            <div>
-                              <p class="font-medium text-gray-900">{bag.name}</p>
-                              <p class="text-xs text-gray-500">
-                                {BAG_TYPES.find((t) => t.type === bag.type)?.label || bag.type}
-                              </p>
-                            </div>
-                          </div>
-                          <div class="flex gap-2">
-                            <button
-                              onClick={() => startEdit(bag)}
-                              class="p-1 text-gray-400 hover:text-blue-600"
-                              title="Edit bag"
-                            >
-                              <svg
-                                class="h-4 w-4"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                              >
-                                <path
-                                  stroke-linecap="round"
-                                  stroke-linejoin="round"
-                                  stroke-width="2"
-                                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                                />
-                              </svg>
-                            </button>
-                            <button
-                              onClick={() => handleDelete(bag.id)}
-                              class="p-1 text-gray-400 hover:text-red-600"
-                              title="Delete bag"
-                            >
-                              <svg
-                                class="h-4 w-4"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                              >
-                                <path
-                                  stroke-linecap="round"
-                                  stroke-linejoin="round"
-                                  stroke-width="2"
-                                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                                />
-                              </svg>
-                            </button>
-                          </div>
+                    <Show
+                      when={editingId() === bag.id}
+                      fallback={
+                        <div class="flex items-center gap-3 rounded-lg border border-gray-200 p-3 hover:border-gray-300">
+                          <BagChip bag={bag} />
+                          <button
+                            onClick={() => startEdit(bag)}
+                            class="p-1 text-gray-400 hover:text-blue-600"
+                            title="Edit bag"
+                            aria-label={`Edit ${bag.name}`}
+                          >
+                            <EditIcon class="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(bag)}
+                            disabled={busy()}
+                            class="p-1 text-gray-400 hover:text-red-600 disabled:opacity-50"
+                            title="Delete bag"
+                            aria-label={`Delete ${bag.name}`}
+                          >
+                            <TrashIcon class="h-4 w-4" />
+                          </button>
                         </div>
-                      )}
-                    </>
+                      }
+                    >
+                      <form
+                        onSubmit={handleUpdate}
+                        class="space-y-3 rounded-lg border border-blue-300 bg-blue-50 p-3"
+                      >
+                        <BagFields value={editData()} onChange={setEditData} />
+                        <div class="flex gap-2">
+                          <Button type="submit" size="sm" disabled={busy()}>
+                            Save
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => setEditingId(null)}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </form>
+                    </Show>
                   )}
                 </For>
               </div>
@@ -305,28 +212,19 @@ export function BagManager(props: BagManagerProps) {
         <Show when={(bagTemplates()?.length || 0) > 0}>
           <div class="border-t border-gray-200 pt-4">
             <h3 class="mb-3 font-semibold text-gray-900">Quick Add from My Bags</h3>
-            <Show when={!bagTemplates.loading} fallback={<LoadingSpinner text="Loading..." />}>
-              <div class="grid grid-cols-2 gap-2">
-                <For each={bagTemplates()}>
-                  {(template) => (
-                    <button
-                      onClick={() => handleAddFromTemplate(template)}
-                      class="flex items-center gap-2 rounded-lg border border-gray-200 p-2 text-left hover:border-blue-500 hover:bg-blue-50"
-                    >
-                      <div
-                        class={`h-4 w-4 flex-shrink-0 rounded-full border border-gray-300 ${getBagColorSwatchClass(template.color)}`}
-                      />
-                      <div class="min-w-0 flex-1">
-                        <p class="truncate text-sm font-medium text-gray-900">{template.name}</p>
-                        <p class="truncate text-xs text-gray-500">
-                          {BAG_TYPES.find((t) => t.type === template.type)?.label || template.type}
-                        </p>
-                      </div>
-                    </button>
-                  )}
-                </For>
-              </div>
-            </Show>
+            <div class="grid grid-cols-2 gap-2">
+              <For each={bagTemplates()}>
+                {(template) => (
+                  <button
+                    onClick={() => handleAddFromTemplate(template)}
+                    disabled={busy()}
+                    class="flex items-center gap-2 rounded-lg border border-gray-200 p-2 text-left hover:border-blue-500 hover:bg-blue-50 disabled:opacity-50"
+                  >
+                    <BagChip bag={template} />
+                  </button>
+                )}
+              </For>
+            </div>
           </div>
         </Show>
 
@@ -342,56 +240,9 @@ export function BagManager(props: BagManagerProps) {
           >
             <form onSubmit={handleSubmit} class="space-y-3">
               <h3 class="font-semibold text-gray-900">Add New Bag</h3>
-
-              <div>
-                <label class="mb-1 block text-sm font-medium text-gray-700">Bag Type</label>
-                <select
-                  value={formData().type}
-                  onChange={(e) => setFormData({ ...formData(), type: e.target.value as any })}
-                  class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
-                >
-                  <For each={BAG_TYPES}>
-                    {(type) => (
-                      <option value={type.type}>
-                        {type.label} - {type.description}
-                      </option>
-                    )}
-                  </For>
-                </select>
-              </div>
-
-              <div>
-                <label class="mb-1 block text-sm font-medium text-gray-700">Bag Name</label>
-                <Input
-                  type="text"
-                  value={formData().name}
-                  onInput={(e) => setFormData({ ...formData(), name: e.currentTarget.value })}
-                  placeholder="e.g., Red Suitcase"
-                />
-              </div>
-
-              <div>
-                <label class="mb-1 block text-sm font-medium text-gray-700">Color</label>
-                <div class="flex gap-2">
-                  <For each={BAG_COLORS}>
-                    {(color) => (
-                      <button
-                        type="button"
-                        onClick={() => setFormData({ ...formData(), color: color.value })}
-                        class={`h-8 w-8 rounded-full border border-gray-300 ${color.class} ${
-                          formData().color === color.value
-                            ? 'ring-2 ring-blue-500 ring-offset-2'
-                            : 'hover:scale-110'
-                        } transition-transform`}
-                        title={color.label}
-                      />
-                    )}
-                  </For>
-                </div>
-              </div>
-
+              <BagFields value={formData()} onChange={setFormData} />
               <div class="flex gap-2">
-                <Button type="submit" size="sm">
+                <Button type="submit" size="sm" disabled={busy()}>
                   Add Bag
                 </Button>
                 <Button
@@ -400,7 +251,7 @@ export function BagManager(props: BagManagerProps) {
                   size="sm"
                   onClick={() => {
                     setShowForm(false);
-                    setFormData({ name: '', type: 'carry_on', color: 'blue' });
+                    setFormData(DEFAULT_BAG_FIELDS);
                   }}
                 >
                   Cancel

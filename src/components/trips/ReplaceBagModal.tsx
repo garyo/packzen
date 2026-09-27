@@ -1,13 +1,11 @@
 import { createSignal, createResource, createMemo, For, Show } from 'solid-js';
 import { api, endpoints } from '../../lib/api';
 import type { Bag, BagTemplate, TripItem } from '../../lib/types';
-import { BAG_TYPES } from '../../lib/types';
-import { BAG_COLORS, getBagColorSwatchClass } from '../../lib/color-utils';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
-import { Input } from '../ui/Input';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
 import { showToast } from '../ui/Toast';
+import { BagChip, BagFields, DEFAULT_BAG_FIELDS, type BagFieldValues } from './BagFields';
 
 interface ReplaceBagModalProps {
   tripId: string;
@@ -19,11 +17,7 @@ interface ReplaceBagModalProps {
 
 export function ReplaceBagModal(props: ReplaceBagModalProps) {
   const [showCustomForm, setShowCustomForm] = createSignal(false);
-  const [formData, setFormData] = createSignal({
-    name: '',
-    type: 'carry_on' as const,
-    color: 'blue',
-  });
+  const [formData, setFormData] = createSignal<BagFieldValues>(DEFAULT_BAG_FIELDS);
 
   const [saving, setSaving] = createSignal(false);
 
@@ -136,7 +130,11 @@ export function ReplaceBagModal(props: ReplaceBagModalProps) {
   };
 
   return (
-    <Modal title={`Replace "${props.currentBag.name}"`} onClose={props.onClose}>
+    <Modal
+      title={`Replace "${props.currentBag.name}"`}
+      onClose={props.onClose}
+      isDirty={() => showCustomForm() && !!formData().name.trim()}
+    >
       <p class="mb-4 text-sm text-gray-500">
         Choose a replacement bag or move items into an existing bag.
       </p>
@@ -153,15 +151,7 @@ export function ReplaceBagModal(props: ReplaceBagModalProps) {
                   onClick={() => handleSelectTemplate(template)}
                   class="flex items-center gap-2 rounded-lg border border-gray-200 p-2 text-left hover:border-blue-500 hover:bg-blue-50 disabled:opacity-50"
                 >
-                  <div
-                    class={`h-4 w-4 flex-shrink-0 rounded-full border border-gray-300 ${getBagColorSwatchClass(template.color)}`}
-                  />
-                  <div class="min-w-0 flex-1">
-                    <p class="truncate text-sm font-medium text-gray-900">{template.name}</p>
-                    <p class="truncate text-xs text-gray-500">
-                      {BAG_TYPES.find((t) => t.type === template.type)?.label || template.type}
-                    </p>
-                  </div>
+                  <BagChip bag={template} />
                 </button>
               )}
             </For>
@@ -186,15 +176,7 @@ export function ReplaceBagModal(props: ReplaceBagModalProps) {
                   onClick={() => mergeIntoBag(bag)}
                   class="flex items-center gap-2 rounded-lg border border-gray-200 p-2 text-left hover:border-green-500 hover:bg-green-50 disabled:opacity-50"
                 >
-                  <div
-                    class={`h-4 w-4 flex-shrink-0 rounded-full border border-gray-300 ${getBagColorSwatchClass(bag.color)}`}
-                  />
-                  <div class="min-w-0 flex-1">
-                    <p class="truncate text-sm font-medium text-gray-900">{bag.name}</p>
-                    <p class="truncate text-xs text-gray-500">
-                      {BAG_TYPES.find((t) => t.type === bag.type)?.label || bag.type}
-                    </p>
-                  </div>
+                  <BagChip bag={bag} />
                 </button>
               )}
             </For>
@@ -215,52 +197,7 @@ export function ReplaceBagModal(props: ReplaceBagModalProps) {
           <form onSubmit={handleCustomSubmit} class="space-y-3">
             <h3 class="text-sm font-semibold text-gray-900">Replace with New Bag</h3>
 
-            <div>
-              <label class="mb-1 block text-sm font-medium text-gray-700">Bag Type</label>
-              <select
-                value={formData().type}
-                onChange={(e) => setFormData({ ...formData(), type: e.target.value as any })}
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
-              >
-                <For each={BAG_TYPES}>
-                  {(type) => (
-                    <option value={type.type}>
-                      {type.label} - {type.description}
-                    </option>
-                  )}
-                </For>
-              </select>
-            </div>
-
-            <div>
-              <label class="mb-1 block text-sm font-medium text-gray-700">Bag Name</label>
-              <Input
-                type="text"
-                value={formData().name}
-                onInput={(e) => setFormData({ ...formData(), name: e.currentTarget.value })}
-                placeholder="e.g., Red Suitcase"
-              />
-            </div>
-
-            <div>
-              <label class="mb-1 block text-sm font-medium text-gray-700">Color</label>
-              <div class="flex gap-2">
-                <For each={BAG_COLORS}>
-                  {(color) => (
-                    <button
-                      type="button"
-                      onClick={() => setFormData({ ...formData(), color: color.value })}
-                      class={`h-8 w-8 rounded-full border border-gray-300 ${color.class} ${
-                        formData().color === color.value
-                          ? 'ring-2 ring-blue-500 ring-offset-2'
-                          : 'hover:scale-110'
-                      } transition-transform`}
-                      title={color.label}
-                    />
-                  )}
-                </For>
-              </div>
-            </div>
+            <BagFields value={formData()} onChange={setFormData} />
 
             <div class="flex gap-2">
               <Button type="submit" size="sm" disabled={saving()}>
@@ -272,7 +209,7 @@ export function ReplaceBagModal(props: ReplaceBagModalProps) {
                 size="sm"
                 onClick={() => {
                   setShowCustomForm(false);
-                  setFormData({ name: '', type: 'carry_on', color: 'blue' });
+                  setFormData(DEFAULT_BAG_FIELDS);
                 }}
               >
                 Cancel
