@@ -67,6 +67,14 @@ interface DraggableItemProps {
 
 function DraggableSourceItem(props: DraggableItemProps) {
   const draggable = createDraggable(props.id, props.dragData);
+  // "✓ Added" rolls in when added from here, not on rows that start out added.
+  const [justAdded, setJustAdded] = createSignal(false);
+  // Adding removes the focused + button; its remove button takes the focus.
+  let refocus = false;
+  const add = () => {
+    setJustAdded(true);
+    props.onAdd();
+  };
 
   return (
     <div
@@ -76,7 +84,7 @@ function DraggableSourceItem(props: DraggableItemProps) {
         'cursor-pointer hover:bg-gray-50': !props.isInTrip,
         'bg-blue-50': draggable.isActiveDraggable,
       }}
-      onClick={() => !props.isInTrip && props.onAdd()}
+      onClick={() => !props.isInTrip && add()}
     >
       {/* Drag handle (desktop: phones show items and bags on separate panes) */}
       <div
@@ -121,7 +129,8 @@ function DraggableSourceItem(props: DraggableItemProps) {
             class="flex flex-shrink-0 items-center justify-center"
             onClick={(e) => {
               e.stopPropagation();
-              props.onAdd();
+              refocus = document.activeElement === e.currentTarget;
+              add();
             }}
             aria-label={`Add ${props.name}`}
           >
@@ -131,12 +140,23 @@ function DraggableSourceItem(props: DraggableItemProps) {
           </button>
         }
       >
-        <span class="flex-shrink-0 text-xs text-gray-500">
+        <span
+          class="flex-shrink-0 text-xs text-gray-500"
+          classList={{ 'animate-roll-in': justAdded() }}
+        >
           {props.isPacked ? '✓ Packed' : '✓ Added'}
         </span>
         <Show when={props.tripItemId}>
           {(tripItemId) => (
             <button
+              ref={(el) => {
+                if (!refocus) return;
+                refocus = false;
+                // Unless focus moved on while the add was saving.
+                requestAnimationFrame(() => {
+                  if (document.activeElement === document.body) el.focus();
+                });
+              }}
               type="button"
               class="flex flex-shrink-0 items-center justify-center text-gray-400 hover:text-red-600"
               onClick={(e) => {

@@ -16,7 +16,8 @@ import type { Bag, Category, TripItem } from '../../lib/types';
 import { NO_BAG_LABEL } from '../../lib/vocabulary';
 import { packingStats } from '../../lib/packing-stats';
 import { getCategoryIcon } from '../../lib/built-in-items';
-import { PackingItemCard } from './PackingItemCard';
+import { collapse } from '../../lib/motion';
+import { PackingItemCard, tripItemElementId } from './PackingItemCard';
 import { liveRectCollision, useAutoScroll, EscapeCancelHandler } from './drag-drop-utils';
 import { CheckIcon } from '../ui/Icons';
 
@@ -51,6 +52,40 @@ export const NO_BAG: Bag = {
 };
 
 export const isUnpacked = (item: TripItem) => !item.is_packed && !item.is_skipped;
+
+// --- "Unpacked only" ---
+
+/** How long a row just packed stays, struck through, before it folds away. */
+const LEAVE_DELAY_MS = 600;
+
+const [leavingIds, setLeavingIds] = createSignal<ReadonlySet<string>>(new Set());
+
+/** What "unpacked only" shows: unpacked items, plus ones just packed on their way out. */
+export const inUnpackedView = (item: TripItem) => isUnpacked(item) || leavingIds().has(item.id);
+
+/** With "unpacked only" on, these items leave nothing to show (and some are packed). */
+export const allPackedIn = (items: TripItem[]) =>
+  !items.some(inUnpackedView) && items.some((item) => item.is_packed);
+
+/**
+ * Keeps a just-packed row in the "unpacked only" view long enough to see it
+ * struck through, then folds it away. `stillLeaving` is checked at each step,
+ * so unpacking it again or turning the filter off keeps the row.
+ */
+export async function leaveUnpackedView(itemId: string, stillLeaving: () => boolean) {
+  if (leavingIds().has(itemId)) return;
+  setLeavingIds((ids) => new Set(ids).add(itemId));
+  await new Promise((resolve) => setTimeout(resolve, LEAVE_DELAY_MS));
+  // The card's wrapper is the grid cell.
+  const cell = document.getElementById(tripItemElementId(itemId))?.parentElement;
+  const folded = stillLeaving() && cell ? await collapse(cell) : undefined;
+  if (!stillLeaving()) folded?.cancel();
+  setLeavingIds((ids) => {
+    const next = new Set(ids);
+    next.delete(itemId);
+    return next;
+  });
+}
 
 /** Category icon: the user's category if it has one, else the built-in one. */
 export function createCategoryIcons(categories: Accessor<Category[] | undefined>) {
@@ -280,9 +315,9 @@ export function ItemGroup(props: {
   class?: string;
   dropZone?: Omit<DropZoneProps, 'children' | 'class'>;
 }) {
-  const visible = () => (props.showUnpackedOnly ? props.items.filter(isUnpacked) : props.items);
+  const visible = () => (props.showUnpackedOnly ? props.items.filter(inUnpackedView) : props.items);
   const packed = () => packingStats(props.items).packed;
-  const allPacked = () => props.showUnpackedOnly && visible().length === 0 && packed() > 0;
+  const allPacked = () => props.showUnpackedOnly && allPackedIn(props.items);
 
   const body = () => (
     <>

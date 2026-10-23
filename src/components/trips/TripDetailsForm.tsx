@@ -1,8 +1,7 @@
 import { createEffect, createSignal } from 'solid-js';
-import { Input } from '../ui/Input';
+import { Input, createFieldError } from '../ui/Input';
 import { DateInput } from '../ui/DateInput';
 import { Button } from '../ui/Button';
-import { showToast } from '../ui/Toast';
 import { normalizeTripDates } from '../../lib/utils';
 
 export interface TripDetailsData {
@@ -36,6 +35,7 @@ export function TripDetailsForm(props: TripDetailsFormProps) {
   const [startDate, setStartDate] = createSignal(initial.startDate);
   const [endDate, setEndDate] = createSignal(initial.endDate);
   const [notes, setNotes] = createSignal(initial.notes);
+  const nameError = createFieldError(name);
 
   createEffect(() => {
     props.onDirtyChange?.(
@@ -51,7 +51,7 @@ export function TripDetailsForm(props: TripDetailsFormProps) {
     e.preventDefault();
 
     if (!name().trim()) {
-      showToast('error', 'Trip name is required');
+      nameError.fail('Enter a name for the trip');
       return;
     }
 
@@ -74,7 +74,8 @@ export function TripDetailsForm(props: TripDetailsFormProps) {
         value={name()}
         onInput={(e) => setName(e.currentTarget.value)}
         placeholder="e.g., Beach Weekend"
-        required
+        field={nameError}
+        aria-required="true"
       />
 
       <Input

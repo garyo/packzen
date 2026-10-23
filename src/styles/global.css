@@ -1,5 +1,54 @@
 @import 'tailwindcss';
 
+/* Motion: two durations and one easing for every animation, CSS or JS
+   (lib/motion.ts mirrors them). Reduced motion is handled once, at the end. */
+:root {
+  --motion-fast: 150ms;
+  --motion-base: 250ms;
+}
+
+@theme {
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+
+  --animate-pop: pop var(--motion-base) var(--ease-out-soft);
+  --animate-roll-in: roll-in var(--motion-base) var(--ease-out-soft);
+  --animate-toast-in: toast-in var(--motion-base) var(--ease-out-soft);
+  --animate-toast-out: toast-out var(--motion-fast) ease-in forwards;
+  --animate-drain: drain linear forwards;
+
+  @keyframes pop {
+    50% {
+      transform: scale(1.25);
+    }
+  }
+  @keyframes roll-in {
+    from {
+      transform: translateY(100%);
+      opacity: 0;
+    }
+  }
+  @keyframes toast-in {
+    from {
+      transform: translateY(0.5rem);
+      opacity: 0;
+    }
+  }
+  @keyframes toast-out {
+    to {
+      transform: translateY(0.5rem);
+      opacity: 0;
+    }
+  }
+  @keyframes drain {
+    from {
+      transform: scaleX(1);
+    }
+    to {
+      transform: scaleX(0);
+    }
+  }
+}
+
 /* Mobile-first base styles */
 * {
   -webkit-tap-highlight-color: transparent;
@@ -58,4 +107,60 @@ html {
 /* Focus visible styles for accessibility */
 *:focus-visible {
   @apply outline-2 outline-offset-2 outline-blue-500;
+}
+
+/* A line-through that draws across the text when .is-struck is added. On an
+   inline element it runs across every wrapped line in turn. */
+.strike {
+  background: linear-gradient(currentColor, currentColor) no-repeat 0 55% / 0 1px;
+  transition: background-size var(--motion-base) var(--ease-out-soft);
+}
+.strike.is-struck {
+  background-size: 100% 1px;
+}
+
+/* Two labels in one slot (see RollLabel): the second rolls up to replace the first. */
+.roll {
+  display: inline-grid;
+  overflow: hidden;
+}
+.roll > * {
+  grid-area: 1 / 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  transition:
+    transform var(--motion-base) var(--ease-out-soft),
+    opacity var(--motion-base) var(--ease-out-soft);
+}
+.roll > :last-child,
+.roll.is-rolled > :first-child {
+  transform: translateY(100%);
+  opacity: 0;
+}
+.roll.is-rolled > :first-child {
+  transform: translateY(-100%);
+}
+.roll.is-rolled > :last-child {
+  transform: none;
+  opacity: 1;
+}
+
+/* Reduced motion: everything settles at once. Motion that reports status (a
+   spinner, a countdown bar) is marked [data-motion='essential'] and keeps going,
+   or it would look frozen. */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *:not([data-motion='essential']),
+  ::before,
+  ::after {
+    animation-duration: 1ms !important;
+    animation-delay: 0s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    transition-delay: 0s !important;
+  }
 }

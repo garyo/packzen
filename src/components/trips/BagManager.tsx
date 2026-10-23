@@ -3,8 +3,9 @@ import { api, endpoints } from '../../lib/api';
 import type { Bag, BagTemplate } from '../../lib/types';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
+import { createFieldError } from '../ui/Input';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
-import { showToast } from '../ui/Toast';
+import { announce, showToast } from '../ui/Toast';
 import { confirmDialog } from '../ui/ConfirmDialog';
 import { EditIcon, TrashIcon } from '../ui/Icons';
 import { BagChip, BagFields, DEFAULT_BAG_FIELDS, type BagFieldValues } from '../ui/BagFields';
@@ -22,6 +23,8 @@ export function BagManager(props: BagManagerProps) {
   const [formData, setFormData] = createSignal<BagFieldValues>(DEFAULT_BAG_FIELDS);
   const [editingId, setEditingId] = createSignal<string | null>(null);
   const [editData, setEditData] = createSignal<BagFieldValues>(DEFAULT_BAG_FIELDS);
+  const nameError = createFieldError(() => formData().name);
+  const editNameError = createFieldError(() => editData().name);
   // Serializes writes so a double tap can't add the same bag twice.
   const [busy, setBusy] = createSignal(false);
 
@@ -66,7 +69,7 @@ export function BagManager(props: BagManagerProps) {
       showToast('error', response.error || 'Failed to add bag');
       return false;
     }
-    showToast('success', successMessage);
+    announce(successMessage);
     refreshAfterChange();
     return true;
   };
@@ -86,7 +89,7 @@ export function BagManager(props: BagManagerProps) {
   const handleSubmit = (e: Event) => {
     e.preventDefault();
     if (!formData().name.trim()) {
-      showToast('error', 'Bag name is required');
+      nameError.fail('Enter a name for the bag');
       return;
     }
     void runExclusive(async () => {
@@ -111,7 +114,7 @@ export function BagManager(props: BagManagerProps) {
         body: JSON.stringify({ bag_id: bag.id }),
       });
       if (response.success) {
-        showToast('success', 'Bag deleted');
+        announce('Bag deleted');
         refreshAfterChange();
       } else {
         showToast('error', response.error || 'Failed to delete bag');
@@ -128,7 +131,7 @@ export function BagManager(props: BagManagerProps) {
     e.preventDefault();
     const data = editData();
     if (!data.name.trim()) {
-      showToast('error', 'Bag name is required');
+      editNameError.fail('Enter a name for the bag');
       return;
     }
     void runExclusive(async () => {
@@ -139,7 +142,7 @@ export function BagManager(props: BagManagerProps) {
         color: data.color,
       });
       if (response.success) {
-        showToast('success', 'Bag updated');
+        announce('Bag updated');
         setEditingId(null);
         refreshAfterChange();
       } else {
@@ -199,7 +202,11 @@ export function BagManager(props: BagManagerProps) {
                         onSubmit={handleUpdate}
                         class="space-y-3 rounded-lg border border-blue-300 bg-blue-50 p-3"
                       >
-                        <BagFields value={editData()} onChange={setEditData} />
+                        <BagFields
+                          value={editData()}
+                          onChange={setEditData}
+                          nameField={editNameError}
+                        />
                         <div class="flex gap-2">
                           <Button type="submit" size="sm" disabled={busy()}>
                             Save
@@ -254,7 +261,7 @@ export function BagManager(props: BagManagerProps) {
           >
             <form onSubmit={handleSubmit} class="space-y-3">
               <h3 class="font-semibold text-gray-900">Add New Bag</h3>
-              <BagFields value={formData()} onChange={setFormData} />
+              <BagFields value={formData()} onChange={setFormData} nameField={nameError} />
               <div class="flex gap-2">
                 <Button type="submit" size="sm" disabled={busy()}>
                   Add Bag

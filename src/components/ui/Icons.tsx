@@ -212,6 +212,15 @@ export function PlusIcon(props: IconProps): JSX.Element {
   );
 }
 
+/** Minus icon */
+export function MinusIcon(props: IconProps): JSX.Element {
+  return (
+    <svg class={props.class ?? 'h-4 w-4'} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4" />
+    </svg>
+  );
+}
+
 /** Question mark in circle / Help icon */
 export function HelpIcon(props: IconProps): JSX.Element {
   return (

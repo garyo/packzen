@@ -13,7 +13,10 @@ import { Modal } from '../ui/Modal';
 import { QuantityInput } from '../ui/QuantityInput';
 import { Button } from '../ui/Button';
 import { Combobox, type ComboboxItem } from '../ui/Combobox';
-import { errorToastOptions, showToast } from '../ui/Toast';
+import { announce, errorToastOptions, showToast } from '../ui/Toast';
+import { createFieldError } from '../ui/Input';
+import { RollLabel } from '../ui/RollLabel';
+import { createFlag } from '../../lib/motion';
 import { searchItems } from '../../lib/search';
 import { builtInItems } from '../../lib/built-in-items';
 import { getOrCreateMasterItem } from '../../lib/item-helpers';
@@ -34,6 +37,8 @@ interface AddTripItemFormProps {
   preSelectedContainerId?: string | null;
   /** A name to start with, e.g. from a search that found nothing. */
   initialName?: string;
+  /** Start with "This is a container" ticked. */
+  initialIsContainer?: boolean;
   // The parent's data; undefined while it is still loading.
   bags: Bag[] | undefined;
   categories: Category[] | undefined;
@@ -54,9 +59,12 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
   const locationId = createUniqueId();
   const [category, setCategory] = createSignal<CategoryChoice>('');
   const [location, setLocation] = createSignal<string>('');
-  const [isContainer, setIsContainer] = createSignal(false);
+  const [isContainer, setIsContainer] = createSignal(props.initialIsContainer ?? false);
   const [skipMasterAddition, setSkipMasterAddition] = createSignal(false);
   const [saving, setSaving] = createSignal(false);
+  const nameError = createFieldError(name);
+  // "Add More" turns into "✓ Added" for a moment, since the form stays open.
+  const [justAdded, flagAdded] = createFlag(1500);
   let formRef: HTMLFormElement | undefined;
 
   const bags = () => props.bags;
@@ -90,6 +98,14 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
 
   const availableContainers = () =>
     (tripItems() ?? []).filter((item) => item.is_container).sort(byName);
+
+  // Containers can't nest: a container aimed at one goes in that container's bag.
+  createEffect(() => {
+    const loc = location();
+    if (!isContainer() || !loc.startsWith('container:')) return;
+    const bagId = tripItems()?.find((item) => item.id === loc.slice('container:'.length))?.bag_id;
+    setLocation(bagId ? `bag:${bagId}` : '');
+  });
 
   const existingItemsByName = createMemo(() => {
     const items = tripItems() || [];
@@ -266,14 +282,13 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
   const handleSubmit = async (e: Event, keepOpenAfterSubmit = false) => {
     e.preventDefault();
     if (saving()) return;
-    setSaving(true);
 
     const itemName = name().trim();
     if (!itemName) {
-      showToast('error', 'Item name is required');
-      setSaving(false);
+      nameError.fail('Enter a name for the item');
       return;
     }
+    setSaving(true);
 
     // Parse location to determine bag_id and container_item_id
     const loc = location();
@@ -284,13 +299,6 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
       bagId = loc.substring(4);
     } else if (loc.startsWith('container:')) {
       containerItemId = loc.substring(10);
-    }
-
-    // Validate: containers cannot be inside other containers
-    if (isContainer() && containerItemId) {
-      showToast('error', 'Containers cannot be placed inside other containers');
-      setSaving(false);
-      return;
     }
 
     // One working copy of categories for both lookups below, so a category
@@ -346,8 +354,7 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
     if (dataChanged) props.onDataChanged();
 
     if (response.success) {
-      showToast(
-        'success',
+      announce(
         savedToMyItems ? `Added "${itemName}" to trip and My Items` : `Added "${itemName}" to trip`
       );
 
@@ -376,6 +383,7 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
           setLocation(lastLocation);
         }
         setCategory(resolved.category?.id ?? '');
+        flagAdded();
         formRef?.querySelector<HTMLInputElement>('input[type="text"]')?.focus();
       } else {
         props.onSaved(createdItem);
@@ -396,7 +404,11 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
   };
 
   return (
-    <Modal title="Add Item" onClose={props.onClose} isDirty={() => !!name().trim()}>
+    <Modal
+      title={isContainer() ? 'Add Container' : 'Add Item'}
+      onClose={props.onClose}
+      isDirty={() => !!name().trim()}
+    >
       <form ref={formRef} onSubmit={handleAddAnother} class="space-y-4">
         <div>
           <label for={nameId} class="mb-1 block text-sm font-medium text-gray-700">
@@ -410,6 +422,7 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
             items={searchResults()}
             tripItemsWarning={tripItemsWarning()}
             placeholder="e.g., Toothbrush"
+            field={nameError}
             autofocus
             minChars={2}
             maxResults={8}
@@ -440,44 +453,35 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
           />
         </div>
 
-        {/* Combined Bag/Container location (only show if not a container itself) */}
-        <Show when={!isContainer()}>
-          <div>
-            <label for={locationId} class="mb-1 block text-sm font-medium text-gray-700">
-              Inside Bag/Container
-            </label>
-            <select
-              id={locationId}
-              value={location()}
-              onChange={(e) => setLocation(e.target.value)}
-              class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">{NO_BAG_LABEL}</option>
-              <For each={bags()}>
-                {(bag) => <option value={`bag:${bag.id}`}>{bag.name}</option>}
+        {/* Where it goes: a bag, or for an item, a container */}
+        <div>
+          <label for={locationId} class="mb-1 block text-sm font-medium text-gray-700">
+            {isContainer() ? 'In bag' : 'Inside Bag/Container'}
+          </label>
+          <select
+            id={locationId}
+            value={location()}
+            onChange={(e) => setLocation(e.target.value)}
+            class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">{NO_BAG_LABEL}</option>
+            <For each={bags()}>{(bag) => <option value={`bag:${bag.id}`}>{bag.name}</option>}</For>
+            <Show when={!isContainer()}>
+              <For each={availableContainers()}>
+                {(container) => (
+                  <option value={`container:${container.id}`}>📦 {container.name}</option>
+                )}
               </For>
-              <Show when={availableContainers().length > 0}>
-                <For each={availableContainers()}>
-                  {(container) => (
-                    <option value={`container:${container.id}`}>📦 {container.name}</option>
-                  )}
-                </For>
-              </Show>
-            </select>
-          </div>
-        </Show>
+            </Show>
+          </select>
+        </div>
 
         <div>
           <label class="flex min-h-11 items-center gap-3 text-sm font-medium text-gray-700">
             <input
               type="checkbox"
               checked={isContainer()}
-              onChange={(e) => {
-                setIsContainer(e.currentTarget.checked);
-                if (e.currentTarget.checked && location().startsWith('container:')) {
-                  setLocation(''); // Containers can't be inside containers
-                }
-              }}
+              onChange={(e) => setIsContainer(e.currentTarget.checked)}
               class="btn-compact h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
             />
             This is a container (sub-bag like a toilet kit)
@@ -503,10 +507,12 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
             variant="secondary"
             disabled={saving()}
           >
-            <span>Add More</span>
-            <span class="hidden rounded bg-gray-900/10 px-1.5 py-0.5 font-mono text-xs md:inline">
-              ↵
-            </span>
+            <RollLabel rolled={justAdded()} done="Added">
+              <span>Add More</span>
+              <span class="hidden rounded bg-gray-900/10 px-1.5 py-0.5 font-mono text-xs md:inline">
+                ↵
+              </span>
+            </RollLabel>
           </Button>
         </div>
       </form>

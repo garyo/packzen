@@ -14,7 +14,7 @@ import type {
 import type { TripItemsStore } from './trip-items-store';
 import { getOrCreateCategory, resolveMasterItems } from './item-helpers';
 import { getStarterItems, getStarterQuantity, type StarterModifier } from './built-in-items';
-import { SEE_PLANS, showToast } from '../components/ui/Toast';
+import { announce, SEE_PLANS, showToast } from '../components/ui/Toast';
 
 export const itemCount = (n: number) => (n === 1 ? '1 item' : `${n} items`);
 
@@ -143,11 +143,11 @@ export function createTripItemAdder(
         `Added ${added.length} of ${toAdd.length} items; the rest were already on your list or over your plan's item limit`,
         { action: SEE_PLANS }
       );
-    } else if (!options.quiet) {
-      showToast(
-        'success',
-        added.length === 1 ? `Added ${added[0].name}` : `Added ${itemCount(added.length)}`
-      );
+    } else {
+      const message =
+        added.length === 1 ? `Added ${added[0].name}` : `Added ${itemCount(added.length)}`;
+      if (options.quiet) announce(message);
+      else showToast('success', message);
     }
     await saveAsMyItems(added, new Map(toAdd.map((item) => [item.name.toLowerCase(), item])));
   }

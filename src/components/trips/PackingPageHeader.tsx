@@ -54,6 +54,7 @@ interface PackingPageHeaderProps {
   searchHasExactMatch: Accessor<boolean>;
   /** Add a new item with this name. */
   onAddNamed: (name: string) => void;
+  /** A search result was touched: show it in the full list once search closes. */
   onScrollToItemRequest?: (itemId: string) => void;
 }
 
@@ -140,33 +141,18 @@ export function PackingPageHeader(props: PackingPageHeaderProps) {
       return null;
     };
 
-    // Tapping a search result finds it: swallow the click that follows this
-    // mousedown so it doesn't also pack the item (or hit a card button).
-    // A press that never becomes a click is cleared by the next mousedown.
-    const swallowNextClick = () => {
-      const swallow = (e: MouseEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
-        document.removeEventListener('mousedown', stop, true);
-      };
-      const stop = () => document.removeEventListener('click', swallow, true);
-      document.addEventListener('click', swallow, { capture: true, once: true });
-      document.addEventListener('mousedown', stop, { capture: true, once: true });
-    };
-
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as HTMLElement | null;
       if (showMenu() && menuRef && !menuRef.contains(target)) setShowMenu(false);
       const inSearch =
         !!target &&
         (!!searchContainerRef?.contains(target) || !!searchOverlayRef?.contains(target));
-      if (isSearchOpen() && !inSearch) {
+      // Search results work as usual (a tap packs), and search stays open
+      // while they're in use, or while a dialog one of them opened is up.
+      if (isSearchOpen() && !inSearch && !document.querySelector('[aria-modal="true"]')) {
         const tripItemId = findTripItemId(target);
-        closeSearch();
-        if (tripItemId) {
-          swallowNextClick();
-          props.onScrollToItemRequest?.(tripItemId);
-        }
+        if (tripItemId && query()) props.onScrollToItemRequest?.(tripItemId);
+        else closeSearch();
       }
     };
 

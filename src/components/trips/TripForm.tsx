@@ -1,6 +1,6 @@
 import { createSignal } from 'solid-js';
 import { Modal } from '../ui/Modal';
-import { showToast } from '../ui/Toast';
+import { announce, showToast } from '../ui/Toast';
 import { api, endpoints } from '../../lib/api';
 import type { Trip } from '../../lib/types';
 import { TripDetailsForm, type TripDetailsData } from './TripDetailsForm';
@@ -23,7 +23,7 @@ export function TripForm(props: TripFormProps) {
     setSaving(false);
 
     if (response.success) {
-      showToast('success', 'Trip updated');
+      announce('Trip updated');
       props.onSaved();
     } else {
       showToast('error', response.error || 'Failed to save trip');

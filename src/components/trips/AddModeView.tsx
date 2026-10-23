@@ -48,6 +48,8 @@ interface AddModeViewProps {
   onRemoveFromTrip: (tripItemId: string) => void;
   /** Open the new-item form aimed at the current target, optionally with a name filled in. */
   onAddNewItem: (target: SelectedTarget, name?: string) => void;
+  /** Open the new-item form for a container in this bag. */
+  onAddNewContainer: (bagId: string | null) => void;
   onManageBags: () => void;
   onReplaceBag: (bag: Bag) => void;
 }
@@ -63,6 +65,9 @@ export interface AddModeBagDropData {
   bagId: string | null;
   containerId?: string;
 }
+
+const SETUP_BUTTON =
+  'flex-1 rounded-lg border border-dashed border-gray-300 text-sm font-medium text-gray-600 hover:border-blue-400 hover:text-blue-700';
 
 /** Where tapped items go: a bag (null = not in a bag) or a container. */
 export interface SelectedTarget {
@@ -260,13 +265,19 @@ export function AddModeView(props: AddModeViewProps) {
                 selectedTarget={selectedTarget}
                 onSelectTarget={handleSelectTarget}
               />
-              <button
-                type="button"
-                onClick={props.onManageBags}
-                class="mt-3 w-full rounded-lg border border-dashed border-gray-300 text-sm font-medium text-gray-600 hover:border-blue-400 hover:text-blue-700"
-              >
-                Add or edit bags…
-              </button>
+              <div class="mt-3 flex gap-2">
+                <button type="button" onClick={props.onManageBags} class={SETUP_BUTTON}>
+                  Add or edit bags…
+                </button>
+                {/* A container goes in the selected bag (or the selected container's bag). */}
+                <button
+                  type="button"
+                  onClick={() => props.onAddNewContainer(selectedTarget().bagId)}
+                  class={SETUP_BUTTON}
+                >
+                  New container…
+                </button>
+              </div>
             </div>
           </div>
         </div>

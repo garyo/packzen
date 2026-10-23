@@ -1,6 +1,7 @@
 import { createSignal, For, Show } from 'solid-js';
 import { Button } from '../ui/Button';
-import { showToast } from '../ui/Toast';
+import { createFieldError } from '../ui/Input';
+import { announce, showToast } from '../ui/Toast';
 import { confirmDialog } from '../ui/ConfirmDialog';
 import { EditIcon, TrashIcon } from '../ui/Icons';
 import { api, endpoints } from '../../lib/api';
@@ -19,13 +20,15 @@ export function BagTemplateManagerContent(props: BagTemplateManagerContentProps)
   const [editingId, setEditingId] = createSignal<string | null>(null);
   const [editBag, setEditBag] = createSignal<BagFieldValues>(DEFAULT_BAG_FIELDS);
   const [updating, setUpdating] = createSignal(false);
+  const nameError = createFieldError(() => newBag().name);
+  const editNameError = createFieldError(() => editBag().name);
 
   const handleAdd = async (e: Event) => {
     e.preventDefault();
     const { type, color } = newBag();
     const name = newBag().name.trim();
     if (!name) {
-      showToast('error', 'Bag name is required');
+      nameError.fail('Enter a name for the bag');
       return;
     }
 
@@ -39,7 +42,7 @@ export function BagTemplateManagerContent(props: BagTemplateManagerContentProps)
     setAdding(false);
 
     if (response.success) {
-      showToast('success', 'Bag added');
+      announce('Bag added');
       setNewBag(DEFAULT_BAG_FIELDS);
     } else {
       showToast('error', response.error || 'Failed to add bag');
@@ -61,7 +64,7 @@ export function BagTemplateManagerContent(props: BagTemplateManagerContentProps)
 
     const response = await api.delete(endpoints.bagTemplate(template.id));
     if (response.success) {
-      showToast('success', 'Bag deleted');
+      announce('Bag deleted');
     } else {
       showToast('error', response.error || 'Failed to delete bag');
     }
@@ -82,7 +85,7 @@ export function BagTemplateManagerContent(props: BagTemplateManagerContentProps)
     const { type, color } = editBag();
     const name = editBag().name.trim();
     if (!name) {
-      showToast('error', 'Bag name is required');
+      editNameError.fail('Enter a name for the bag');
       return;
     }
 
@@ -95,7 +98,7 @@ export function BagTemplateManagerContent(props: BagTemplateManagerContentProps)
     setUpdating(false);
 
     if (response.success) {
-      showToast('success', 'Bag updated');
+      announce('Bag updated');
       setEditingId(null);
     } else {
       showToast('error', response.error || 'Failed to update bag');
@@ -118,6 +121,7 @@ export function BagTemplateManagerContent(props: BagTemplateManagerContentProps)
             value={newBag()}
             onChange={setNewBag}
             placeholder="e.g., Weekend Carry-on, Red Suitcase"
+            nameField={nameError}
           />
           <Button type="submit" size="sm" disabled={adding()}>
             {adding() ? 'Adding...' : 'Add Bag'}
@@ -176,6 +180,7 @@ export function BagTemplateManagerContent(props: BagTemplateManagerContentProps)
                       value={editBag()}
                       onChange={setEditBag}
                       placeholder="e.g., Weekend Carry-on"
+                      nameField={editNameError}
                     />
                     <div class="flex gap-2">
                       <Button type="submit" size="sm" disabled={updating()}>

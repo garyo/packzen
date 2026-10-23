@@ -21,9 +21,11 @@ import { NO_BAG_LABEL } from '../../lib/vocabulary';
 import { packingStats } from '../../lib/packing-stats';
 import { byName, categoryOf, groupSorted, placeItems } from '../../lib/item-placement';
 import { BagSwatch } from '../ui/BagFields';
+import { tripItemElementId } from './PackingItemCard';
 import { EditIcon, PlusIcon, SwitchBagIcon } from '../ui/Icons';
 import {
   AllPackedNote,
+  allPackedIn,
   DropZone,
   ItemGrid,
   ItemGroup,
@@ -32,7 +34,7 @@ import {
   createCardRenderer,
   createCategoryIcons,
   dropInto,
-  isUnpacked,
+  inUnpackedView,
   useDragState,
   type PackingListProps,
 } from './PackingListParts';
@@ -251,8 +253,7 @@ export function PackingListBagView(props: PackingListBagViewProps) {
         <For each={sortedBags()}>
           {(bag) => {
             const stats = () => packingStats(bagItems(bag.id));
-            const allPacked = () =>
-              props.showUnpackedOnly() && stats().remaining === 0 && stats().packed > 0;
+            const allPacked = () => props.showUnpackedOnly() && allPackedIn(bagItems(bag.id));
             const categoryGroups = createMemo(
               () => new Map(groupSorted(bagItems(bag.id), categoryOf))
             );
@@ -353,7 +354,7 @@ function ContainerSection(props: {
   onAdd: () => void;
 }) {
   const stats = () => packingStats(props.contents);
-  const allPacked = () => props.showUnpackedOnly && stats().remaining === 0 && stats().packed > 0;
+  const allPacked = () => props.showUnpackedOnly && allPackedIn(props.contents);
 
   return (
     <DropZone
@@ -370,7 +371,7 @@ function ContainerSection(props: {
           <h3 class="flex-1 font-semibold text-gray-800">
             {props.container.name}
             <button
-              onClick={() => scrollToElement(`trip-item-${props.container.id}`)}
+              onClick={() => scrollToElement(tripItemElementId(props.container.id))}
               class="ml-2 text-xs font-normal text-blue-600 hover:underline"
             >
               view in {props.bagName} ↑
@@ -414,7 +415,7 @@ function ContainerSection(props: {
             <AllPackedNote count={stats().total} />
           </Show>
           <ItemGrid
-            items={props.showUnpackedOnly ? props.contents.filter(isUnpacked) : props.contents}
+            items={props.showUnpackedOnly ? props.contents.filter(inUnpackedView) : props.contents}
             hiddenPacked={props.showUnpackedOnly ? stats().packed : 0}
             renderCard={props.renderCard}
           />

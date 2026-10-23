@@ -5,7 +5,7 @@ import { Modal } from '../ui/Modal';
 import { QuantityInput } from '../ui/QuantityInput';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
-import { showToast } from '../ui/Toast';
+import { announce, showToast } from '../ui/Toast';
 import { TrashIcon } from '../ui/Icons';
 import { NO_BAG_LABEL } from '../../lib/vocabulary';
 import {
@@ -124,7 +124,7 @@ export function EditTripItem(props: EditTripItemProps) {
     const response = await api.patch(endpoints.tripItems(props.tripId), patchData);
 
     if (response.success) {
-      showToast('success', 'Item updated');
+      announce('Item updated');
       // Construct updated item by merging original with changes
       const updatedItem: TripItem = {
         ...props.item,

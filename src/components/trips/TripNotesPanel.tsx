@@ -2,12 +2,16 @@
  * TripNotesPanel Component
  *
  * Expandable panel for viewing and editing trip notes.
- * Auto-saves on blur with debouncing.
+ * Auto-saves on blur and as you type (debounced), showing "Saving…" then "✓ Saved".
  * Mobile-responsive layout with auto-growing textarea.
  * URLs in notes are clickable when in view mode.
  */
 
 import { createSignal, createEffect, onCleanup, onMount, Show } from 'solid-js';
+import { CheckIcon } from '../ui/Icons';
+
+/** How long "✓ Saved" stays before fading. */
+const SAVED_SHOWN_MS = 2000;
 
 // Convert URLs in text to clickable links
 function linkifyText(text: string) {
@@ -36,13 +40,14 @@ function linkifyText(text: string) {
 
 interface TripNotesPanelProps {
   notes: string;
-  onNotesChange: (notes: string) => void;
+  /** Saves the notes; resolves to whether the save succeeded. */
+  onNotesChange: (notes: string) => Promise<boolean>;
   onClose: () => void;
 }
 
 export function TripNotesPanel(props: TripNotesPanelProps) {
   const [localNotes, setLocalNotes] = createSignal(props.notes || '');
-  const [isSaving, setIsSaving] = createSignal(false);
+  const [saveState, setSaveState] = createSignal<'idle' | 'saving' | 'saved'>('idle');
   const [isEditing, setIsEditing] = createSignal(!props.notes); // Start in edit mode if no notes
 
   // Sync from props when not actively editing (e.g. from SSE sync)
@@ -53,6 +58,8 @@ export function TripNotesPanel(props: TripNotesPanelProps) {
     }
   });
   let saveTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  let savedTimeoutId: ReturnType<typeof setTimeout> | undefined;
+  let latestSave = 0;
   let textareaRef: HTMLTextAreaElement | undefined;
   let panelRef: HTMLDivElement | undefined;
 
@@ -63,7 +70,7 @@ export function TripNotesPanel(props: TripNotesPanelProps) {
     if (panelRef && !e.composedPath().includes(panelRef)) {
       // Save before closing if there are changes
       if (localNotes() !== props.notes) {
-        props.onNotesChange(localNotes());
+        void props.onNotesChange(localNotes());
       }
       props.onClose();
     }
@@ -83,16 +90,20 @@ export function TripNotesPanel(props: TripNotesPanelProps) {
     if (saveTimeoutId) {
       clearTimeout(saveTimeoutId);
     }
+    clearTimeout(savedTimeoutId);
     document.removeEventListener('click', handleClickOutside);
   });
 
-  const saveNotes = (value: string) => {
-    if (value !== props.notes) {
-      setIsSaving(true);
-      props.onNotesChange(value);
-      // Reset saving indicator after a brief moment
-      setTimeout(() => setIsSaving(false), 500);
-    }
+  const saveNotes = async (value: string) => {
+    if (value === props.notes) return;
+    const save = ++latestSave;
+    clearTimeout(savedTimeoutId);
+    setSaveState('saving');
+    // A failed save shows its own error toast.
+    const saved = await props.onNotesChange(value);
+    if (save !== latestSave) return; // A newer save owns the status.
+    setSaveState(saved ? 'saved' : 'idle');
+    if (saved) savedTimeoutId = setTimeout(() => setSaveState('idle'), SAVED_SHOWN_MS);
   };
 
   // Auto-grow textarea to fit content, capped at max height
@@ -117,7 +128,7 @@ export function TripNotesPanel(props: TripNotesPanelProps) {
     }
 
     saveTimeoutId = setTimeout(() => {
-      saveNotes(value);
+      void saveNotes(value);
     }, 1500);
   };
 
@@ -128,7 +139,7 @@ export function TripNotesPanel(props: TripNotesPanelProps) {
       saveTimeoutId = null;
     }
 
-    saveNotes(localNotes());
+    void saveNotes(localNotes());
     // Exit edit mode if there's content
     if (localNotes().trim()) {
       setIsEditing(false);
@@ -139,7 +150,7 @@ export function TripNotesPanel(props: TripNotesPanelProps) {
     if (e.key === 'Escape' && isEditing() && localNotes().trim()) {
       e.preventDefault();
       // Save and exit edit mode
-      saveNotes(localNotes());
+      void saveNotes(localNotes());
       setIsEditing(false);
     }
   };
@@ -182,7 +193,25 @@ export function TripNotesPanel(props: TripNotesPanelProps) {
     <div ref={panelRef} class="mb-2 rounded-lg border border-amber-200 bg-amber-50 p-1.5 shadow-sm">
       <div class="mb-1 flex items-center justify-between px-0.5">
         <span class="text-xs font-medium text-amber-700">Trip Notes</span>
-        {isSaving() && <span class="text-xs text-amber-700">Saving...</span>}
+        {/* "✓ Saved" fades out in place, rather than vanishing. */}
+        <span
+          class="flex items-center gap-1 text-xs text-amber-700 transition-opacity duration-500"
+          classList={{ 'opacity-0': saveState() === 'idle' }}
+          aria-hidden={saveState() === 'idle'}
+          aria-live="polite"
+        >
+          <Show
+            when={saveState() === 'saving'}
+            fallback={
+              <>
+                <CheckIcon class="h-3 w-3" />
+                Saved
+              </>
+            }
+          >
+            Saving…
+          </Show>
+        </span>
       </div>
 
       <Show

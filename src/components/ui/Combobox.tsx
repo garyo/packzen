@@ -11,6 +11,7 @@ import {
 } from 'solid-js';
 import { cn } from '../../lib/utils';
 import { NO_BAG_LABEL } from '../../lib/vocabulary';
+import { FieldErrorMessage, fieldErrorAttrs, type FieldError } from './Input';
 
 export interface ComboboxItem {
   id: string;
@@ -37,6 +38,8 @@ interface ComboboxProps {
   class?: string;
   /** Input id, so a <label for> can name the field. */
   id?: string;
+  /** Validation from `createFieldError`. */
+  field?: FieldError;
 }
 
 export function Combobox(props: ComboboxProps) {
@@ -44,6 +47,7 @@ export function Combobox(props: ComboboxProps) {
   // Unique per instance so two comboboxes mounted at once don't collide on
   // element ids / aria-activedescendant references.
   const listboxId = createUniqueId();
+  const errorId = `${listboxId}-error`;
   const itemId = (index: number) => `${listboxId}-item-${index}`;
 
   const [isOpen, setIsOpen] = createSignal(false);
@@ -203,7 +207,11 @@ export function Combobox(props: ComboboxProps) {
   return (
     <div ref={containerRef} class={cn('relative w-full', props.class)}>
       <input
-        ref={inputRef}
+        {...fieldErrorAttrs(props.field, errorId)}
+        ref={(el) => {
+          inputRef = el;
+          props.field?.ref(el);
+        }}
         id={props.id}
         type="text"
         value={props.value}
@@ -212,7 +220,10 @@ export function Combobox(props: ComboboxProps) {
         onBlur={handleBlur}
         onKeyDown={handleKeyDown}
         placeholder={props.placeholder}
-        class="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500 focus:outline-none"
+        class={cn(
+          'w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500 focus:outline-none',
+          props.field?.message() && 'border-red-500 focus:ring-red-500'
+        )}
         autocomplete="off"
         role="combobox"
         aria-autocomplete="list"
@@ -220,6 +231,7 @@ export function Combobox(props: ComboboxProps) {
         aria-controls={listboxId}
         aria-activedescendant={highlightedIndex() >= 0 ? itemId(highlightedIndex()) : undefined}
       />
+      <FieldErrorMessage id={errorId} message={props.field?.message()} />
 
       <Show when={shouldShowDropdown()}>
         <div

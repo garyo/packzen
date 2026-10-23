@@ -10,7 +10,7 @@ import type {
 import { Button } from '../ui/Button';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
 import { EmptyState } from '../ui/EmptyState';
-import { showToast } from '../ui/Toast';
+import { announce, showToast } from '../ui/Toast';
 import { confirmDialog } from '../ui/ConfirmDialog';
 import { AllItemsPageHeader } from './AllItemsPageHeader';
 import { AllItemsPageTabs } from './AllItemsPageTabs';
@@ -71,7 +71,7 @@ export function AllItemsPage() {
 
     const response = await api.delete(endpoints.masterItem(item.id));
     if (response.success) {
-      showToast('success', `Deleted ${item.name}`);
+      announce(`Deleted ${item.name}`);
       mutateItems((prev) => prev?.filter((i) => i.id !== item.id));
     } else {
       showToast('error', response.error || 'Failed to delete item');

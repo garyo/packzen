@@ -2,8 +2,8 @@ import { splitProps, type JSX } from 'solid-js';
 import { cn } from '../../lib/utils';
 
 // Matches the API's quantity bounds (lib/validation.ts).
-const MIN_QUANTITY = 1;
-const MAX_QUANTITY = 9999;
+export const MIN_QUANTITY = 1;
+export const MAX_QUANTITY = 9999;
 
 interface QuantityInputProps extends Omit<
   JSX.InputHTMLAttributes<HTMLInputElement>,

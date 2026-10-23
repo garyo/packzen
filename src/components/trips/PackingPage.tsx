@@ -18,7 +18,6 @@ import { Button } from '../ui/Button';
 import { showToast } from '../ui/Toast';
 import { confirmDialog } from '../ui/ConfirmDialog';
 import { isModalOpen } from '../ui/Modal';
-import { isSmallScreen } from '../../lib/utils';
 import { BagManager } from './BagManager';
 import { EditTripItem } from './EditTripItem';
 import { AddTripItemForm } from './AddTripItemForm';
@@ -28,7 +27,8 @@ import { TripForm } from './TripForm';
 import { PackingPageHeader, type ViewMode } from './PackingPageHeader';
 import { PackingListBagView } from './PackingListBagView';
 import { PackingListCategoryView } from './PackingListCategoryView';
-import type { PackingListProps } from './PackingListParts';
+import { isUnpacked, leaveUnpackedView, type PackingListProps } from './PackingListParts';
+import { revealTripItem } from './PackingItemCard';
 import { AddModeView } from './AddModeView';
 import { SelectModeActionBar } from './SelectModeActionBar';
 import { StarterListPanel } from './StarterListPanel';
@@ -84,17 +84,26 @@ export function PackingPage(props: PackingPageProps) {
   const [showImport, setShowImport] = createSignal(false);
   const [showEditTrip, setShowEditTrip] = createSignal(false);
   const [showNotesPanel, setShowNotesPanel] = createSignal(false);
-  // Where the Add Item form puts its item, and any name to start with; null while closed.
+  // Where the Add Item form puts its item, and how it starts; null while closed.
   const [addFormTarget, setAddFormTarget] = createSignal<{
     bagId: string | null;
     containerId: string | null;
     name?: string;
+    isContainer?: boolean;
   } | null>(null);
   const openAddForm = (
     bagId: string | null = null,
     containerId: string | null = null,
-    name?: string
-  ) => setAddFormTarget({ bagId, containerId, name });
+    start: { name?: string; isContainer?: boolean } = {}
+  ) => setAddFormTarget({ bagId, containerId, ...start });
+  // The last item the open form added, to show in the list once the form closes.
+  let lastAddedId: string | undefined;
+  const closeAddForm = () => {
+    setAddFormTarget(null);
+    const added = lastAddedId;
+    lastAddedId = undefined;
+    if (added) requestAnimationFrame(() => revealTripItem(added));
+  };
 
   const [selectMode, setSelectMode] = createSignal(false);
   const [selectedItems, setSelectedItems] = createSignal<Set<string>>(new Set());
@@ -190,20 +199,38 @@ export function PackingPage(props: PackingPageProps) {
 
   // --- Packing ---
 
-  // On phones the checkbox is feedback enough; a toast would cover the list.
-  const togglePacked = (item: TripItem) =>
-    store.patchItems(
+  // The row itself shows the change and can change it back, so these only
+  // offer Undo when "unpacked only" folds the row away.
+  const foldAwayIfHidden = (item: TripItem) => {
+    if (!showUnpackedOnly() || !isUnpacked(item)) return false;
+    void leaveUnpackedView(item.id, () => {
+      const now = store.find(item.id);
+      return showUnpackedOnly() && !!now && !isUnpacked(now);
+    });
+    return true;
+  };
+
+  const togglePacked = (item: TripItem) => {
+    const hiding = foldAwayIfHidden(item);
+    return store.patchItems(
       [item.id],
       { is_packed: !item.is_packed },
-      { label: `${item.name} ${item.is_packed ? 'unpacked' : 'packed'}`, quiet: isSmallScreen() }
+      { label: `${item.name} ${item.is_packed ? 'unpacked' : 'packed'}`, quiet: !hiding }
     );
+  };
 
-  const toggleSkipped = (item: TripItem) =>
-    store.patchItems(
+  const toggleSkipped = (item: TripItem) => {
+    const hiding = foldAwayIfHidden(item);
+    return store.patchItems(
       [item.id],
       { is_skipped: !item.is_skipped },
-      { label: `${item.name} ${item.is_skipped ? 'unskipped' : 'skipped'}`, quiet: isSmallScreen() }
+      { label: `${item.name} ${item.is_skipped ? 'unskipped' : 'skipped'}`, quiet: !hiding }
     );
+  };
+
+  // The ×N on the row shows it; no toast.
+  const setQuantity = (itemId: string, quantity: number) =>
+    store.patchItems([itemId], { quantity }, { label: 'Quantity changed', quiet: true });
 
   const moveItemToBag = (itemId: string, bagId: string | null) => {
     const item = store.find(itemId);
@@ -334,7 +361,17 @@ export function PackingPage(props: PackingPageProps) {
       });
       if (!confirmed) return;
     }
-    void store.deleteItems([itemId], { label: `Removed ${item.name}` });
+    // The row's + adds it back as a fresh copy of its My Item, so Undo is
+    // offered only when that would lose something.
+    const source = masterItems()?.find((m) => m.id === item.master_item_id);
+    const fresh =
+      !!source &&
+      isUnpacked(item) &&
+      contents === 0 &&
+      !item.container_item_id &&
+      item.quantity === source.default_quantity &&
+      (item.notes ?? '') === (source.description ?? '');
+    void store.deleteItems([itemId], { label: `Removed ${item.name}`, quiet: fresh });
   };
 
   // --- Modals and menu actions ---
@@ -380,6 +417,7 @@ export function PackingPage(props: PackingPageProps) {
     const response = await api.patch(endpoints.trip(props.tripId), { notes });
     if (response.success) refetchTrip();
     else showToast('error', response.error || 'Failed to save notes');
+    return response.success;
   };
 
   const handleExport = () => {
@@ -449,7 +487,7 @@ export function PackingPage(props: PackingPageProps) {
         searchQuery={search.query}
         onSearchChange={search.setQuery}
         searchHasExactMatch={search.hasExactMatch}
-        onAddNamed={(name) => openAddForm(firstBagId(), null, name)}
+        onAddNamed={(name) => openAddForm(firstBagId(), null, { name })}
         visibleItemCount={() => search.results()?.length ?? 0}
         onScrollToItemRequest={search.scrollToItem}
         viewMode={viewMode}
@@ -467,7 +505,10 @@ export function PackingPage(props: PackingPageProps) {
               onAddItems={adder.addItems}
               onAddStarter={adder.addStarter}
               onRemoveFromTrip={removeFromTrip}
-              onAddNewItem={(target, name) => openAddForm(target.bagId, target.containerId, name)}
+              onAddNewItem={(target, name) =>
+                openAddForm(target.bagId, target.containerId, { name })
+              }
+              onAddNewContainer={(bagId) => openAddForm(bagId, null, { isContainer: true })}
               onManageBags={() => setShowBagManager(true)}
               onReplaceBag={setReplacingBag}
             />
@@ -587,6 +628,7 @@ export function PackingPage(props: PackingPageProps) {
             preSelectedBagId={target().bagId}
             preSelectedContainerId={target().containerId}
             initialName={target().name}
+            initialIsContainer={target().isContainer}
             bags={bags() && sortedBags()}
             categories={categories()}
             tripItems={items()}
@@ -595,10 +637,11 @@ export function PackingPage(props: PackingPageProps) {
               refetchCategories();
               refetchMasterItems();
             }}
-            onClose={() => setAddFormTarget(null)}
+            onClose={closeAddForm}
             onSaved={(createdItem) => {
               if (createdItem) store.local.upsert([createdItem]);
               else void store.refresh(true);
+              lastAddedId = createdItem?.id;
             }}
           />
         )}
@@ -614,6 +657,7 @@ export function PackingPage(props: PackingPageProps) {
             onMoveToContainer={(containerId) => moveItemToContainer(item().id, containerId)}
             onMoveToNewBag={(bag) => moveItemToNewBag(item().id, bag)}
             onToggleSkipped={() => toggleSkipped(item())}
+            onQuantityChange={setQuantity}
             onEdit={() => setEditingItem(item())}
             onDelete={() => removeFromTrip(item().id)}
             onClose={() => setActionItem(null)}

@@ -21,7 +21,10 @@ const { title, nav = false, ...rootAttrs } = Astro.props;
   <div id="app-root" {...rootAttrs}>
     <slot>
       <div role="status" class="flex justify-center py-24">
-        <div class="h-12 w-12 animate-spin rounded-full border-b-2 border-blue-600"></div>
+        <div
+          data-motion="essential"
+          class="h-12 w-12 animate-spin rounded-full border-b-2 border-blue-600"
+        ></div>
         <span class="sr-only">Loading…</span>
       </div>
     </slot>

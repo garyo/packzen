@@ -1,15 +1,16 @@
 /**
- * An item's actions: skip, edit or delete it, or move it to a bag or
- * container in one tap — including a new bag, created on the spot.
+ * An item's actions: skip, edit or delete it, change its quantity, or move it
+ * to a bag or container in one tap — including a new bag, created on the spot.
  */
 
-import { createSignal, For, Show, type JSX } from 'solid-js';
+import { createSignal, For, onCleanup, Show, type JSX } from 'solid-js';
 import type { Bag, TripItem } from '../../lib/types';
 import { NO_BAG_LABEL } from '../../lib/vocabulary';
 import { BAG_COLORS } from '../../lib/color-utils';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
-import { EditIcon, SkipIcon, TrashIcon } from '../ui/Icons';
+import { EditIcon, MinusIcon, PlusIcon, SkipIcon, TrashIcon } from '../ui/Icons';
+import { MAX_QUANTITY, MIN_QUANTITY } from '../ui/QuantityInput';
 import { BagChip, BagFields, DEFAULT_BAG_FIELDS, type BagFieldValues } from '../ui/BagFields';
 
 interface ItemActionSheetProps {
@@ -21,6 +22,7 @@ interface ItemActionSheetProps {
   /** Create a bag and move the item into it; resolves false if that failed. */
   onMoveToNewBag: (bag: BagFieldValues) => Promise<boolean>;
   onToggleSkipped: () => void;
+  onQuantityChange: (itemId: string, quantity: number) => void;
   onEdit: () => void;
   onDelete: () => void;
   onClose: () => void;
@@ -38,6 +40,9 @@ function Action(props: { onClick: () => void; danger?: boolean; children: JSX.El
     </button>
   );
 }
+
+/** How long the quantity waits after a tap before saving, so a run of taps is one write. */
+const QUANTITY_SAVE_MS = 600;
 
 function Destination(props: { current: boolean; onClick: () => void; children: JSX.Element }) {
   return (
@@ -69,6 +74,26 @@ export function ItemActionSheet(props: ItemActionSheetProps) {
   // A container can't go inside another container.
   const containers = () => (props.item.is_container ? [] : props.containers);
 
+  // Saved after a pause, and on close. The item and handler are captured now:
+  // by cleanup the sheet's props are gone.
+  const { id: itemId } = props.item;
+  const saveQuantity = props.onQuantityChange;
+  const [quantity, setQuantity] = createSignal(props.item.quantity);
+  let savedQuantity = props.item.quantity;
+  let saveTimer: ReturnType<typeof setTimeout> | undefined;
+  const flushQuantity = () => {
+    clearTimeout(saveTimer);
+    if (quantity() === savedQuantity) return;
+    savedQuantity = quantity();
+    saveQuantity(itemId, savedQuantity);
+  };
+  const stepQuantity = (by: number) => {
+    setQuantity((n) => Math.min(MAX_QUANTITY, Math.max(MIN_QUANTITY, n + by)));
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(flushQuantity, QUANTITY_SAVE_MS);
+  };
+  onCleanup(flushQuantity);
+
   const [newBag, setNewBag] = createSignal<BagFieldValues | null>(null);
   const [saving, setSaving] = createSignal(false);
   const startNewBag = () => {
@@ -98,6 +123,39 @@ export function ItemActionSheet(props: ItemActionSheetProps) {
           <TrashIcon class="h-5 w-5" />
           Delete
         </Action>
+      </div>
+
+      <div
+        role="group"
+        aria-label="Quantity"
+        class="mt-3 flex items-center justify-between rounded-lg border border-gray-200 py-1 pr-1 pl-4"
+      >
+        <span class="text-sm font-medium text-gray-800" aria-hidden="true">
+          Quantity
+        </span>
+        <div class="flex items-center">
+          <button
+            type="button"
+            onClick={() => stepQuantity(-1)}
+            disabled={quantity() <= MIN_QUANTITY}
+            aria-label="Fewer"
+            class="flex items-center justify-center rounded-lg text-gray-700 hover:bg-gray-100 disabled:text-gray-300 disabled:hover:bg-transparent"
+          >
+            <MinusIcon class="h-5 w-5" />
+          </button>
+          <span class="w-10 text-center font-medium text-gray-900 tabular-nums" aria-live="polite">
+            {quantity()}
+          </span>
+          <button
+            type="button"
+            onClick={() => stepQuantity(1)}
+            disabled={quantity() >= MAX_QUANTITY}
+            aria-label="More"
+            class="flex items-center justify-center rounded-lg text-gray-700 hover:bg-gray-100 disabled:text-gray-300 disabled:hover:bg-transparent"
+          >
+            <PlusIcon class="h-5 w-5" />
+          </button>
+        </div>
       </div>
 
       <h3 class="mt-5 mb-2 text-sm font-medium text-gray-700">Move to</h3>

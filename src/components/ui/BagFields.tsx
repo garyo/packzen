@@ -1,7 +1,7 @@
 import { createUniqueId, For, Show, type JSX } from 'solid-js';
 import { BAG_TYPES, type Bag } from '../../lib/types';
 import { BAG_COLORS, getBagColorClass, getBagColorStyle } from '../../lib/color-utils';
-import { Input } from './Input';
+import { Input, type FieldError } from './Input';
 
 export interface BagFieldValues {
   name: string;
@@ -20,6 +20,8 @@ export function BagFields(props: {
   value: BagFieldValues;
   onChange: (value: BagFieldValues) => void;
   placeholder?: string;
+  /** Validation for the name, from `createFieldError`. */
+  nameField?: FieldError;
 }) {
   const update = (patch: Partial<BagFieldValues>) => props.onChange({ ...props.value, ...patch });
   const typeId = createUniqueId();
@@ -35,6 +37,7 @@ export function BagFields(props: {
         value={props.value.name}
         onInput={(e) => update({ name: e.currentTarget.value })}
         placeholder={props.placeholder ?? 'e.g., Red Suitcase'}
+        field={props.nameField}
       />
 
       <div>

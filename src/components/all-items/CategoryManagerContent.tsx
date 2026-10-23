@@ -1,6 +1,7 @@
-import { createSignal, For, Show } from 'solid-js';
+import { createSignal, createUniqueId, For, Show } from 'solid-js';
 import { Button } from '../ui/Button';
-import { showToast } from '../ui/Toast';
+import { createFieldError, fieldErrorAttrs, FieldErrorMessage } from '../ui/Input';
+import { announce, showToast } from '../ui/Toast';
 import { confirmDialog } from '../ui/ConfirmDialog';
 import { api, endpoints } from '../../lib/api';
 import type { Category } from '../../lib/types';
@@ -19,13 +20,17 @@ export function CategoryManagerContent(props: CategoryManagerContentProps) {
   const [editName, setEditName] = createSignal('');
   const [editIcon, setEditIcon] = createSignal('');
   const [updating, setUpdating] = createSignal(false);
+  const nameError = createFieldError(newName);
+  const editNameError = createFieldError(editName);
+  const nameErrorId = createUniqueId();
+  const editNameErrorId = createUniqueId();
 
   const handleAdd = async (e: Event) => {
     e.preventDefault();
 
     const name = newName().trim();
     if (!name) {
-      showToast('error', 'Category name is required');
+      nameError.fail('Enter a name for the category');
       return;
     }
     // The server would just return the existing one (get-or-create).
@@ -48,7 +53,7 @@ export function CategoryManagerContent(props: CategoryManagerContentProps) {
     setAdding(false);
 
     if (response.success) {
-      showToast('success', 'Category added');
+      announce('Category added');
       setNewName('');
       setNewIcon('');
       props.onSaved();
@@ -69,7 +74,7 @@ export function CategoryManagerContent(props: CategoryManagerContentProps) {
     const response = await api.delete(endpoints.category(category.id));
 
     if (response.success) {
-      showToast('success', 'Category deleted');
+      announce('Category deleted');
       props.onSaved();
     } else {
       showToast('error', response.error || 'Failed to delete category');
@@ -92,7 +97,7 @@ export function CategoryManagerContent(props: CategoryManagerContentProps) {
     e.preventDefault();
 
     if (!editName().trim()) {
-      showToast('error', 'Category name is required');
+      editNameError.fail('Enter a name for the category');
       return;
     }
 
@@ -106,7 +111,7 @@ export function CategoryManagerContent(props: CategoryManagerContentProps) {
     setUpdating(false);
 
     if (response.success) {
-      showToast('success', 'Category updated');
+      announce('Category updated');
       cancelEdit();
       props.onSaved();
     } else {
@@ -139,12 +144,18 @@ export function CategoryManagerContent(props: CategoryManagerContentProps) {
             onInput={(e) => setNewName(e.currentTarget.value)}
             placeholder="Category name"
             aria-label="Category name"
-            class="min-w-0 flex-1 rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500 focus:outline-none md:w-64 md:flex-none"
+            {...fieldErrorAttrs(nameError, nameErrorId)}
+            class="min-w-0 flex-1 rounded-lg border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500 focus:outline-none md:w-64 md:flex-none"
+            classList={{
+              'border-gray-300': !nameError.message(),
+              'border-red-500': !!nameError.message(),
+            }}
           />
           <Button type="submit" disabled={adding()}>
             {adding() ? '...' : 'Add'}
           </Button>
         </div>
+        <FieldErrorMessage id={nameErrorId} message={nameError.message()} />
       </form>
 
       {/* Existing Categories */}
@@ -203,7 +214,12 @@ export function CategoryManagerContent(props: CategoryManagerContentProps) {
                       onInput={(e) => setEditName(e.currentTarget.value)}
                       placeholder="Category name"
                       aria-label="Category name"
-                      class="min-w-0 flex-1 rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      {...fieldErrorAttrs(editNameError, editNameErrorId)}
+                      class="min-w-0 flex-1 rounded-lg border px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      classList={{
+                        'border-gray-300': !editNameError.message(),
+                        'border-red-500': !!editNameError.message(),
+                      }}
                     />
                     <Button type="submit" disabled={updating()} size="sm">
                       {updating() ? '...' : 'Save'}
@@ -212,6 +228,7 @@ export function CategoryManagerContent(props: CategoryManagerContentProps) {
                       Cancel
                     </Button>
                   </div>
+                  <FieldErrorMessage id={editNameErrorId} message={editNameError.message()} />
                 </form>
               </Show>
             )}

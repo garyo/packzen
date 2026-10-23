@@ -89,15 +89,6 @@ export function cn(...classes: (string | undefined | null | false)[]): string {
 }
 
 /**
- * True on phone-sized viewports: narrow portrait or short landscape.
- * SSR-safe (returns false when there is no window).
- */
-export function isSmallScreen(): boolean {
-  if (typeof window === 'undefined') return false;
-  return window.matchMedia('(max-width: 767px), (max-height: 500px)').matches;
-}
-
-/**
  * Map `items` through async `fn` with at most `limit` calls in flight,
  * preserving order. Keeps big fan-outs (restores, imports) from flooding the
  * network and tripping request timeouts.

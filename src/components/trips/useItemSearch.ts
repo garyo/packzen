@@ -1,5 +1,6 @@
 import { createEffect, createMemo, createSignal, onCleanup, type Accessor } from 'solid-js';
 import type { Bag, TripItem } from '../../lib/types';
+import { revealTripItem } from './PackingItemCard';
 
 const SEARCH_DEBOUNCE_MS = 200;
 
@@ -65,15 +66,13 @@ export function useItemSearch(
     return !!items()?.some((item) => item.name.toLowerCase() === needle);
   };
 
-  // Once search closes (e.g. by tapping a result) and the full list is back,
-  // scroll to the chosen item.
+  // Once search closes and the full list is back, scroll to the last result
+  // touched and highlight it.
   createEffect(() => {
     const itemId = scrollTarget();
     if (!itemId || isSearching() || debouncedQuery()) return;
     requestAnimationFrame(() => {
-      document
-        .getElementById(`trip-item-${itemId}`)
-        ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      revealTripItem(itemId);
       setScrollTarget(null);
     });
   });

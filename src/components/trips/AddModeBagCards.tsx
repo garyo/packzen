@@ -5,7 +5,7 @@
  * desktop drop items onto it. Each card shows what's in it by category.
  */
 
-import { Show, For, createMemo, createSignal, type Accessor } from 'solid-js';
+import { Show, For, createEffect, createMemo, createSignal, on, type Accessor } from 'solid-js';
 import { createDroppable } from '@thisbeyond/solid-dnd';
 import type { TripItem, Bag } from '../../lib/types';
 import type { AddModeBagDropData, SelectedTarget } from './AddModeView';
@@ -14,6 +14,7 @@ import { packingStats } from '../../lib/packing-stats';
 import { byName, categoryOf, groupSorted, placeItems } from '../../lib/item-placement';
 import { SwitchBagIcon } from '../ui/Icons';
 import { BagChip } from '../ui/BagFields';
+import { flash, pop, reveal } from '../../lib/motion';
 
 interface AddModeBagCardsProps {
   items: Accessor<TripItem[] | undefined>;
@@ -40,6 +41,8 @@ interface BagCardProps {
   onReplaceBag: (bag: Bag) => void;
   selectedTarget: Accessor<SelectedTarget>;
   onSelectTarget: (target: SelectedTarget) => void;
+  /** Items new to the list since its last change. */
+  arrived: Accessor<ReadonlySet<string>>;
 }
 
 const bagCardId = (bagId: string | null) => `add-mode-bag-${bagId ?? 'none'}`;
@@ -78,9 +81,48 @@ function DroppableBagCard(props: BagCardProps) {
 
   const select = () => props.onSelectTarget(target());
 
+  // Point out items that arrive here: their names if the card is open,
+  // otherwise their categories in the summary. (Phones hide the cards while
+  // adding, so there's nothing to show there.) Deferred, so a card that mounts
+  // later doesn't replay an earlier arrival.
+  let card!: HTMLDivElement;
+  createEffect(
+    on(
+      props.arrived,
+      (arrived) => {
+        const items = props.items.filter((item) => arrived.has(item.id));
+        if (items.length === 0) return;
+        requestAnimationFrame(() => {
+          const shown = (selector: string) => {
+            const el = card.querySelector(selector);
+            return el?.getClientRects().length ? el : null;
+          };
+          const targets = new Set(
+            items.map(
+              (item) =>
+                shown(`:scope > [data-contents] [data-item-id="${item.id}"]`) ??
+                shown(`:scope > [data-summary] [data-category="${CSS.escape(categoryOf(item))}"]`)
+            )
+          );
+          targets.delete(null);
+          // Scroll only when everything new landed here; cards scrolling at once would fight.
+          const [first, ...rest] = targets;
+          if (items.length === arrived.size) reveal(first, 'nearest');
+          else flash(first);
+          rest.forEach(flash);
+          targets.forEach(pop);
+        });
+      },
+      { defer: true }
+    )
+  );
+
   return (
     <div
-      ref={droppable.ref}
+      ref={(el) => {
+        card = el;
+        droppable.ref(el);
+      }}
       role="button"
       tabindex={0}
       aria-label={`Add items to ${name()}`}
@@ -162,10 +204,13 @@ function DroppableBagCard(props: BagCardProps) {
         when={groupedByCategory().length > 0}
         fallback={<div class="mt-1 pl-7 text-xs text-gray-400 italic">Empty</div>}
       >
-        <div class="mt-1 hidden flex-wrap gap-x-3 gap-y-1 text-sm text-gray-600 md:flex">
+        <div
+          data-summary
+          class="mt-1 hidden flex-wrap gap-x-3 gap-y-1 text-sm text-gray-600 md:flex"
+        >
           <For each={groupedByCategory()}>
             {([category, items]) => (
-              <span>
+              <span data-category={category} class="rounded">
                 {category}: <span class="font-medium">{items.length}</span>
               </span>
             )}
@@ -175,8 +220,11 @@ function DroppableBagCard(props: BagCardProps) {
 
       {/* Expanded Contents */}
       <Show when={props.isExpanded && groupedByCategory().length > 0}>
-        <div class="mt-2 border-t border-gray-100 pt-2">
-          <div class="grid grid-cols-1 gap-x-4 gap-y-1 md:grid-cols-2">
+        <div data-contents class="mt-2 border-t border-gray-100 pt-2">
+          <div
+            class="grid grid-cols-1 gap-x-4 gap-y-1"
+            classList={{ 'md:grid-cols-2': groupedByCategory().length > 1 }}
+          >
             <For each={groupedByCategory()}>
               {([category, items]) => (
                 <div class="text-xs">
@@ -186,8 +234,10 @@ function DroppableBagCard(props: BagCardProps) {
                       {(item, index) => (
                         <>
                           {index() > 0 && ', '}
-                          {item.name}
-                          {item.quantity > 1 && ` (x${item.quantity})`}
+                          <span data-item-id={item.id} class="inline-block rounded">
+                            {item.name}
+                            {item.quantity > 1 && ` (x${item.quantity})`}
+                          </span>
                         </>
                       )}
                     </For>
@@ -217,6 +267,7 @@ function DroppableBagCard(props: BagCardProps) {
                 onReplaceBag={props.onReplaceBag}
                 selectedTarget={props.selectedTarget}
                 onSelectTarget={props.onSelectTarget}
+                arrived={props.arrived}
               />
             )}
           </For>
@@ -234,6 +285,17 @@ export function AddModeBagCards(props: AddModeBagCardsProps) {
 
   const placement = createMemo(() => placeItems(props.items() ?? [], props.bags() ?? []));
   const contentsOf = (containerId: string) => placement().byContainer.get(containerId) ?? [];
+
+  // Items added since the last change, from here or elsewhere (Undo, another device)
+  const [arrived, setArrived] = createSignal<ReadonlySet<string>>(new Set());
+  let knownIds: Set<string> | undefined;
+  createEffect(() => {
+    const items = props.items();
+    if (!items) return;
+    const ids = new Set(items.map((item) => item.id));
+    if (knownIds) setArrived(new Set([...ids].filter((id) => !knownIds!.has(id))));
+    knownIds = ids;
+  });
 
   // Bags alphabetically, then "not in a bag"
   const cards = createMemo((): (Bag | null)[] => [...[...(props.bags() ?? [])].sort(byName), null]);
@@ -262,6 +324,7 @@ export function AddModeBagCards(props: AddModeBagCardsProps) {
               onReplaceBag={props.onReplaceBag}
               selectedTarget={props.selectedTarget}
               onSelectTarget={props.onSelectTarget}
+              arrived={arrived}
             />
           );
         }}

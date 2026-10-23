@@ -5,11 +5,13 @@
 
 import { createMemo, createSignal, createUniqueId, For, Show, type Accessor } from 'solid-js';
 import { createStore, type SetStoreFunction } from 'solid-js/store';
-import { Input } from '../ui/Input';
+import { Input, createFieldError } from '../ui/Input';
 import { Button } from '../ui/Button';
+import { RollLabel } from '../ui/RollLabel';
 import { Combobox, type ComboboxItem } from '../ui/Combobox';
 import { QuantityInput } from '../ui/QuantityInput';
-import { showToast } from '../ui/Toast';
+import { announce, showToast } from '../ui/Toast';
+import { createFlag } from '../../lib/motion';
 import { api, endpoints } from '../../lib/api';
 import { searchItems } from '../../lib/search';
 import { builtInItems } from '../../lib/built-in-items';
@@ -54,6 +56,8 @@ export function AddItemForm(props: {
   const [draft, setDraft] = createStore(emptyDraft());
   const [showMore, setShowMore] = createSignal(false);
   const [adding, setAdding] = createSignal(false);
+  const [justAdded, flagAdded] = createFlag(1500);
+  const nameError = createFieldError(() => draft.name);
   const nameId = createUniqueId();
 
   const toSuggestion = (item: BuiltInItem, idx: number): ComboboxItem => ({
@@ -88,7 +92,7 @@ export function AddItemForm(props: {
   const handleAdd = async (e: Event) => {
     e.preventDefault();
     if (!draft.name.trim()) {
-      showToast('error', 'Item name is required');
+      nameError.fail('Enter a name for the item');
       return;
     }
 
@@ -112,7 +116,8 @@ export function AddItemForm(props: {
     setAdding(false);
 
     if (response.success && response.data) {
-      showToast('success', `Added ${payload.name}`);
+      announce(`Added ${payload.name}`);
+      flagAdded();
       setDraft(emptyDraft());
       props.onAdded(response.data);
     } else {
@@ -125,7 +130,7 @@ export function AddItemForm(props: {
       <label for={nameId} class="mb-1 block text-sm font-medium text-gray-700">
         Add to My Items
       </label>
-      <div class="flex gap-2">
+      <div class="flex items-start gap-2">
         <Combobox
           id={nameId}
           value={draft.name}
@@ -134,9 +139,12 @@ export function AddItemForm(props: {
           onSelect={handleSelect}
           placeholder="e.g. Toothbrush"
           class="min-w-0 flex-1"
+          field={nameError}
         />
         <Button type="submit" disabled={adding()}>
-          {adding() ? 'Adding…' : 'Add'}
+          <RollLabel rolled={justAdded()} done="Added">
+            {adding() ? 'Adding…' : 'Add'}
+          </RollLabel>
         </Button>
         <Button
           type="button"
@@ -170,12 +178,13 @@ export function ItemEditForm(props: {
     is_container: props.item.is_container || false,
   });
   const [saving, setSaving] = createSignal(false);
+  const nameError = createFieldError(() => draft.name);
 
   const handleSave = async (e: Event) => {
     e.preventDefault();
     const payload = toPayload(draft);
     if (!payload.name) {
-      showToast('error', 'Name is required');
+      nameError.fail('Enter a name for the item');
       return;
     }
 
@@ -187,7 +196,7 @@ export function ItemEditForm(props: {
     setSaving(false);
 
     if (response.success && response.data) {
-      showToast('success', 'Item updated');
+      announce('Item updated');
       props.onSaved(response.data);
     } else {
       showToast('error', response.error || 'Failed to update item');
@@ -204,7 +213,8 @@ export function ItemEditForm(props: {
         type="text"
         value={draft.name}
         onInput={(e) => setDraft('name', e.currentTarget.value)}
-        required
+        field={nameError}
+        aria-required="true"
       />
       <ItemDetailsFields draft={draft} setDraft={setDraft} categories={props.categories} />
       <div class="flex gap-2">

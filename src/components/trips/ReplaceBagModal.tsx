@@ -3,6 +3,7 @@ import { api, endpoints } from '../../lib/api';
 import type { Bag, BagTemplate, TripItem } from '../../lib/types';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
+import { createFieldError } from '../ui/Input';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
 import { showToast } from '../ui/Toast';
 import { BagChip, BagFields, DEFAULT_BAG_FIELDS, type BagFieldValues } from '../ui/BagFields';
@@ -18,6 +19,7 @@ interface ReplaceBagModalProps {
 export function ReplaceBagModal(props: ReplaceBagModalProps) {
   const [showCustomForm, setShowCustomForm] = createSignal(false);
   const [formData, setFormData] = createSignal<BagFieldValues>(DEFAULT_BAG_FIELDS);
+  const nameError = createFieldError(() => formData().name);
 
   const [saving, setSaving] = createSignal(false);
 
@@ -123,7 +125,7 @@ export function ReplaceBagModal(props: ReplaceBagModalProps) {
     e.preventDefault();
     const data = formData();
     if (!data.name.trim()) {
-      showToast('error', 'Bag name is required');
+      nameError.fail('Enter a name for the bag');
       return;
     }
     replaceWithValues(data.name.trim(), data.type, data.color);
@@ -197,7 +199,7 @@ export function ReplaceBagModal(props: ReplaceBagModalProps) {
           <form onSubmit={handleCustomSubmit} class="space-y-3">
             <h3 class="text-sm font-semibold text-gray-900">Replace with New Bag</h3>
 
-            <BagFields value={formData()} onChange={setFormData} />
+            <BagFields value={formData()} onChange={setFormData} nameField={nameError} />
 
             <Button type="submit" size="sm" disabled={saving()}>
               Replace Bag

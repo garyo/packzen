@@ -3,10 +3,21 @@
  * mode, select) the item; "⋯" opens its actions.
  */
 
-import { Show } from 'solid-js';
+import { createSignal, Show } from 'solid-js';
 import type { TripItem } from '../../lib/types';
 import type { PackingStats } from '../../lib/packing-stats';
+import { reveal } from '../../lib/motion';
 import { DragHandleIcon } from '../ui/Icons';
+
+export const tripItemElementId = (itemId: string) => `trip-item-${itemId}`;
+
+/**
+ * Scrolls an item's row to the middle of the screen (clear of the fixed nav)
+ * and briefly highlights it.
+ */
+export function revealTripItem(itemId: string) {
+  reveal(document.getElementById(tripItemElementId(itemId)));
+}
 
 type DragActivators = Record<string, (event: Event) => void>;
 
@@ -28,15 +39,17 @@ interface PackingItemCardProps {
 }
 
 export function PackingItemCard(props: PackingItemCardProps) {
+  // The checkbox pops when the user packs the item (not when a row first renders packed).
+  const [popping, setPopping] = createSignal(false);
   const checkboxId = () => `${props.selectMode ? 'select' : 'pack'}-checkbox-${props.item.id}`;
   const hasContents = () =>
     !!props.containerStats && props.containerStats.total + props.containerStats.skipped > 0;
 
   return (
     <div
-      id={`trip-item-${props.item.id}`}
+      id={tripItemElementId(props.item.id)}
       data-trip-item-id={props.item.id}
-      class="flex min-h-12 items-center rounded-lg pl-2 shadow-sm md:min-h-10"
+      class="flex min-h-12 items-center rounded-lg pl-2 shadow-sm transition-opacity md:min-h-10"
       classList={{
         'border border-blue-200 bg-blue-50': props.item.is_container,
         'bg-white': !props.item.is_container && !props.item.is_skipped,
@@ -68,8 +81,13 @@ export function PackingItemCard(props: PackingItemCardProps) {
               type="checkbox"
               id={checkboxId()}
               checked={props.item.is_packed}
-              onChange={props.onTogglePacked}
+              onChange={() => {
+                setPopping(!props.item.is_packed);
+                props.onTogglePacked();
+              }}
+              onAnimationEnd={() => setPopping(false)}
               class="btn-compact h-6 w-6 flex-shrink-0 cursor-pointer rounded border-2 border-gray-300 text-green-600 focus:ring-2 focus:ring-green-500"
+              classList={{ 'animate-pop': popping() }}
               aria-label={`Pack ${props.item.name}`}
             />
           }
@@ -95,11 +113,16 @@ export function PackingItemCard(props: PackingItemCardProps) {
               class="line-clamp-2 min-w-0 font-medium break-words md:text-sm"
               classList={{
                 'text-gray-400 italic': props.item.is_skipped,
-                'text-gray-500 line-through': props.item.is_packed && !props.item.is_skipped,
+                'text-gray-500': props.item.is_packed && !props.item.is_skipped,
                 'text-gray-900': !props.item.is_packed && !props.item.is_skipped,
               }}
             >
-              {props.item.name}
+              <span
+                class="strike"
+                classList={{ 'is-struck': props.item.is_packed && !props.item.is_skipped }}
+              >
+                {props.item.name}
+              </span>
             </span>
             <Show when={props.item.quantity > 1}>
               <span class="flex-shrink-0 rounded bg-gray-100 px-1.5 text-xs font-medium text-gray-600">

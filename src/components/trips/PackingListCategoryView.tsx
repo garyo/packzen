@@ -12,6 +12,7 @@ import { byName, categoryOf, placeItems } from '../../lib/item-placement';
 import { BagSwatch } from '../ui/BagFields';
 import {
   AllPackedNote,
+  allPackedIn,
   ItemGroup,
   NO_BAG,
   PackDnd,
@@ -90,8 +91,7 @@ export function PackingListCategoryView(props: PackingListProps) {
           {(category) => {
             const section = () => sections().get(category)!;
             const stats = () => packingStats(section().items);
-            const allPacked = () =>
-              props.showUnpackedOnly() && stats().remaining === 0 && stats().packed > 0;
+            const allPacked = () => props.showUnpackedOnly() && allPackedIn(section().items);
             const accepts = (item: TripItem) => categoryOf(item) === category;
             return (
               <div>
