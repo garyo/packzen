@@ -17,7 +17,7 @@ auth. Single maintainer (Gary); the audience is phones first.
   changed files.
 
 **Local testing without Clerk:** `/dev/login?as=<name>&new=1&redirect=/trips`
-(dev only; `new=1` = a fresh user, `&plan=free_user` for the free plan).
+(dev only; `new=1` = a fresh user).
 
 ## Deploying — read DEPLOYMENT.md first
 
@@ -41,9 +41,8 @@ deploy`, `wrangler secret …`, pushes to `main`).
 ## Architecture map
 
 - `src/pages/api/**` — API routes built with `createGetHandler`/`createPostHandler`/
-  `createPatchHandler`/`createDeleteHandler` (`src/lib/api-helpers.ts`); ownership via `requireOwnedTrip`; plan limits in
-  `resource-limits.ts`; billing resolved lazily (`billing.ts`), no Clerk API
-  call per request.
+  `createPatchHandler`/`createDeleteHandler` (`src/lib/api-helpers.ts`); ownership via `requireOwnedTrip`; per-user
+  ceilings (very high — PackZen is free) in `resource-limits.ts`.
 - `src/middleware.ts` — auth for `/api/*`: **state-changing requests require a
   Bearer token** (there is no CSRF machinery); security headers on every
   response; dev fake auth only under `import.meta.env.DEV`.

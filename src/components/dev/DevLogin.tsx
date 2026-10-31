@@ -9,7 +9,6 @@ import {
   makeFakeUserId,
   type FakeUser,
 } from '../../lib/dev-auth';
-import type { BillingPlan } from '../../lib/billing';
 import { safeRedirectPath } from '../../lib/clerk';
 
 function emailFor(id: string): string {
@@ -20,14 +19,13 @@ function randomSuffix(): string {
   return Math.random().toString(36).slice(2, 6);
 }
 
-function buildUser(rawName: string, plan: BillingPlan, fresh: boolean): FakeUser {
+function buildUser(rawName: string, fresh: boolean): FakeUser {
   const base = makeFakeUserId(rawName);
   const id = fresh ? `${base}-${randomSuffix()}` : base;
   return {
     id,
     email: emailFor(id),
     firstName: rawName.trim().split(/\s+/)[0] || 'Dev',
-    plan,
   };
 }
 
@@ -42,7 +40,6 @@ export default function DevLogin() {
   const [roster, setRoster] = createSignal<FakeUser[]>([]);
   const [current, setCurrent] = createSignal<FakeUser | null>(null);
   const [name, setName] = createSignal('');
-  const [plan, setPlan] = createSignal<BillingPlan>('standard');
 
   const refresh = () => {
     setRoster(getFakeRoster());
@@ -51,13 +48,12 @@ export default function DevLogin() {
 
   onMount(() => {
     // Automation entry point:
-    //   /dev/login?as=Alice[&new=1][&plan=free_user][&redirect=/some/path]
+    //   /dev/login?as=Alice[&new=1][&redirect=/some/path]
     const params = new URLSearchParams(window.location.search);
     const as = params.get('as');
     if (as) {
-      const planParam: BillingPlan = params.get('plan') === 'free_user' ? 'free_user' : 'standard';
       const fresh = params.get('new') === '1';
-      enter(buildUser(as, planParam, fresh), safeRedirectPath(params.get('redirect')));
+      enter(buildUser(as, fresh), safeRedirectPath(params.get('redirect')));
       return;
     }
     refresh();
@@ -66,7 +62,7 @@ export default function DevLogin() {
   const createUser = (fresh: boolean) => {
     const trimmed = name().trim();
     if (!trimmed) return;
-    enter(buildUser(trimmed, plan(), fresh));
+    enter(buildUser(trimmed, fresh));
   };
 
   const signOutFake = () => {
@@ -98,9 +94,7 @@ export default function DevLogin() {
             <div class="rounded-lg border border-green-200 bg-green-50 p-4">
               <p class="text-sm text-gray-600">Signed in as</p>
               <p class="font-medium text-gray-900">{u().email}</p>
-              <p class="text-xs text-gray-500">
-                {u().id} · {u().plan}
-              </p>
+              <p class="text-xs text-gray-500">{u().id}</p>
               <div class="mt-3 flex gap-2">
                 <a href="/trips" class="rounded bg-blue-600 px-3 py-1.5 text-sm text-white">
                   Go to app
@@ -125,14 +119,6 @@ export default function DevLogin() {
             placeholder="Name (e.g. Alice)"
             class="w-full rounded border border-gray-300 px-3 py-2"
           />
-          <select
-            value={plan()}
-            onChange={(e) => setPlan(e.currentTarget.value as BillingPlan)}
-            class="w-full rounded border border-gray-300 px-3 py-2"
-          >
-            <option value="standard">standard (paid — no limits)</option>
-            <option value="free_user">free_user (free-tier limits)</option>
-          </select>
           <div class="flex gap-2">
             <button
               onClick={() => createUser(false)}
@@ -164,7 +150,7 @@ export default function DevLogin() {
                     onClick={() => enter(u)}
                     class="flex-1 truncate text-left text-sm text-blue-700 hover:underline"
                   >
-                    {u.email} <span class="text-xs text-gray-500">· {u.plan}</span>
+                    {u.email}
                   </button>
                   <button
                     onClick={() => forget(u.id)}

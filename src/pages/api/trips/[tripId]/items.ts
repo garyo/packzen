@@ -28,7 +28,7 @@ import {
   ForbiddenError,
   type SyncConfig,
 } from '../../../../lib/api-helpers';
-import { planLimit, limitMessage } from '../../../../lib/resource-limits';
+import { LIMITS, limitMessage } from '../../../../lib/resource-limits';
 import { chunkRowsForInsert, selectByIds } from '../../../../lib/d1';
 import { logChange, logChanges, getSourceId } from '../../../../lib/sync';
 import { logEvent } from '../../../../lib/analytics';
@@ -212,7 +212,7 @@ async function createItem(
   }
 
   const count = await db.$count(tripItems, eq(tripItems.trip_id, trip.id));
-  await enforceLimit(context.locals, 'maxItemsPerTrip', count + 1);
+  enforceLimit('maxItemsPerTrip', count + 1);
   await validateItemRefs(db, userId, trip.id, [item]);
 
   const newItem = await db.insert(tripItems).values(newItemRow(trip.id, item)).returning().get();
@@ -267,14 +267,9 @@ async function createItems(
     return successResponse([], 200);
   }
 
-  const max = await planLimit(
-    context.locals.billing,
-    'maxItemsPerTrip',
-    existing.length + rows.length
-  );
-  const toInsert = rows.slice(0, Math.max(0, max - existing.length));
+  const toInsert = rows.slice(0, Math.max(0, LIMITS.maxItemsPerTrip - existing.length));
   if (toInsert.length === 0) {
-    throw new ForbiddenError(limitMessage('maxItemsPerTrip', max));
+    throw new ForbiddenError(limitMessage('maxItemsPerTrip'));
   }
 
   await validateItemRefs(db, userId, trip.id, toInsert);

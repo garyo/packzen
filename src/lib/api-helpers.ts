@@ -10,7 +10,7 @@ import { and, eq } from 'drizzle-orm';
 import { drizzle, type DrizzleD1Database } from 'drizzle-orm/d1';
 import type { z } from 'zod';
 import { trips, type Trip } from '../../db/schema';
-import { planLimit, limitMessage, type LimitKey } from './resource-limits';
+import { LIMITS, limitMessage, type LimitKey } from './resource-limits';
 import { logChange, getSourceId } from './sync';
 import { validateRequestSafe } from './validation';
 
@@ -104,14 +104,9 @@ export async function requireOwnedTrip(
   return trip;
 }
 
-/** Throw ForbiddenError (403) unless the user's plan allows `total` of `key`. */
-export async function enforceLimit(
-  locals: APIContext['locals'],
-  key: LimitKey,
-  total: number
-): Promise<void> {
-  const max = await planLimit(locals.billing, key, total);
-  if (total > max) throw new ForbiddenError(limitMessage(key, max));
+/** Throw ForbiddenError (403) if `total` of `key` would exceed its limit. */
+export function enforceLimit(key: LimitKey, total: number): void {
+  if (total > LIMITS[key]) throw new ForbiddenError(limitMessage(key));
 }
 
 /**

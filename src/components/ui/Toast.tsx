@@ -23,16 +23,6 @@ export interface ToastOptions {
   duration?: number;
 }
 
-/** Offers the plans page, on a message about a plan limit. */
-export const SEE_PLANS: ToastAction = {
-  label: 'See plans',
-  onClick: () => window.location.assign('/pricing'),
-};
-
-/** Toast options for a failed API call: a plan-limit refusal (403) offers "See plans". */
-export const errorToastOptions = (statusCode: number | undefined): ToastOptions | undefined =>
-  statusCode === 403 ? { action: SEE_PLANS } : undefined;
-
 const MAX_TOASTS = 3;
 
 /** How far a toast must be dragged sideways to dismiss it. */

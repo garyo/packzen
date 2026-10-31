@@ -1,6 +1,5 @@
 import type { APIContext, MiddlewareNext } from 'astro';
-import { clerkMiddleware, clerkClient, type AuthFn } from '@clerk/astro/server';
-import { createBilling, planFromClaims } from './lib/billing';
+import { clerkMiddleware, type AuthFn } from '@clerk/astro/server';
 import { DEV_FAKE_AUTH, parseFakeAuth } from './lib/dev-auth';
 
 // Verified by its Svix signature instead of a Clerk session.
@@ -53,15 +52,14 @@ async function authenticateApi(
     return unauthorized();
   }
 
-  // Dev-only fake auth (see lib/dev-auth.ts): a `Bearer devfake:<id>~<plan>`
+  // Dev-only fake auth (see lib/dev-auth.ts): a `Bearer devfake:<id>`
   // token stands in for a Clerk session. The inline `import.meta.env.DEV` is
   // a build-time `false` in production, so this branch and parseFakeAuth are
   // removed from the production bundle.
   if (import.meta.env.DEV && DEV_FAKE_AUTH) {
-    const fake = parseFakeAuth(authorization);
-    if (fake) {
-      context.locals.userId = fake.userId;
-      context.locals.billing = createBilling(fake.plan);
+    const fakeUserId = parseFakeAuth(authorization);
+    if (fakeUserId) {
+      context.locals.userId = fakeUserId;
       return next();
     }
   }
@@ -69,15 +67,7 @@ async function authenticateApi(
   const authObject = await auth();
   if (!authObject.userId) return unauthorized();
 
-  const userId = authObject.userId;
-  context.locals.userId = userId;
-  // The plan comes from the session token; the billing override needs a
-  // Clerk API call, made only if a plan-limit check needs it.
-  context.locals.billing = createBilling(planFromClaims(authObject), async () => {
-    const user = await clerkClient(context).users.getUser(userId);
-    return user.publicMetadata?.billingOverride;
-  });
-
+  context.locals.userId = authObject.userId;
   return next();
 }
 

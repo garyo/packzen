@@ -1,7 +1,7 @@
 /**
  * AccountMenu Component
  *
- * The Account dialog opened from the app nav: account and plan links, help,
+ * The Account dialog opened from the app nav: account settings, help,
  * full backup/restore, and sign out.
  */
 
@@ -93,7 +93,6 @@ export function AccountMenu(props: AccountMenuProps) {
 
       <nav class="flex flex-col" aria-label="Account">
         <MenuLink href="/profile">Account settings</MenuLink>
-        <MenuLink href="/pricing">Plan & pricing</MenuLink>
         <MenuButton onClick={props.onShowHelp}>How PackZen works</MenuButton>
         <MenuButton onClick={props.onShowAbout}>About PackZen</MenuButton>
 

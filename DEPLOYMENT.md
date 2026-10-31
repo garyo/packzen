@@ -6,7 +6,7 @@ deploys it through Cloudflare Workers Builds, usually within a minute.
 
 ## How the app is served
 
-- **Static pages** (landing, `/trips`, `/all-items`, sign-in/up, pricing, …) are
+- **Static pages** (landing, `/trips`, `/all-items`, sign-in/up, …) are
   built once and served as files. The Worker never runs for them.
 - **Server-rendered pages**: `/trips/[id]/pack` and `/trips/[id]/print`
   (`prerender = false`), plus every `/api/*` route. These run in the Worker, go
@@ -119,7 +119,7 @@ pack URL must redirect to sign-in — not show "Couldn't load sign-in". Check th
 console for Clerk errors.
 
 With a real account (the agent can't do this): sign in, open a trip, add, pack,
-edit and print items; check plan limits and the pricing table.
+edit and print items.
 
 ## Rollback
 

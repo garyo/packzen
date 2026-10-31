@@ -17,8 +17,7 @@ import { deleteAllUserData } from '../src/lib/user-data-cleanup';
 import * as bagTemplatesApi from '../src/pages/api/bag-templates/index';
 import * as tripsApiIndex from '../src/pages/api/trips/index';
 import * as tripItemsApi from '../src/pages/api/trips/[tripId]/items';
-import { getLimitsForPlan, planLimit } from '../src/lib/resource-limits';
-import { createBilling } from '../src/lib/billing';
+import { LIMITS } from '../src/lib/resource-limits';
 import {
   createTestDatabase,
   buildApiContext,
@@ -27,6 +26,7 @@ import {
   summarizeSnapshot,
   importBackupForUser,
   callApi,
+  insertRows,
 } from './test-helpers';
 
 test('Full backup export/import round-trips data through YAML using a D1 database', async () => {
@@ -66,65 +66,44 @@ trips: invalid
   assert.throws(() => yamlToFullBackup(malformed), /Invalid backup/);
 });
 
-test('Bag template API enforces free-plan limits and allows standard plan', async () => {
+test('Bag template API enforces the bag template limit', async () => {
   const d1 = await createTestDatabase();
   const db = drizzle(d1);
   const userId = 'user_limit_test';
+  const limit = LIMITS.maxBagTemplates;
 
-  // Seed up to limit - 1
-  const limit = getLimitsForPlan('free_user').maxBagTemplates;
-  for (let i = 0; i < limit; i++) {
-    await db.insert(bagTemplates).values({
+  await insertRows(
+    db,
+    bagTemplates,
+    Array.from({ length: limit - 1 }, (_, i) => ({
       clerk_user_id: userId,
       name: `Template ${i + 1}`,
-      type: 'carry_on',
-      color: null,
+      type: 'carry_on' as const,
       sort_order: i,
+    }))
+  );
+
+  const post = () =>
+    callApi(bagTemplatesApi.POST, d1, userId, {
+      method: 'POST',
+      body: { name: 'Extra Template', type: 'checked', color: '#ff0000' },
     });
-  }
-
-  const requestBody = {
-    name: 'Extra Template',
-    type: 'checked',
-    color: '#ff0000',
-  };
-
-  const postRequest = new Request('http://localhost/api/bag-templates', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(requestBody),
-  });
-
-  const freeContext = buildApiContext({
-    db: d1,
-    userId,
-    request: postRequest.clone() as unknown as Request,
-  });
-  const freeResponse = await bagTemplatesApi.POST!(freeContext);
-  assert.equal(freeResponse.status, 403);
-
-  const standardContext = buildApiContext({
-    db: d1,
-    userId,
-    request: postRequest.clone() as unknown as Request,
-    billing: createBilling('standard'),
-  });
-
-  const standardResponse = await bagTemplatesApi.POST!(standardContext);
-  assert.equal(standardResponse.status, 201);
+  assert.equal((await post()).status, 201, 'the last slot is usable');
+  assert.equal((await post()).status, 403);
 
   const templatesAfter = await db
     .select({ count: count() })
     .from(bagTemplates)
     .where(eq(bagTemplates.clerk_user_id, userId))
     .get();
-  assert.equal(templatesAfter?.count, limit + 1);
+  assert.equal(templatesAfter?.count, limit);
 });
 
 test('Trip API enforces trip limits and returns stats', async () => {
   const d1 = await createTestDatabase();
+  const db = drizzle(d1);
   const userId = 'trip_test_user';
-  const limit = getLimitsForPlan('free_user').maxTrips;
+  const limit = LIMITS.maxTrips;
 
   const createTripRequest = (name: string) =>
     new Request('http://localhost/api/trips', {
@@ -138,11 +117,13 @@ test('Trip API enforces trip limits and returns stats', async () => {
       }),
     });
 
-  for (let i = 0; i < limit; i++) {
-    const ctx = buildApiContext({ db: d1, userId, request: createTripRequest(`Trip ${i + 1}`) });
-    const response = await tripsApiIndex.POST!(ctx);
-    assert.equal(response.status, 201);
-  }
+  await insertRows(
+    db,
+    trips,
+    Array.from({ length: limit - 1 }, (_, i) => ({ clerk_user_id: userId, name: `Trip ${i + 1}` }))
+  );
+  const lastCtx = buildApiContext({ db: d1, userId, request: createTripRequest('Last Trip') });
+  assert.equal((await tripsApiIndex.POST!(lastCtx)).status, 201);
 
   const extraCtx = buildApiContext({ db: d1, userId, request: createTripRequest('Overflow Trip') });
   const extraResponse = await tripsApiIndex.POST!(extraCtx);
@@ -721,17 +702,14 @@ test('Trip copy respects the per-user trip limit (B1)', async () => {
   const d1 = await createTestDatabase();
   const db = drizzle(d1);
   const userId = 'copy_trip_limit_user';
-  const limit = getLimitsForPlan('free_user').maxTrips;
+  const limit = LIMITS.maxTrips;
 
-  let sourceTripId = '';
-  for (let i = 0; i < limit; i++) {
-    const trip = await db
-      .insert(trips)
-      .values({ clerk_user_id: userId, name: `Trip ${i + 1}` })
-      .returning()
-      .get();
-    if (i === 0) sourceTripId = trip.id;
-  }
+  await insertRows(
+    db,
+    trips,
+    Array.from({ length: limit }, (_, i) => ({ clerk_user_id: userId, name: `Trip ${i + 1}` }))
+  );
+  const sourceTripId = (await db.select().from(trips).limit(1).get())!.id;
 
   const { POST: COPY_POST } = await import('../src/pages/api/trips/[tripId]/copy');
   const copyCtx = buildApiContext({
@@ -755,7 +733,7 @@ test('Trip copy respects the per-trip item limit (B1)', async () => {
   const d1 = await createTestDatabase();
   const db = drizzle(d1);
   const userId = 'copy_item_limit_user';
-  const maxItems = getLimitsForPlan('free_user').maxItemsPerTrip;
+  const maxItems = LIMITS.maxItemsPerTrip;
 
   const trip = await db
     .insert(trips)
@@ -763,9 +741,11 @@ test('Trip copy respects the per-trip item limit (B1)', async () => {
     .returning()
     .get();
 
-  for (let i = 0; i < maxItems; i++) {
-    await db.insert(tripItems).values({ trip_id: trip.id, name: `Item ${i + 1}` });
-  }
+  await insertRows(
+    db,
+    tripItems,
+    Array.from({ length: maxItems }, (_, i) => ({ trip_id: trip.id, name: `Item ${i + 1}` }))
+  );
 
   const { POST: COPY_POST } = await import('../src/pages/api/trips/[tripId]/copy');
   const copy = () =>
@@ -1111,7 +1091,6 @@ test('Batch item create referencing many master items stays within D1 limits (C3
         body: JSON.stringify({ items }),
       }),
       params: { tripId: trip.id },
-      billing: createBilling('standard'),
     })
   );
   assert.equal(response.status, 201);
@@ -1199,16 +1178,18 @@ test('Merging a duplicate item clamps quantity and is allowed at the item limit'
   const d1 = await createTestDatabase();
   const db = drizzle(d1);
   const userId = 'merge_limit_user';
-  const maxItems = getLimitsForPlan('free_user').maxItemsPerTrip;
+  const maxItems = LIMITS.maxItemsPerTrip;
   const trip = await db
     .insert(trips)
     .values({ clerk_user_id: userId, name: 'Full Trip' })
     .returning()
     .get();
   await db.insert(tripItems).values({ trip_id: trip.id, name: 'Socks', quantity: 9990 });
-  for (let i = 1; i < maxItems; i++) {
-    await db.insert(tripItems).values({ trip_id: trip.id, name: `Item ${i}` });
-  }
+  await insertRows(
+    db,
+    tripItems,
+    Array.from({ length: maxItems - 1 }, (_, i) => ({ trip_id: trip.id, name: `Item ${i + 1}` }))
+  );
 
   const add = (name: string) =>
     callApi(tripItemsApi.POST, d1, userId, {
@@ -1428,33 +1409,6 @@ test('PATCH accepts every field the removed PUT handlers did', async () => {
     params: { id: master.id },
   });
   assert.equal(foreignCategory.status, 400);
-});
-
-test('Plan limits consult the billing override only when the session plan falls short (P1)', async () => {
-  let fetches = 0;
-  const fetchOverride = async () => {
-    fetches++;
-    return 'standard';
-  };
-  const free = getLimitsForPlan('free_user').maxTrips;
-
-  const overridden = createBilling('free_user', fetchOverride);
-  assert.equal(await planLimit(overridden, 'maxTrips', free), free);
-  assert.equal(fetches, 0, 'within the free limit, no Clerk call');
-  assert.equal(
-    await planLimit(overridden, 'maxTrips', free + 1),
-    getLimitsForPlan('standard').maxTrips
-  );
-  await planLimit(overridden, 'maxTrips', free + 1);
-  assert.equal(fetches, 1, 'the override is fetched once per request');
-
-  await planLimit(createBilling('standard', fetchOverride), 'maxTrips', 1000);
-  assert.equal(fetches, 1, 'a standard session never fetches the override');
-
-  const unreachable = createBilling('free_user', async () => {
-    throw new Error('Clerk is down');
-  });
-  assert.equal(await planLimit(unreachable, 'maxTrips', free + 1), free);
 });
 
 test('PATCH links a trip item to one of your own My Items only', async () => {

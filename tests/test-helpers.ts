@@ -5,7 +5,7 @@ import Database from 'better-sqlite3';
 import { D1Database, D1DatabaseAPI } from '@miniflare/d1';
 import { env } from 'cloudflare:workers';
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, asc } from 'drizzle-orm';
+import { eq, asc, type Table } from 'drizzle-orm';
 import {
   bagTemplates,
   bags,
@@ -24,8 +24,7 @@ import type { FullBackup } from '../src/lib/yaml';
 import { restoreFullBackup } from '../src/lib/backup';
 import { makeHandlerApi } from './handler-api';
 import type { APIContext, APIRoute } from 'astro';
-import { D1_MAX_BOUND_PARAMS } from '../src/lib/d1';
-import { createBilling, type Billing } from '../src/lib/billing';
+import { D1_MAX_BOUND_PARAMS, chunkRowsForInsert } from '../src/lib/d1';
 
 export interface Snapshot {
   categories: Category[];
@@ -96,13 +95,11 @@ export async function createTestDatabase() {
 export function buildApiContext({
   db,
   userId,
-  billing = createBilling('free_user'),
   request,
   params,
 }: {
   db: D1Database;
   userId: string;
-  billing?: Billing;
   request?: Request;
   params?: Record<string, string>;
 }): APIContext {
@@ -113,10 +110,7 @@ export function buildApiContext({
   return {
     request: req,
     params: params ?? {},
-    locals: {
-      userId,
-      billing,
-    },
+    locals: { userId },
     url: new URL(req.url),
     redirect: () => {
       throw new Error('Not implemented');
@@ -135,15 +129,25 @@ export async function callApi(
     method = 'GET',
     body,
     params,
-    billing,
-  }: { method?: string; body?: unknown; params?: Record<string, string>; billing?: Billing } = {}
+  }: { method?: string; body?: unknown; params?: Record<string, string> } = {}
 ): Promise<Response> {
   const request = new Request('http://localhost/api', {
     method,
     headers: { 'Content-Type': 'application/json' },
     body: body === undefined || typeof body === 'string' ? body : JSON.stringify(body),
   });
-  return handler!(buildApiContext({ db, userId, request, params, billing }));
+  return handler!(buildApiContext({ db, userId, request, params }));
+}
+
+/** Insert many rows quickly, in statements that stay within D1's parameter limit. */
+export async function insertRows<T extends Table>(
+  db: ReturnType<typeof drizzle>,
+  table: T,
+  rows: T['$inferInsert'][]
+): Promise<void> {
+  for (const chunk of chunkRowsForInsert(table, rows)) {
+    await db.insert(table).values(chunk);
+  }
 }
 
 export async function seedUserData(db: ReturnType<typeof drizzle>, userId: string) {

@@ -28,7 +28,7 @@ export const POST: APIRoute = async (context) => {
     // A copy consumes a trip slot and as many item slots as the source trip
     // has, same as creating them from scratch would.
     const tripCount = await db.$count(trips, eq(trips.clerk_user_id, userId));
-    await enforceLimit(context.locals, 'maxTrips', tripCount + 1);
+    enforceLimit('maxTrips', tripCount + 1);
 
     const originalBags = await db
       .select()
@@ -40,7 +40,7 @@ export const POST: APIRoute = async (context) => {
       .from(tripItems)
       .where(eq(tripItems.trip_id, originalTrip.id))
       .all();
-    await enforceLimit(context.locals, 'maxItemsPerTrip', originalItems.length);
+    enforceLimit('maxItemsPerTrip', originalItems.length);
 
     // Pre-generate every new ID so bag/container relationships can be wired
     // up before any row is inserted, letting the whole copy run as one batch.

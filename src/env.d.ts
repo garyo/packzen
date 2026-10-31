@@ -10,7 +10,6 @@ interface ImportMetaEnv {
 declare namespace App {
   interface Locals {
     userId: string;
-    billing?: import('./lib/billing').Billing;
   }
 }
 

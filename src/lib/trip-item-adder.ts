@@ -14,7 +14,7 @@ import type {
 import type { TripItemsStore } from './trip-items-store';
 import { getOrCreateCategory, resolveMasterItems } from './item-helpers';
 import { getStarterItems, getStarterQuantity, type StarterModifier } from './built-in-items';
-import { announce, SEE_PLANS, showToast } from '../components/ui/Toast';
+import { announce, showToast } from '../components/ui/Toast';
 
 export const itemCount = (n: number) => (n === 1 ? '1 item' : `${n} items`);
 
@@ -128,11 +128,11 @@ export function createTripItemAdder(
         };
       })
     );
-    // A rejected add (including the plan limit, a 403) was already reported.
+    // A rejected add (including the item limit, a 403) was already reported.
     if (!added) return;
 
     // The server skips names another device added meanwhile, and anything
-    // over the plan's item limit once some items fit.
+    // over the trip's item limit once some items fit.
     if (added.length === 0) {
       showToast('info', ALREADY_ON_LIST);
       return;
@@ -140,8 +140,7 @@ export function createTripItemAdder(
     if (added.length < toAdd.length) {
       showToast(
         'info',
-        `Added ${added.length} of ${toAdd.length} items; the rest were already on your list or over your plan's item limit`,
-        { action: SEE_PLANS }
+        `Added ${added.length} of ${toAdd.length} items; the rest were already on your list or over the trip's item limit`
       );
     } else {
       const message =

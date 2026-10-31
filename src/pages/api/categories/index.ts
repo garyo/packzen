@@ -20,7 +20,7 @@ export const GET: APIRoute = createGetHandler(async ({ db, userId }) => {
  * whitespace) returns that category with 200 instead of adding a duplicate.
  */
 export const POST: APIRoute = createPostHandler(
-  async ({ db, userId, validatedData, locals }) => {
+  async ({ db, userId, validatedData }) => {
     const { name, icon, sort_order } = validatedData;
 
     const existing = await db
@@ -36,7 +36,7 @@ export const POST: APIRoute = createPostHandler(
     if (existing) return successResponse(existing);
 
     const count = await db.$count(categories, eq(categories.clerk_user_id, userId));
-    await enforceLimit(locals, 'maxCategories', count + 1);
+    enforceLimit('maxCategories', count + 1);
 
     return await db
       .insert(categories)

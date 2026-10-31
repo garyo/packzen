@@ -32,9 +32,9 @@ export const GET: APIRoute = createGetHandler(async ({ db, userId }) => {
 }, 'fetch trips');
 
 export const POST: APIRoute = createPostHandler(
-  async ({ db, userId, validatedData, locals }) => {
+  async ({ db, userId, validatedData }) => {
     const count = await db.$count(trips, eq(trips.clerk_user_id, userId));
-    await enforceLimit(locals, 'maxTrips', count + 1);
+    enforceLimit('maxTrips', count + 1);
 
     const { name, destination, start_date, end_date, notes } = validatedData;
     const dates = normalizeTripDates(start_date, end_date);

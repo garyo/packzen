@@ -15,8 +15,6 @@
 // returns non-null). With the gate on but no fake user chosen, real Clerk login
 // keeps working normally — so this never gets in the way of ordinary dev.
 
-import type { BillingPlan } from './billing';
-
 // The `typeof` guard is for non-Vite runtimes (the tsx test runner) where
 // `import.meta.env` is undefined. It also stops the build from replacing
 // these reads with literals, so DEV_FAKE_AUTH is a runtime `false` in
@@ -31,7 +29,6 @@ export interface FakeUser {
   email: string;
   firstName?: string;
   lastName?: string;
-  plan: BillingPlan;
 }
 
 const TOKEN_PREFIX = 'devfake:';
@@ -41,22 +38,16 @@ const ROSTER_LIMIT = 20;
 
 // --- token (isomorphic) -----------------------------------------------------
 
-// The plan rides along in the token so the server can honor free-vs-standard
-// limits without a lookup. id is `devuser_<slug>` (no `~`), plan has no `~`.
+// id is `devuser_<slug>`.
 export function fakeUserToken(user: FakeUser): string {
-  return `${TOKEN_PREFIX}${user.id}~${user.plan}`;
+  return `${TOKEN_PREFIX}${user.id}`;
 }
 
-// Server side: extract the fake identity from an Authorization header, or null
-// when fake auth is unavailable or the header isn't a fake-user bearer token.
-export function parseFakeAuth(
-  authHeader: string | null | undefined
-): { userId: string; plan: BillingPlan } | null {
+// Server side: the fake user id from an Authorization header, or null when
+// fake auth is unavailable or the header isn't a fake-user bearer token.
+export function parseFakeAuth(authHeader: string | null | undefined): string | null {
   if (!DEV_FAKE_AUTH || !authHeader) return null;
-  const match = /^Bearer\s+devfake:([^~\s]+)~([a-z_]+)$/i.exec(authHeader);
-  if (!match) return null;
-  const plan: BillingPlan = match[2] === 'standard' ? 'standard' : 'free_user';
-  return { userId: match[1], plan };
+  return /^Bearer\s+devfake:(\S+)$/i.exec(authHeader)?.[1] ?? null;
 }
 
 // --- client session (localStorage) ------------------------------------------

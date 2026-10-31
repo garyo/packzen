@@ -16,9 +16,9 @@ export const GET: APIRoute = createGetHandler(async ({ db, userId }) => {
 }, 'fetch bag templates');
 
 export const POST: APIRoute = createPostHandler(
-  async ({ db, userId, validatedData, locals }) => {
+  async ({ db, userId, validatedData }) => {
     const count = await db.$count(bagTemplates, eq(bagTemplates.clerk_user_id, userId));
-    await enforceLimit(locals, 'maxBagTemplates', count + 1);
+    enforceLimit('maxBagTemplates', count + 1);
 
     const { name, type, color, sort_order } = validatedData;
     return await db

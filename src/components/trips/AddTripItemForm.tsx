@@ -13,7 +13,7 @@ import { Modal } from '../ui/Modal';
 import { QuantityInput } from '../ui/QuantityInput';
 import { Button } from '../ui/Button';
 import { Combobox, type ComboboxItem } from '../ui/Combobox';
-import { announce, errorToastOptions, showToast } from '../ui/Toast';
+import { announce, showToast } from '../ui/Toast';
 import { createFieldError } from '../ui/Input';
 import { RollLabel } from '../ui/RollLabel';
 import { createFlag } from '../../lib/motion';
@@ -390,11 +390,7 @@ export function AddTripItemForm(props: AddTripItemFormProps) {
         props.onClose();
       }
     } else {
-      showToast(
-        'error',
-        response.error || 'Failed to add item',
-        errorToastOptions(response.statusCode)
-      );
+      showToast('error', response.error || 'Failed to add item');
       setSaving(false);
     }
   };

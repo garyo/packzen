@@ -26,9 +26,9 @@ export const GET: APIRoute = createGetHandler(async ({ db, userId }) => {
 }, 'fetch master items');
 
 export const POST: APIRoute = createPostHandler(
-  async ({ db, userId, validatedData, locals }) => {
+  async ({ db, userId, validatedData }) => {
     const count = await db.$count(masterItems, eq(masterItems.clerk_user_id, userId));
-    await enforceLimit(locals, 'maxMasterItems', count + 1);
+    enforceLimit('maxMasterItems', count + 1);
 
     const { name, description, category_id, default_quantity, is_container } = validatedData;
     if (category_id) await requireOwnedCategory(db, userId, category_id);

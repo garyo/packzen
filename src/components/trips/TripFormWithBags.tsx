@@ -13,12 +13,6 @@ interface TripFormWithBagsProps {
   onSaved: (tripId: string) => void;
 }
 
-interface CreateError {
-  message: string;
-  /** The plan's trip limit was reached (HTTP 403). */
-  isLimit: boolean;
-}
-
 export function TripFormWithBags(props: TripFormWithBagsProps) {
   const [step, setStep] = createSignal<1 | 2>(1);
   const [tripData, setTripData] = createSignal<TripDetailsData | null>(null);
@@ -26,7 +20,7 @@ export function TripFormWithBags(props: TripFormWithBagsProps) {
   const [selectedTemplateIds, setSelectedTemplateIds] = createSignal<Set<string>>(new Set());
   const [customBags, setCustomBags] = createSignal<CustomBagData[]>([]);
   const [creating, setCreating] = createSignal(false);
-  const [createError, setCreateError] = createSignal<CreateError | null>(null);
+  const [createError, setCreateError] = createSignal<string | null>(null);
 
   // Never errors, so reading it can't throw mid-submit; on failure the user
   // can still add bags by hand.
@@ -88,10 +82,7 @@ export function TripFormWithBags(props: TripFormWithBagsProps) {
 
     const tripResponse = await api.post<Trip>(endpoints.trips, data);
     if (!tripResponse.success || !tripResponse.data) {
-      setCreateError({
-        message: tripResponse.error || 'Failed to create trip. Please try again.',
-        isLimit: tripResponse.statusCode === 403,
-      });
+      setCreateError(tripResponse.error || 'Failed to create trip. Please try again.');
       setCreating(false);
       return;
     }
@@ -142,15 +133,7 @@ export function TripFormWithBags(props: TripFormWithBagsProps) {
               role="alert"
               class="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"
             >
-              <p>{error().message}</p>
-              <Show when={error().isLimit}>
-                <a
-                  href="/pricing"
-                  class="mt-1 inline-block font-medium text-blue-700 underline hover:text-blue-900"
-                >
-                  See plans →
-                </a>
-              </Show>
+              {error()}
             </div>
           )}
         </Show>
